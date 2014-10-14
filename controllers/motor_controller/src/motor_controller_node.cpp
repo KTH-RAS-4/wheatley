@@ -51,7 +51,12 @@ public:
     double estimated_w2 = ((double) (enc.delta_encoder2)*2*M_PI*10)/360;
     pwm.PWM1 = pwm.PWM1 + (int)(1*(desired_w1 - estimated_w1));
     pwm.PWM2 = -(-pwm.PWM2 + (int)(1*(desired_w2 - estimated_w2)));
-    pub.publish(pwm);
+    
+    ras_arduino_msgs::PWM pwm_msg;
+    pwm_msg = pwm;
+    if(pwm_msg.PWM1 < 30) pwm_msg.PWM1 = 0;
+    if(pwm_msg.PWM2 > -30) pwm_msg.PWM2 = 0;
+    pub.publish(pwm_msg);
     ROS_INFO("[%f, %f] estimated: [%f, %f], PWM: [%d, %d]",desired_w1, desired_w2, estimated_w1, estimated_w2, pwm.PWM1, pwm.PWM2);
   }
   

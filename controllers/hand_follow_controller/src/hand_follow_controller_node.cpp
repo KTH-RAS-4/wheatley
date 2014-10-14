@@ -52,7 +52,7 @@ cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
     cropFilter.setMax(maxPoint);
 
     cropFilter.filter (*cloud_filtered);
-
+/*
     //Compute centroid
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_centroid(new pcl::PointCloud<pcl::PointXYZRGB>);
     //pcl::fromPCLPointCloud2(cloud_filtered, *cloud_centroid);
@@ -72,14 +72,19 @@ cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
     twi.linear.x = travel_speed;
     twi.angular.z = 0;
     pubTwist.publish(twi);
-    ROS_INFO("%f", centroid[2]);
+    ROS_INFO("%f", centroid[2]);*/
+
+    if(cloud_filtered->size() == 0)
+    {
+        return;
+    }
+
     // Convert to ROS data type
-    //sensor_msgs::PointCloud2 output;
-    /*pcl_conversions::fromPCL(*cloud_filtered, output);*/
-    //pcl::toROSMsg(*cloud_filtered, output);
+    sensor_msgs::PointCloud2::Ptr output(new sensor_msgs::PointCloud2());
+    pcl::toROSMsg(*cloud_filtered, *output);
 
     // Publish the data
-    //pub.publish (output);
+    pub.publish (output);
 }
 
 int
@@ -97,12 +102,12 @@ main (int argc, char** argv)
   pub = nh.advertise<sensor_msgs::PointCloud2> ("output", 1);
   pubTwist = nh.advertise<geometry_msgs::Twist> ("/motor_controller/twist", 1);
 
-  ros::Rate loop_rate(10.0);
+  //ros::Rate loop_rate(10.0);
 
   while(ros::ok()){
-
-    ros::spinOnce();
-    loop_rate.sleep();
+    ros::spin();
+    //ros::spinOnce();
+    //loop_rate.sleep();
   }
   return 0;
 }
