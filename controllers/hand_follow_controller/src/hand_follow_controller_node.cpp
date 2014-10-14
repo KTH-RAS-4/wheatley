@@ -69,7 +69,7 @@ cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
     }
     ROS_INFO("%f angle: %f", travel_distance, angle);
     geometry_msgs::Twist twi;
-    twi.linear.x = travel_distance;
+    twi.linear.x = travel_speed;
     twi.angular.z = 0;
     pubTwist.publish(twi);
     // Convert to ROS data type
