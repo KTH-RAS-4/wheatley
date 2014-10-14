@@ -62,19 +62,23 @@ cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
 
     double distance = sqrt(pow(centroid[2],2) + pow(centroid[0],2));
     double angle = tan(centroid[0]/centroid[2]);
-    double travel_distance = distance - 0.45;
+    double travel_speed = 0;
+    if (distance > 0.5)
+    {
+        travel_speed = 0.3*(distance-0.5);
+    }
     ROS_INFO("%f angle: %f", travel_distance, angle);
     geometry_msgs::Twist twi;
     twi.linear.x = travel_distance;
-    twi.angular.z = angle;
+    twi.angular.z = 0;
     pubTwist.publish(twi);
     // Convert to ROS data type
-    sensor_msgs::PointCloud2 output;
+    //sensor_msgs::PointCloud2 output;
     /*pcl_conversions::fromPCL(*cloud_filtered, output);*/
-    pcl::toROSMsg(*cloud_filtered, output);
+    //pcl::toROSMsg(*cloud_filtered, output);
 
     // Publish the data
-    pub.publish (output);
+    //pub.publish (output);
 }
 
 int
