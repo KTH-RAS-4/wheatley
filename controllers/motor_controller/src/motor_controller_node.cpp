@@ -45,14 +45,14 @@ public:
   
   void calc()
   {
-    double desired_w1 = -((twi.linear.x-(0.5*0.238*twi.angular.z))/0.0975);
+    double desired_w1 = (twi.linear.x-(0.5*0.238*twi.angular.z))/0.0975;
     double desired_w2 = (twi.linear.x+(0.5*0.238*twi.angular.z))/0.0975;
     double estimated_w1 = ((double) (enc.delta_encoder1)*2*M_PI*10)/360;
     double estimated_w2 = ((double) (enc.delta_encoder2)*2*M_PI*10)/360;
-    pwm.PWM1 = pwm.PWM1 + (int)(2*2.21*(desired_w1 - estimated_w1));
-    pwm.PWM2 = pwm.PWM2 + (int)(2*2*(desired_w2 - estimated_w2));
+    pwm.PWM1 = pwm.PWM1 + (int)(2*(desired_w1 - estimated_w1));
+    pwm.PWM2 = pwm.PWM2 + (int)(2*(desired_w2 - estimated_w2));
     pub.publish(pwm);
-    ROS_INFO("%f %f",desired_w1, estimated_w1);
+    ROS_INFO("[%f, %f] estimated: [%f, %f]",desired_w1, desired_w2, estimated_w1, estimated_w2);
   }
   
 private:
