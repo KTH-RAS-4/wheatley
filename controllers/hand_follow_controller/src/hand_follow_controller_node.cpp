@@ -65,7 +65,7 @@ cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
     double travel_speed = 0;
     if (distance > 0.5)
     {
-        travel_speed = 0.3*(distance-0.5);
+        travel_speed = 0.3*(1+(distance-0.5));
     }
     ROS_INFO("%f angle: %f", travel_speed, angle);
     geometry_msgs::Twist twi;
