@@ -52,6 +52,7 @@ public:
     pwm.PWM1 = pwm.PWM1 + (int)(2*2.21*(desired_w1 - estimated_w1));
     pwm.PWM2 = pwm.PWM2 + (int)(2*2*(desired_w2 - estimated_w2));
     pub.publish(pwm);
+    ROS_INFO("%f %f",desired_w1, estimated_w1);
   }
   
 private:
