@@ -28,8 +28,8 @@ public:
   
   void init()
   {
-    pub = n.advertise<ras_arduino_msgs::PWM>("/kobuki/pwm", 1000);
-    encode = n.subscribe("/kobuki/encoders", 1000, &MotorControllerNode::encCallback, this);
+    pub = n.advertise<ras_arduino_msgs::PWM>("/arduino/pwm", 1000);
+    encode = n.subscribe("/arduino/encoders", 1000, &MotorControllerNode::encCallback, this);
     twist = n.subscribe("/motor_controller/twist", 1000, &MotorControllerNode::twistCallback, this);
   }
   void encCallback(const ras_arduino_msgs::Encoders::ConstPtr &msg)
@@ -61,8 +61,6 @@ private:
   
 };
 int main (int argc, char **argv){
-  // double wheel_radius_ = 0.0352;
-  //double base_ = 0.23;
   ros::init(argc, argv, "motor_controller_node");
   MotorControllerNode my_node = MotorControllerNode();
   my_node.init();
