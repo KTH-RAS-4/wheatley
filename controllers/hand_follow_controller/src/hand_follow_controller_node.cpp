@@ -72,6 +72,7 @@ cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
     twi.linear.x = travel_speed;
     twi.angular.z = 0;
     pubTwist.publish(twi);
+    ROS_INFO("%f", centroid[2]);
     // Convert to ROS data type
     //sensor_msgs::PointCloud2 output;
     /*pcl_conversions::fromPCL(*cloud_filtered, output);*/
