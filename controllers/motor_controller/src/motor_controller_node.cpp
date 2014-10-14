@@ -34,7 +34,7 @@ public:
   }
   void encCallback(const ras_arduino_msgs::Encoders::ConstPtr &msg)
   {
-    enc.delta_encoder1 = msg->delta_encoder1;
+    enc.delta_encoder1 = -msg->delta_encoder1;
     enc.delta_encoder2 = msg->delta_encoder2;
   }
   void twistCallback(const geometry_msgs::Twist::ConstPtr &msg)
@@ -45,10 +45,10 @@ public:
   
   void calc()
   {
-    double desired_w1 = (twi.linear.x-(0.5*0.23*twi.angular.z))/0.0352;
-    double desired_w2 = (twi.linear.x+(0.5*0.23*twi.angular.z))/0.0352;
+    double desired_w1 = (twi.linear.x-(0.5*0.238*twi.angular.z))/0.0975;
+    double desired_w2 = (twi.linear.x+(0.5*0.238*twi.angular.z))/0.0975;
     double estimated_w1 = ((double) (enc.delta_encoder1)*2*M_PI*10)/360;
-    double estimated_w2 = ((double) (-enc.delta_encoder2)*2*M_PI*10)/360;
+    double estimated_w2 = ((double) (enc.delta_encoder2)*2*M_PI*10)/360;
     pwm.PWM1 = pwm.PWM1 + (int)(2*2.21*(desired_w1 - estimated_w1));
     pwm.PWM2 = pwm.PWM2 + (int)(2*2*(desired_w2 - estimated_w2));
     pub.publish(pwm);
