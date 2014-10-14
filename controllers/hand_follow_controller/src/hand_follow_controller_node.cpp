@@ -67,7 +67,7 @@ cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
     geometry_msgs::Twist twi;
     twi.linear.x = travel_distance;
     twi.angular.z = angle;
-    pub.publish(twi);
+    pubTwist.publish(twi);
     // Convert to ROS data type
     sensor_msgs::PointCloud2 output;
     /*pcl_conversions::fromPCL(*cloud_filtered, output);*/
