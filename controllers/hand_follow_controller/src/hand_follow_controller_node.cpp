@@ -8,32 +8,52 @@
 #include <pcl/filters/voxel_grid.h>
 #include <math.h>
 #include <pcl/filters/crop_box.h>
+#include <ctime>
 
+#include <tf/transform_datatypes.h>
+#include <geometry_msgs/PoseStamped.h>
 
 
 ros::Publisher pub;
 ros::Publisher pubTwist;
+ros::Publisher pubPose;
+
+
+geometry_msgs::PoseStamped constructPoseStampedMsg(float xPos, float yPos, float angle)
+{
+        geometry_msgs::PoseStamped poseMsg;
+        poseMsg.header.frame_id = "/camera_depth_frame";
+        poseMsg.header.stamp = ros::Time::now();
+        poseMsg.pose.position.x = 0;
+        poseMsg.pose.position.y = 0;
+        poseMsg.pose.position.z = 0;
+        tf::Quaternion quat = tf::createQuaternionFromYaw(angle);
+        tf::quaternionTFToMsg(quat, poseMsg.pose.orientation);
+        return poseMsg;
+}
 
 void
 cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
 {
+    std::clock_t start;
+    start = std::clock();
     // Container for original & filtered data
-    pcl::PCLPointCloud2::Ptr cloud (new pcl::PCLPointCloud2());
-    pcl::PCLPointCloud2::Ptr cloud_voxel(new pcl::PCLPointCloud2());
+    //pcl::PCLPointCloud2::Ptr cloud (new pcl::PCLPointCloud2());
+    //pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_voxel(new pcl::PointCloud<pcl::PointXYZRGB>);
     //pcl::PCLPointCloud2::Ptr cloud_filtered(new pcl::PCLPointCloud2());
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_input(new pcl::PointCloud<pcl::PointXYZRGB>);
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZRGB>);
 
     // Convert to PCL data type
     //pcl_conversions::toPCL(*cloud_msg, *cloud);
+    pcl::fromROSMsg(*cloud_msg, *cloud_input);
 
     // Perform the actual filtering
-   /* pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
-    sor.setInputCloud (cloud);
+    /*pcl::VoxelGrid<pcl::PointXYZRGB> sor;
+    sor.setInputCloud (cloud_input);
     sor.setLeafSize (0.03, 0.03, 0.03);
     sor.filter (*cloud_voxel);*/
 
-    pcl::fromROSMsg(*cloud_msg, *cloud_input);
 
 
     //pcl::CropBox<pcl::PCLPointCloud2> cropFilter;
@@ -52,16 +72,13 @@ cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
     cropFilter.setMax(maxPoint);
 
     cropFilter.filter (*cloud_filtered);
-/*
-    //Compute centroid
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_centroid(new pcl::PointCloud<pcl::PointXYZRGB>);
-    //pcl::fromPCLPointCloud2(cloud_filtered, *cloud_centroid);
 
+    //Compute centroid
     Eigen::Vector4f centroid;
     pcl::compute3DCentroid(*cloud_filtered, centroid);
 
     double distance = sqrt(pow(centroid[2],2) + pow(centroid[0],2));
-    double angle = tan(centroid[0]/centroid[2]);
+    double angle = -tan(centroid[0]/centroid[2]);
     double travel_speed = 0;
     if (distance > 0.5)
     {
@@ -70,9 +87,11 @@ cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
     ROS_INFO("%f angle: %f", travel_speed, angle);
     geometry_msgs::Twist twi;
     twi.linear.x = travel_speed;
-    twi.angular.z = 0;
+    twi.angular.z = angle;
     pubTwist.publish(twi);
-    ROS_INFO("%f", centroid[2]);*/
+    pubPose.publish(constructPoseStampedMsg(centroid[0], centroid[2], angle));
+
+    ROS_INFO("%f", centroid[2]);
 
     if(cloud_filtered->size() == 0)
     {
@@ -85,13 +104,16 @@ cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
 
     // Publish the data
     pub.publish (output);
+    ROS_INFO("Time %f ms", (std::clock() - start) / (double)(CLOCKS_PER_SEC / 1000));
 }
+
+
 
 int
 main (int argc, char** argv)
 {
   // Initialize ROS
-  ros::init (argc, argv, "my_pcl_tutorial");
+  ros::init (argc, argv, "hand_follow_controller");
   ros::NodeHandle nh;
 
   // Create a ROS subscriber for the input point cloud
@@ -101,13 +123,14 @@ main (int argc, char** argv)
   // Create a ROS publisher for the output point cloud
   pub = nh.advertise<sensor_msgs::PointCloud2> ("output", 1);
   pubTwist = nh.advertise<geometry_msgs::Twist> ("/motor_controller/twist", 1);
+  pubPose = nh.advertise<geometry_msgs::PoseStamped> ("/move_base_simple/goal",30);
 
-  //ros::Rate loop_rate(10.0);
+  ros::Rate loop_rate(10.0);
 
   while(ros::ok()){
-    ros::spin();
-    //ros::spinOnce();
-    //loop_rate.sleep();
+    //ros::spin();
+    ros::spinOnce();
+    loop_rate.sleep();
   }
   return 0;
 }
