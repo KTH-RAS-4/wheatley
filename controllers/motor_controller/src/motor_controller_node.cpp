@@ -63,12 +63,13 @@ public:
 
   void calc()
   {
-    n.getParam("/settings/pid/Kp1", Kp1);
-    n.getParam("/settings/pid/Ki1", Ki1);
-    n.getParam("/settings/pid/Kd1", Kd1);
-    n.getParam("/settings/pid/Kp2", Kp2);
-    n.getParam("/settings/pid/Ki2", Ki2);
-    n.getParam("/settings/pid/Kd2", Kd2);
+    //TODO: use right for one of the motors
+    n.getParam("/settings/pid/left/P", Kp1);
+    n.getParam("/settings/pid/left/I", Ki1);
+    n.getParam("/settings/pid/left/D", Kd1);
+    n.getParam("/settings/pid/left/P", Kp2);
+    n.getParam("/settings/pid/left/I", Ki2);
+    n.getParam("/settings/pid/left/D", Kd2);
 
     pwm.PWM1 = 0;
     pwm.PWM2 = 0;
@@ -90,16 +91,18 @@ public:
     last_error1 = error1;
     last_error2 = error2;
 
-    ROS_INFO("%.2f", Kp1);
-    ROS_INFO("%.2f", Ki1);
-    ROS_INFO("%.2f", Kd1);
+    /*ROS_INFO("P: %.2f", Kp1);
+    ROS_INFO("I: %.2f", Ki1);
+    ROS_INFO("D: %.2f", Kd1);*/
 
-    ras_arduino_msgs::PWM pwm_msg;
+    /*ras_arduino_msgs::PWM pwm_msg;
     pwm_msg = pwm;
     if(pwm_msg.PWM1 < 30) pwm_msg.PWM1 = 0;
-    if(pwm_msg.PWM2 > -30) pwm_msg.PWM2 = 0;
+    if(pwm_msg.PWM2 > -30) pwm_msg.PWM2 = 0;*/
     pub.publish(pwm);
-    ROS_INFO("[%.1f, %.1f] estimated: [%.1f, %.1f], PWM: [%d, %d]",desired_w1, desired_w2, estimated_w1, estimated_w2, pwm.PWM1, pwm.PWM2);
+    ROS_INFO("desired: [%6.1f, %6.1f]", desired_w1, desired_w2);
+    ROS_INFO(" actual: [%6.1f, %6.1f]", estimated_w1, estimated_w2);
+    ROS_INFO("    PWM: [%6d, %6d]", pwm.PWM1, pwm.PWM2);
   }
   
 private:

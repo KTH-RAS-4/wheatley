@@ -1,0 +1,13 @@
+motors:
+    max-angular-speed: !degrees 180
+    max-linear-speed: 1
+
+pid:
+    left:
+        P: 10
+        I: 0.0
+        D: 0.0
+    right:
+        P: 1
+        I: 0.01
+        D: 0.2
