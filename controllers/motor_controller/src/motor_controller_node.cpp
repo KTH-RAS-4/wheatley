@@ -15,7 +15,6 @@ public:
   ros::Publisher pub;
   ros::Subscriber encode;
   ros::Subscriber twist;
-  std::list pid;
 
   
   MotorControllerNode()
@@ -34,6 +33,11 @@ public:
     pub = n.advertise<ras_arduino_msgs::PWM>("/arduino/pwm", 1000);
     encode = n.subscribe("/arduino/encoders", 1000, &MotorControllerNode::encCallback, this);
     twist = n.subscribe("/motor_controller/twist", 1000, &MotorControllerNode::twistCallback, this);
+    last_error1 = 0;
+    last_error2 = 0;
+    I1 = 0;
+    I2 = 0;
+    previous_time = std::clock();
 
   }
   void encCallback(const ras_arduino_msgs::Encoders::ConstPtr &msg)
@@ -90,14 +94,20 @@ public:
   }
   
 private:
-  double last_error1 = 0;
-  double last_error2 = 0;
-  double I1 = 0;
-  double I2 = 0;
+  double last_error1;
+  double last_error2;
+  double I1;
+  double I2;
+  double Kp1;
+  double Ki1;
+  double Kd1;
+  double Kp2;
+  double Ki2;
+  double Kd2;
   ras_arduino_msgs::PWM pwm;
   ras_arduino_msgs::Encoders enc;
   geometry_msgs::Twist twi;
-  std::clock_t previous_time = std::clock();
+  std::clock_t previous_time;
 };
 int main (int argc, char **argv){
   ros::init(argc, argv, "motor_controller_node");
