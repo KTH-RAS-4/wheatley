@@ -12,7 +12,7 @@
 
 #include <tf/transform_datatypes.h>
 #include <geometry_msgs/PoseStamped.h>
-
+#include <pcl/kdtree/kdtree_flann.h>
 
 ros::Publisher pub;
 ros::Publisher pubTwist;
@@ -48,28 +48,46 @@ cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
     cropFilter.setInputCloud (cloud_input);
 
     Eigen::Vector4f minPoint;
-    minPoint[0]=-2;
+    minPoint[0]=-1.5;
     minPoint[1]=-.15;
     minPoint[2]=0;
     Eigen::Vector4f maxPoint;
-    maxPoint[0]=2;
+    maxPoint[0]=1.5;
     maxPoint[1]=.10;
-    maxPoint[2]=1;
+    maxPoint[2]=2;
     cropFilter.setMin(minPoint);
     cropFilter.setMax(maxPoint);
 
     cropFilter.filter (*cloud_filtered);
 
+    //Search for K closest points
+    pcl::KdTreeFLANN<pcl::PointXYZRGB> kdtree;
+
+    if(cloud_filtered->size() == 0) 
+    {
+        return;
+    }
+
+    kdtree.setInputCloud (cloud_filtered);
+
+    int K = 100;
+
+    std::vector<int> pointIdxNKNSearch(K);
+    std::vector<float> pointNKNSquaredDistance(K);
+    kdtree.nearestKSearch (pcl::PointXYZRGB(0,0,0), K, pointIdxNKNSearch, pointNKNSquaredDistance);
+
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_searched(new pcl::PointCloud<pcl::PointXYZRGB>(*cloud_filtered, pointIdxNKNSearch));
+
     //Compute centroid
     Eigen::Vector4f centroid;
-    pcl::compute3DCentroid(*cloud_filtered, centroid);
+    pcl::compute3DCentroid(*cloud_searched, centroid);
 
     double distance = sqrt(pow(centroid[2],2) + pow(centroid[0],2));
     double angle = -tan(centroid[0]/centroid[2]);
     double travel_speed = 0;
     //if (distance > 0.5)
     //{
-        travel_speed = 0.3*(distance-0.5);
+        travel_speed = 0.8*(distance-0.6);
     //}
     ROS_INFO("%f angle: %f", travel_speed, angle);
     geometry_msgs::Twist twi;
@@ -80,14 +98,9 @@ cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
 
     ROS_INFO("%f", centroid[2]);
 
-    if(cloud_filtered->size() == 0)
-    {
-        return;
-    }
-
     // Convert to ROS data type
     sensor_msgs::PointCloud2::Ptr output(new sensor_msgs::PointCloud2());
-    pcl::toROSMsg(*cloud_filtered, *output);
+    pcl::toROSMsg(*cloud_searched, *output);
 
     // Publish the data
     pub.publish (output);

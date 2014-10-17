@@ -4,7 +4,7 @@
 	<node pkg="motor_controller" type="motor_controller_node"
 		name="motor_controller" output="screen"
 		ns="settings" clear_params="true">
-			<rosparam command="load" file="$(find motor_controller)/config/settings.yaml"/>
+			<rosparam command="load" file="$(find motor_controller)/config/settings.yaml" ns="/settings" />
 	</node>
 </launch>
 
