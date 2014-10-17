@@ -38,36 +38,23 @@ cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
     std::clock_t start;
     start = std::clock();
     // Container for original & filtered data
-    //pcl::PCLPointCloud2::Ptr cloud (new pcl::PCLPointCloud2());
-    //pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_voxel(new pcl::PointCloud<pcl::PointXYZRGB>);
-    //pcl::PCLPointCloud2::Ptr cloud_filtered(new pcl::PCLPointCloud2());
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_input(new pcl::PointCloud<pcl::PointXYZRGB>);
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZRGB>);
 
     // Convert to PCL data type
-    //pcl_conversions::toPCL(*cloud_msg, *cloud);
     pcl::fromROSMsg(*cloud_msg, *cloud_input);
 
-    // Perform the actual filtering
-    /*pcl::VoxelGrid<pcl::PointXYZRGB> sor;
-    sor.setInputCloud (cloud_input);
-    sor.setLeafSize (0.03, 0.03, 0.03);
-    sor.filter (*cloud_voxel);*/
-
-
-
-    //pcl::CropBox<pcl::PCLPointCloud2> cropFilter;
     pcl::CropBox<pcl::PointXYZRGB> cropFilter;
     cropFilter.setInputCloud (cloud_input);
 
     Eigen::Vector4f minPoint;
-    minPoint[0]=-2;  // define minimum point x
-    minPoint[1]=-.15;  // define minimum point y
-    minPoint[2]=0;  // define minimum point z
+    minPoint[0]=-2;
+    minPoint[1]=-.15;
+    minPoint[2]=0;
     Eigen::Vector4f maxPoint;
-    maxPoint[0]=2;  // define max point x
-    maxPoint[1]=.10;  // define max point y
-    maxPoint[2]=1;  // define max point z
+    maxPoint[0]=2;
+    maxPoint[1]=.10;
+    maxPoint[2]=1;
     cropFilter.setMin(minPoint);
     cropFilter.setMax(maxPoint);
 
@@ -80,10 +67,10 @@ cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
     double distance = sqrt(pow(centroid[2],2) + pow(centroid[0],2));
     double angle = -tan(centroid[0]/centroid[2]);
     double travel_speed = 0;
-    if (distance > 0.5)
-    {
+    //if (distance > 0.5)
+    //{
         travel_speed = 0.3*(1+(distance-0.5));
-    }
+    //}
     ROS_INFO("%f angle: %f", travel_speed, angle);
     geometry_msgs::Twist twi;
     twi.linear.x = travel_speed;
