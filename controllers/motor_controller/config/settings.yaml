@@ -1,7 +1,8 @@
+timeout: 0.2
+
 motors:
     max-angular-speed: !degrees 180
     max-linear-speed: 1
-    timeout: 1
 
     gains:
         P: 2

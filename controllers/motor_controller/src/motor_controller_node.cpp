@@ -119,10 +119,10 @@ public:
   {
     n.getParam("timeout", timeout);
     pwmPub = n.advertise<ras_arduino_msgs::PWM>("/arduino/pwm", 1000);
-    desiredAngularVelocityLeftPub   = n.advertise<std_msgs::Float64>("~/motors/left/desiredAngular",   1);
-    desiredAngularVelocityRightPub  = n.advertise<std_msgs::Float64>("~/motors/right/desiredAngular",  1);
-    measuredAngularVelocityLeftPub  = n.advertise<std_msgs::Float64>("~/motors/left/measuredAngular",  1);
-    measuredAngularVelocityRightPub = n.advertise<std_msgs::Float64>("~/motors/right/measuredAngular", 1);
+    desiredAngularVelocityLeftPub   = n.advertise<std_msgs::Float64>("motors/left/desiredAngular",   1);
+    desiredAngularVelocityRightPub  = n.advertise<std_msgs::Float64>("motors/right/desiredAngular",  1);
+    measuredAngularVelocityLeftPub  = n.advertise<std_msgs::Float64>("motors/left/measuredAngular",  1);
+    measuredAngularVelocityRightPub = n.advertise<std_msgs::Float64>("motors/right/measuredAngular", 1);
 
     encode = n.subscribe("/arduino/encoders", 1000, &MotorControllerNode::encCallback, this);
     twist = n.subscribe("/motor_controller/twist", 1000, &MotorControllerNode::twistCallback, this);
@@ -159,26 +159,24 @@ public:
     double wMeasuredL = ((double) (enc.delta_encoder1)*2*M_PI*10)/360;
     double wMeasuredR = ((double) (enc.delta_encoder2)*2*M_PI*10)/360;
 
-    if ((ros::Time::now()-last_input).toSec()>timeout)
-    {
-        wDesiredL = 0;
-        wDesiredR = 0;
-    }
+    bool timedOut = (ros::Time::now()-last_input).toSec() > timeout;
+
+    if (timedOut)
+        wDesiredL = wDesiredR = 0;
 
     double errorL = wDesiredL - wMeasuredL;
     double errorR = wDesiredR - wMeasuredR;
 
-    pwm.PWM1 =   motorL.update(elapsed, errorL);
-    pwm.PWM2 = - motorR.update(elapsed, errorR);
-
-    /*ROS_INFO("P: %.2f", motorR.P);
-    ROS_INFO("I: %.2f", motorR.I);
-    ROS_INFO("D: %.2f", motorR.D);*/
-
-    /*ras_arduino_msgs::PWM pwm_msg;
-    pwm_msg = pwm;
-    if(pwm_msg.PWM1 < 30) pwm_msg.PWM1 = 0;
-    if(pwm_msg.PWM2 > -30) pwm_msg.PWM2 = 0;*/
+    if (timedOut)
+    {
+        pwm.PWM1 = 0;
+        pwm.PWM2 = 0;
+    }
+    else
+    {
+        pwm.PWM1 =   motorL.update(elapsed, errorL);
+        pwm.PWM2 = - motorR.update(elapsed, errorR);
+    }
 
     pwmPub.publish(pwm);
     std_msgs::Float64 dw1m; dw1m.data = wDesiredL;
