@@ -1,14 +1,15 @@
 motors:
     max-angular-speed: !degrees 180
     max-linear-speed: 1
+    timeout: 1
 
-pid:
-    left:
+    gains:
         P: 2
         I: 20
         D: 0.1
-    right:
-        P: 2
-        I: 20
-        D: 0.1
+    transform:
+        constant: 11.35
+        exponent: 0.41
+        min: 77
+        max: 255
 

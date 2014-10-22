@@ -13,17 +13,44 @@ template <typename T> T CLAMP(const T& value, const T& low, const T& high)
 
 class Motor
 {
+private:
+    ros::NodeHandle n;
 public:
+    //gains
     double kP;
     double kI;
     double kD;
+    //transform
+    double constant;
+    double exponent;
+    double cutoff;
+    int max;
+    //other
     double I;
     double last_error;
 
-    Motor()
-        : kP(0), kI(0), kD(0), I(0)
-        , last_error(0)
+public:
+    Motor(std::string paramPath)
+        : n(paramPath)
+        , kP(0), kI(0), kD(0)
+        , constant(0), exponent(0)
+        , cutoff(0), max(0)
+        , I(0), last_error(0)
     {
+        if (!n.hasParam("gains"))
+        {
+            ROS_FATAL("no parameter %s/gains found", paramPath.data());
+            ros::shutdown();
+        }
+
+        n.getParam("gains/P", kP);
+        n.getParam("gains/I", kI);
+        n.getParam("gains/D", kD);
+        n.getParam("transform/constant", constant);
+        n.getParam("transform/exponent", exponent);
+        n.getParam("transform/min", cutoff);
+        n.getParam("transform/max", max);
+        ROS_INFO("listening on %s", n.getNamespace().data());
     }
 
     int update(double elapsed, double error)
@@ -31,14 +58,24 @@ public:
         double D = (error - last_error) / elapsed;
         I += error*elapsed;
         last_error = error;
-        return (int) (kP*error + kD*D + kI*I);
+        double speed = kP*error + kD*D + kI*I;
+
+        int pwm;
+        if (fabs(speed) < cutoff)
+            pwm = 0;
+        else if (speed > 0)
+            pwm = (int)(constant*pow(speed-cutoff,exponent));
+        else
+            pwm = (int)(constant*pow(speed+cutoff,exponent));
+
+        pwm = CLAMP(pwm, -max, max);
+        return pwm;
     }
 };
 
 class MotorControllerNode
 {
-public:
-
+private:
   ros::NodeHandle n;
   ros::Publisher pwmPub;
   ros::Publisher desiredAngularVelocityLeftPub;
@@ -49,40 +86,58 @@ public:
   ros::Subscriber encode;
   ros::Subscriber twist;
 
-  
+  Motor motorL;
+  Motor motorR;
+
+  ras_arduino_msgs::PWM pwm;
+  ras_arduino_msgs::Encoders enc;
+  geometry_msgs::Twist twi;
+  ros::Rate loop_rate;
+  ros::Time last_input;
+
+private:
+  double timeout;
+public:
   MotorControllerNode(double rate)
       : loop_rate(rate)
+      , n("~")
+      , motorL("~/motors")
+      , motorR("~/motors")
+      , last_input(-1000)
   {
-    n = ros::NodeHandle("~");
+    //ROS_INFO("listening on %s", n.getNamespace());
     pwm.PWM1 = 0;
     pwm.PWM2 = 0;
     init();
   }
-  
+
   ~MotorControllerNode()
   {
   }
-  
+
   void init()
   {
+    n.getParam("timeout", timeout);
     pwmPub = n.advertise<ras_arduino_msgs::PWM>("/arduino/pwm", 1000);
-    desiredAngularVelocityLeftPub   = n.advertise<std_msgs::Float64>("/motors/left/desiredAngular",   1);
-    desiredAngularVelocityRightPub  = n.advertise<std_msgs::Float64>("/motors/right/desiredAngular",  1);
-    measuredAngularVelocityLeftPub  = n.advertise<std_msgs::Float64>("/motors/left/measuredAngular",  1);
-    measuredAngularVelocityRightPub = n.advertise<std_msgs::Float64>("/motors/right/measuredAngular", 1);
+    desiredAngularVelocityLeftPub   = n.advertise<std_msgs::Float64>("~/motors/left/desiredAngular",   1);
+    desiredAngularVelocityRightPub  = n.advertise<std_msgs::Float64>("~/motors/right/desiredAngular",  1);
+    measuredAngularVelocityLeftPub  = n.advertise<std_msgs::Float64>("~/motors/left/measuredAngular",  1);
+    measuredAngularVelocityRightPub = n.advertise<std_msgs::Float64>("~/motors/right/measuredAngular", 1);
 
     encode = n.subscribe("/arduino/encoders", 1000, &MotorControllerNode::encCallback, this);
     twist = n.subscribe("/motor_controller/twist", 1000, &MotorControllerNode::twistCallback, this);
   }
   void encCallback(const ras_arduino_msgs::Encoders::ConstPtr &msg)
   {
+    //TODO: += to integrate encoder deltas, and then reset them when read
     enc.delta_encoder1 = -msg->delta_encoder1;
     enc.delta_encoder2 = -msg->delta_encoder2;
   }
   void twistCallback(const geometry_msgs::Twist::ConstPtr &msg)
-  { 
+  {
     twi.linear.x = msg->linear.x;
     twi.angular.z = msg->angular.z;
+    last_input = ros::Time::now();
   }
 
   void run()
@@ -98,26 +153,23 @@ public:
 
   void calc()
   {
-    n.getParam("/settings/pid/left/P", motorL.kP);
-    n.getParam("/settings/pid/left/I", motorL.kI);
-    n.getParam("/settings/pid/left/D", motorL.kD);
-    n.getParam("/settings/pid/right/P", motorR.kP);
-    n.getParam("/settings/pid/right/I", motorR.kI);
-    n.getParam("/settings/pid/right/D", motorR.kD);
-
     double elapsed = loop_rate.expectedCycleTime().toSec();
     double wDesiredL = (twi.linear.x-(0.5*0.238*twi.angular.z))/(0.0975/2);
     double wDesiredR = (twi.linear.x+(0.5*0.238*twi.angular.z))/(0.0975/2);
     double wMeasuredL = ((double) (enc.delta_encoder1)*2*M_PI*10)/360;
     double wMeasuredR = ((double) (enc.delta_encoder2)*2*M_PI*10)/360;
+
+    if ((ros::Time::now()-last_input).toSec()>timeout)
+    {
+        wDesiredL = 0;
+        wDesiredR = 0;
+    }
+
     double errorL = wDesiredL - wMeasuredL;
     double errorR = wDesiredR - wMeasuredR;
 
     pwm.PWM1 =   motorL.update(elapsed, errorL);
     pwm.PWM2 = - motorR.update(elapsed, errorR);
-
-    pwm.PWM1 = CLAMP(pwm.PWM1, -255, 255);
-    pwm.PWM2 = CLAMP(pwm.PWM2, -255, 255);
 
     /*ROS_INFO("P: %.2f", motorR.P);
     ROS_INFO("I: %.2f", motorR.I);
@@ -144,20 +196,11 @@ public:
     ROS_INFO("integral: [%6.1f, %6.1f]", motorL.I, motorR.I);
     ROS_INFO("     PWM: [%6d, %6d]", pwm.PWM1, pwm.PWM2);
   }
-  
-private:
-  Motor motorL;
-  Motor motorR;
-
-  ras_arduino_msgs::PWM pwm;
-  ras_arduino_msgs::Encoders enc;
-  geometry_msgs::Twist twi;
-  ros::Rate loop_rate;
 };
 
 int main (int argc, char **argv)
 {
-  ros::init(argc, argv, "motor_controller_node");
+  ros::init(argc, argv, "motor_controller");
   MotorControllerNode my_node = MotorControllerNode(10.0);
   my_node.run();
   return 0;
