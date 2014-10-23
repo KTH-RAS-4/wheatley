@@ -5,10 +5,16 @@
 #include <geometry_msgs/Twist.h>
 #include <std_msgs/Float64.h>
 #include <math.h>
+#include <boost/circular_buffer.hpp>
 
 template <typename T> T CLAMP(const T& value, const T& low, const T& high)
 {
   return value < low ? low : (value > high ? high : value);
+}
+
+template <typename T> int sgn(T val)
+{
+    return (T(0) < val) - (val < T(0));
 }
 
 class Motor
@@ -23,19 +29,22 @@ public:
     //transform
     double constant;
     double exponent;
-    double cutoff;
+    double min;
     int max;
     //other
     double I;
+    int I_memory;
     double last_error;
+    boost::circular_buffer<double> errors;
 
 public:
     Motor(std::string paramPath)
         : n(paramPath)
         , kP(0), kI(0), kD(0)
         , constant(0), exponent(0)
-        , cutoff(0), max(0)
-        , I(0), last_error(0)
+        , min(0), max(0)
+        , I(0), I_memory(0)
+        , last_error(0)
     {
         if (!n.hasParam("gains"))
         {
@@ -48,28 +57,32 @@ public:
         n.getParam("gains/D", kD);
         n.getParam("transform/constant", constant);
         n.getParam("transform/exponent", exponent);
-        n.getParam("transform/min", cutoff);
+        n.getParam("transform/min", min);
         n.getParam("transform/max", max);
-        ROS_INFO("listening on %s", n.getNamespace().data());
+        n.getParam("gains/I_memory", I_memory);
+        errors = boost::circular_buffer<double>(I_memory, I_memory, 0); //pre-filled buffer
+        //ROS_INFO("listening on %s", n.getNamespace().data());
     }
 
     int update(double elapsed, double error)
     {
         double D = (error - last_error) / elapsed;
-        I += error*elapsed;
         last_error = error;
+
+        if (I_memory > 0)
+            I -= errors.front();
+        I += error*elapsed;
+        errors.push_back(error*elapsed);
+
         double speed = kP*error + kD*D + kI*I;
+        int sign = sgn(speed);
+        speed = fabs(speed);
 
-        int pwm;
-        if (fabs(speed) < cutoff)
-            pwm = 0;
-        else if (speed > 0)
-            pwm = (int)(constant*pow(speed-cutoff,exponent));
-        else
-            pwm = (int)(constant*pow(speed+cutoff,exponent));
+        int pwm = (int) (pow(speed/constant, 1/exponent)+min);
+        ROS_INFO("pwm:%d speed:%f", pwm, speed);
 
-        pwm = CLAMP(pwm, -max, max);
-        return pwm;
+        pwm = CLAMP(pwm, 0, max);
+        return sign*pwm; //if speed==0, sign==0
     }
 };
 
@@ -98,13 +111,17 @@ private:
 private:
   double timeout;
 public:
-  MotorControllerNode(double rate)
-      : loop_rate(rate)
-      , n("~")
+  MotorControllerNode()
+      : n("~")
       , motorL("~/motors")
       , motorR("~/motors")
       , last_input(-1000)
+      , loop_rate(1)
   {
+    double rate;
+    n.getParam("rate", rate);
+    loop_rate = ros::Rate(rate);
+
     //ROS_INFO("listening on %s", n.getNamespace());
     pwm.PWM1 = 0;
     pwm.PWM2 = 0;
@@ -171,6 +188,8 @@ public:
     {
         pwm.PWM1 = 0;
         pwm.PWM2 = 0;
+        motorL.I = 0;
+        motorR.I = 0;
     }
     else
     {
@@ -199,7 +218,7 @@ public:
 int main (int argc, char **argv)
 {
   ros::init(argc, argv, "motor_controller");
-  MotorControllerNode my_node = MotorControllerNode(10.0);
+  MotorControllerNode my_node;
   my_node.run();
   return 0;
 }
