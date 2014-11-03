@@ -1,0 +1,8 @@
+prefix=/home/john/catkin_ws/install
+
+Name: image_publisher
+Description: Description of image_publisher
+Version: 0.0.0
+Cflags: 
+Libs: -L/home/john/catkin_ws/install/lib 
+Requires: 
