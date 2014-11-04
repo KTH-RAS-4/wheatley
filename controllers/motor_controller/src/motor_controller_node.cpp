@@ -108,8 +108,8 @@ private:
   ros::Rate loop_rate;
   ros::Time last_input;
 
-private:
   double timeout;
+
 public:
   MotorControllerNode()
       : n("~")
@@ -118,10 +118,6 @@ public:
       , last_input(-1000)
       , loop_rate(1)
   {
-    double rate;
-    n.getParam("rate", rate);
-    loop_rate = ros::Rate(rate);
-
     //ROS_INFO("listening on %s", n.getNamespace());
     pwm.PWM1 = 0;
     pwm.PWM2 = 0;
@@ -134,7 +130,12 @@ public:
 
   void init()
   {
+    double rate;
+    n.getParam("rate", rate);
+    loop_rate = ros::Rate(rate);
+
     n.getParam("timeout", timeout);
+
     pwmPub = n.advertise<ras_arduino_msgs::PWM>("/arduino/pwm", 1000);
     desiredAngularVelocityLeftPub   = n.advertise<std_msgs::Float64>("motors/left/desiredAngular",   1);
     desiredAngularVelocityRightPub  = n.advertise<std_msgs::Float64>("motors/right/desiredAngular",  1);
@@ -159,7 +160,8 @@ public:
 
   void run()
   {
-      while(ros::ok()){
+      while(ros::ok())
+      {
         ros::spinOnce();
         calc();
         loop_rate.sleep();
