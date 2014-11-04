@@ -18,7 +18,6 @@ ros::Publisher pub;
 ros::Publisher pubTwist;
 ros::Publisher pubPose;
 
-
 geometry_msgs::PoseStamped constructPoseStampedMsg(float xPos, float yPos, float angle)
 {
         geometry_msgs::PoseStamped poseMsg;
@@ -63,7 +62,7 @@ cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
     //Search for K closest points
     pcl::KdTreeFLANN<pcl::PointXYZRGB> kdtree;
 
-    if(cloud_filtered->size() == 0) 
+    if(cloud_filtered->size() == 0)
     {
         return;
     }

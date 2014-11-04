@@ -103,16 +103,20 @@ include_directories(
 
 ## Declare a cpp executable
  add_executable(motor_controller_node src/motor_controller_node.cpp)
+add_executable(average_topic src/average_topic.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
  add_dependencies(motor_controller_node motor_controller_generate_messages_cpp)
+ add_dependencies(average_topic motor_controller_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
  target_link_libraries(motor_controller_node
    ${catkin_LIBRARIES}
  )
-
+ target_link_libraries(average_topic
+   ${catkin_LIBRARIES}
+ )
 #############
 ## Install ##
 #############
