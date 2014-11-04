@@ -118,6 +118,13 @@ target_link_libraries(object_recognizer_node
   ${OpenCV_LIBS}
 )
 
+# The object color trainer
+add_executable(object_color_trainer src/object_color_trainer.cpp)
+target_link_libraries(object_color_trainer
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBS}
+)
+
 #############
 ## Install ##
 #############
