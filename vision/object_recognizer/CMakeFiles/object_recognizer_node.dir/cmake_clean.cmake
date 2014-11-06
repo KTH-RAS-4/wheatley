@@ -1,7 +1,7 @@
 FILE(REMOVE_RECURSE
   "CMakeFiles/object_recognizer_node.dir/src/object_recognizer_node.cpp.o"
-  "../../devel/lib/object_recognizer/object_recognizer_node.pdb"
-  "../../devel/lib/object_recognizer/object_recognizer_node"
+  "/home/john/catkin_ws/devel/lib/object_recognizer/object_recognizer_node.pdb"
+  "/home/john/catkin_ws/devel/lib/object_recognizer/object_recognizer_node"
 )
 
 # Per-language clean rules from dependency scanning.

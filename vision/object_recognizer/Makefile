@@ -189,6 +189,20 @@ geometry_msgs_generate_messages_py/fast:
 .PHONY : geometry_msgs_generate_messages_py/fast
 
 # Convenience name for target.
+vision/object_recognizer/CMakeFiles/object_color_trainer.dir/rule:
+	cd /home/john/catkin_ws/src && $(MAKE) -f CMakeFiles/Makefile2 vision/object_recognizer/CMakeFiles/object_color_trainer.dir/rule
+.PHONY : vision/object_recognizer/CMakeFiles/object_color_trainer.dir/rule
+
+# Convenience name for target.
+object_color_trainer: vision/object_recognizer/CMakeFiles/object_color_trainer.dir/rule
+.PHONY : object_color_trainer
+
+# fast build rule for target.
+object_color_trainer/fast:
+	cd /home/john/catkin_ws/src && $(MAKE) -f vision/object_recognizer/CMakeFiles/object_color_trainer.dir/build.make vision/object_recognizer/CMakeFiles/object_color_trainer.dir/build
+.PHONY : object_color_trainer/fast
+
+# Convenience name for target.
 vision/object_recognizer/CMakeFiles/object_recognizer_node.dir/rule:
 	cd /home/john/catkin_ws/src && $(MAKE) -f CMakeFiles/Makefile2 vision/object_recognizer/CMakeFiles/object_recognizer_node.dir/rule
 .PHONY : vision/object_recognizer/CMakeFiles/object_recognizer_node.dir/rule
@@ -370,6 +384,30 @@ std_msgs_generate_messages_py/fast:
 	cd /home/john/catkin_ws/src && $(MAKE) -f vision/object_recognizer/CMakeFiles/std_msgs_generate_messages_py.dir/build.make vision/object_recognizer/CMakeFiles/std_msgs_generate_messages_py.dir/build
 .PHONY : std_msgs_generate_messages_py/fast
 
+src/object_color_trainer.o: src/object_color_trainer.cpp.o
+.PHONY : src/object_color_trainer.o
+
+# target to build an object file
+src/object_color_trainer.cpp.o:
+	cd /home/john/catkin_ws/src && $(MAKE) -f vision/object_recognizer/CMakeFiles/object_color_trainer.dir/build.make vision/object_recognizer/CMakeFiles/object_color_trainer.dir/src/object_color_trainer.cpp.o
+.PHONY : src/object_color_trainer.cpp.o
+
+src/object_color_trainer.i: src/object_color_trainer.cpp.i
+.PHONY : src/object_color_trainer.i
+
+# target to preprocess a source file
+src/object_color_trainer.cpp.i:
+	cd /home/john/catkin_ws/src && $(MAKE) -f vision/object_recognizer/CMakeFiles/object_color_trainer.dir/build.make vision/object_recognizer/CMakeFiles/object_color_trainer.dir/src/object_color_trainer.cpp.i
+.PHONY : src/object_color_trainer.cpp.i
+
+src/object_color_trainer.s: src/object_color_trainer.cpp.s
+.PHONY : src/object_color_trainer.s
+
+# target to generate assembly for a file
+src/object_color_trainer.cpp.s:
+	cd /home/john/catkin_ws/src && $(MAKE) -f vision/object_recognizer/CMakeFiles/object_color_trainer.dir/build.make vision/object_recognizer/CMakeFiles/object_color_trainer.dir/src/object_color_trainer.cpp.s
+.PHONY : src/object_color_trainer.cpp.s
+
 src/object_recognizer_node.o: src/object_recognizer_node.cpp.o
 .PHONY : src/object_recognizer_node.o
 
@@ -408,6 +446,7 @@ help:
 	@echo "... install/local"
 	@echo "... install/strip"
 	@echo "... list_install_components"
+	@echo "... object_color_trainer"
 	@echo "... object_recognizer_node"
 	@echo "... rebuild_cache"
 	@echo "... roscpp_generate_messages_cpp"
@@ -423,6 +462,9 @@ help:
 	@echo "... std_msgs_generate_messages_lisp"
 	@echo "... std_msgs_generate_messages_py"
 	@echo "... test"
+	@echo "... src/object_color_trainer.o"
+	@echo "... src/object_color_trainer.i"
+	@echo "... src/object_color_trainer.s"
 	@echo "... src/object_recognizer_node.o"
 	@echo "... src/object_recognizer_node.i"
 	@echo "... src/object_recognizer_node.s"
