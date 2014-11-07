@@ -103,16 +103,20 @@ include_directories(
 
 ## Declare a cpp executable
 add_executable(distance_sensors src/distance_sensors.cpp)
+add_executable(pose src/pose_node.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
-add_dependencies(distance_sensors sensors_generate_messages_cpp)
+add_dependencies(pose pose_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(distance_sensors
   ${catkin_LIBRARIES}
 )
 
+target_link_libraries(pose
+  ${catkin_LIBRARIES}
+)
 #############
 ## Install ##
 #############

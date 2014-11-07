@@ -67,12 +67,12 @@ float poly(int ch, param_t params){
 
 void adcCallback(const ras_arduino_msgs::ADConverter::ConstPtr &msg)
 {
-  out.left_front = poly(msg->ch1, param_ch1);
-  out.front = poly(msg->ch2, param_ch2);
-  out.left_rear = poly(msg->ch3, param_ch3);
-  out.right_rear = poly(msg->ch4, param_ch4);
-  out.rear = poly(msg->ch5, param_ch5);
-  out.right_front = poly(msg->ch6, param_ch6);
+  out.left_front = round(poly(msg->ch1, param_ch1)*10)/10;
+  out.front = round(poly(msg->ch2, param_ch2)*10)/10;
+  out.left_rear = round(poly(msg->ch3, param_ch3)*10)/10;
+  out.right_rear = round(poly(msg->ch4, param_ch4)*10)/10;
+  out.rear = round(poly(msg->ch5, param_ch5)*10)/10;
+  out.right_front = round(poly(msg->ch6, param_ch6)*10)/10;
 
 
   pub.publish(out);
