@@ -1,9 +1,8 @@
 #include <ros/ros.h>
 #include <ras_arduino_msgs/ADConverter.h>
-#include <ras_arduino_msgs/Distance.h>
+#include <sensors/Distance.h>
 #include <math.h>
 
-ras_arduino_msgs::Distance out;
 ras_arduino_msgs::ADConverter in;
 
 ros::Publisher pub;
@@ -61,12 +60,14 @@ void init() {
   param_ch6.p6 = 122.1;
 }
 
-float poly(int ch, param_t params){
+float poly(int ch, param_t params)
+{
     return params.p1*pow(ch,5) + params.p2*pow(ch,4) + params.p3*pow(ch,3) + params.p4*pow(ch,2) + params.p5*ch + params.p6;
 }
 
 void adcCallback(const ras_arduino_msgs::ADConverter::ConstPtr &msg)
 {
+  sensors::Distance out;
   out.left_front = round(poly(msg->ch1, param_ch1)*10)/10;
   out.front = round(poly(msg->ch2, param_ch2)*10)/10;
   out.left_rear = round(poly(msg->ch3, param_ch3)*10)/10;
@@ -74,9 +75,7 @@ void adcCallback(const ras_arduino_msgs::ADConverter::ConstPtr &msg)
   out.rear = round(poly(msg->ch5, param_ch5)*10)/10;
   out.right_front = round(poly(msg->ch6, param_ch6)*10)/10;
 
-
   pub.publish(out);
-
 }
 
 int main (int argc, char** argv)
@@ -89,7 +88,7 @@ int main (int argc, char** argv)
 
 
   // Create a ROS publisher for the output point cloud
-  pub = nh.advertise<ras_arduino_msgs::Distance> ("/sensors/distance", 1);
+  pub = nh.advertise<sensors::Distance> ("/sensors/distance", 1);
 
   ros::Rate loop_rate(10.0);
 
