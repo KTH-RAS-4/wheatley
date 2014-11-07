@@ -11,8 +11,8 @@ motors:
         D: 0.1
         I_memory: 0
     transform:
-        constant: 0.88
-        exponent: 2.44
+        constant: 0.088
+        exponent: 2.439
         min: 33        # 33 when lifted up, 77 on the floor
         max: 255
 

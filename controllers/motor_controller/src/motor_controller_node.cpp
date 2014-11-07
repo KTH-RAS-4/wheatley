@@ -4,7 +4,7 @@
 #include <ras_arduino_msgs/Encoders.h>
 #include <geometry_msgs/Twist.h>
 #include <std_msgs/Float64.h>
-#include <math.h>
+#include <cmath>
 #include <boost/circular_buffer.hpp>
 
 template <typename T> T CLAMP(const T& value, const T& low, const T& high)
@@ -78,7 +78,7 @@ public:
         int sign = sgn(speed);
         speed = fabs(speed);
 
-        int pwm = (int) (pow(speed/constant, 1/exponent)+min);
+        int pwm = (int) (pow(constant*speed, exponent)+min);
         ROS_INFO("pwm:%d speed:%f", pwm, speed);
 
         pwm = CLAMP(pwm, 0, max);
