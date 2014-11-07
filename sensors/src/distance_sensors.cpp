@@ -1,9 +1,7 @@
 #include <ros/ros.h>
 #include <ras_arduino_msgs/ADConverter.h>
 #include <sensors/Distance.h>
-#include <math.h>
-
-ras_arduino_msgs::ADConverter in;
+#include <cmath>
 
 ros::Publisher pub;
 
@@ -80,22 +78,12 @@ void adcCallback(const ras_arduino_msgs::ADConverter::ConstPtr &msg)
 
 int main (int argc, char** argv)
 {
-  // Initialize ROS
-  ros::init (argc, argv, "in_topic");
-  ros::NodeHandle nh;
+  ros::init (argc, argv, "distance_sensors_node");
+  ros::NodeHandle nh("~");
+
   init();
+  pub = nh.advertise<sensors::Distance> ("", 1);
   ros::Subscriber sub = nh.subscribe ("/arduino/adc", 1, adcCallback);
 
-
-  // Create a ROS publisher for the output point cloud
-  pub = nh.advertise<sensors::Distance> ("/sensors/distance", 1);
-
-  ros::Rate loop_rate(10.0);
-
-  while(ros::ok()){
-    //ros::spin();
-    ros::spinOnce();
-    loop_rate.sleep();
-  }
-  return 0;
+  ros::spin();
 }

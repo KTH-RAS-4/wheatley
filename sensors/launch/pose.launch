@@ -1,0 +1,8 @@
+<!-- motor controller launch file -->
+
+<launch>
+	<node pkg="sensors" type="pose"
+		name="pose" output="screen" clear_params="true">
+	</node>
+</launch>
+
