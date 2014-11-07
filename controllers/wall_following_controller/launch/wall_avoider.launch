@@ -1,12 +1,15 @@
 <!-- wall avoider launch file -->
 
 <launch>
-	<node pkg="sensors" type="distance_sensors" name="distance_sensors" />
-	<node pkg="wall_following_controller" type="wall_following_controller_node"
-		name="wall_avoider" output="screen" clear_params="true">
-		<rosparam command="load" file="$(find wall_following_controller)/config/settings.yaml"/>
-		<remap from="~/twist_out" to="/motor_controller/twist"/>
-                <remap from="~/twist_in" to="~/twist"/>
-	</node>
-</launch>
+    <group ns="sensors" clear_params="true">
+        <include file="$(find sensors)/launch/distance.launch"/>
+        <include file="$(find sensors)/launch/pose.launch"/>
+    </group>
 
+    <node pkg="wall_following_controller" type="wall_following_controller_node"
+        name="wall_avoider" output="screen" clear_params="true">
+        <rosparam command="load" file="$(find wall_following_controller)/config/settings.yaml"/>
+        <remap from="~/twist_out" to="/motor_controller/twist"/>
+        <remap from="~/twist_in" to="~/twist"/>
+    </node>
+</launch>
