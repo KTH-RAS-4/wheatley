@@ -19,7 +19,6 @@ float lerp(float a, float b, float m)
 class WallFollowingControllerNode
 {
 private:
-  ras_arduino_msgs::Distance dist;
   geometry_msgs::Twist twist_in;
 
   ros::NodeHandle n;
@@ -29,12 +28,10 @@ private:
 
 
   ras_arduino_msgs::Distance distance;
-  ros::Rate loop_rate;
 
 public:
   WallFollowingControllerNode()
     : n("~")
-    , loop_rate(1)
   {
     init();
   }
@@ -45,11 +42,6 @@ public:
   
   void init()
   {
-    double rate;
-    n.getParam("rate", rate);
-    loop_rate = ros::Rate(rate);
-
-
     sub_distance = n.subscribe("/sensors/distance", 1000, &WallFollowingControllerNode::distanceCallback, this);
     sub_twist = n.subscribe("twist_in", 1000, &WallFollowingControllerNode::twistCallback, this);
     pub_twist = n.advertise<geometry_msgs::Twist>("twist_out", 1000);
@@ -58,8 +50,7 @@ public:
   void twistCallback(const geometry_msgs::Twist::ConstPtr &msg)
   {
     twist_in = *msg;
-    //twist_in.linear.x = msg->linear.x;
-    //twist_in.angular.z = msg->angular.z;
+    calc();
   }
 
   void distanceCallback(const ras_arduino_msgs::Distance::ConstPtr &msg)
@@ -69,12 +60,7 @@ public:
 
   void run()
   {
-    while (ros::ok())
-    {
-      ros::spinOnce();
-      calc();
-      loop_rate.sleep();
-    }
+    ros::spin();
   }
 
 
@@ -143,6 +129,11 @@ public:
     else
         twist_out = twist_in;
 
+    if (distance.front < 4)
+    {
+        twist_out.linear.x = 0;
+        twist_out.angular.z = 0;
+    }
 
     //float x = CLAMP(5-distance.right_front, 0, 1);
 

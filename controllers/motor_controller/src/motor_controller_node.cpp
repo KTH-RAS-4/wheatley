@@ -192,28 +192,30 @@ public:
         pwm.PWM2 = 0;
         motorL.I = 0;
         motorR.I = 0;
+        pwmPub.publish(pwm);
+        ROS_INFO("timeout");
     }
     else
     {
         pwm.PWM1 =   motorL.update(elapsed, errorL);
         pwm.PWM2 = - motorR.update(elapsed, errorR);
+        pwmPub.publish(pwm);
+
+        std_msgs::Float64 dw1m; dw1m.data = wDesiredL;
+        std_msgs::Float64 dw2m; dw2m.data = wDesiredR;
+        std_msgs::Float64 mw1m; mw1m.data = wMeasuredL;
+        std_msgs::Float64 mw2m; mw2m.data = wMeasuredR;
+        desiredAngularVelocityLeftPub.publish(dw1m);
+        desiredAngularVelocityRightPub.publish(dw2m);
+        measuredAngularVelocityLeftPub.publish(mw1m);
+        measuredAngularVelocityRightPub.publish(mw2m);
+
+        ROS_INFO(" desired: [%6.1f, %6.1f]", wDesiredL, wDesiredR);
+        ROS_INFO("  actual: [%6.1f, %6.1f]", wMeasuredL, wMeasuredR);
+        ROS_INFO("   error: [%6.1f, %6.1f]", errorL, errorR);
+        ROS_INFO("integral: [%6.1f, %6.1f]", motorL.I, motorR.I);
+        ROS_INFO("     PWM: [%6d, %6d]", pwm.PWM1, pwm.PWM2);
     }
-
-    pwmPub.publish(pwm);
-    std_msgs::Float64 dw1m; dw1m.data = wDesiredL;
-    std_msgs::Float64 dw2m; dw2m.data = wDesiredR;
-    std_msgs::Float64 mw1m; mw1m.data = wMeasuredL;
-    std_msgs::Float64 mw2m; mw2m.data = wMeasuredR;
-    desiredAngularVelocityLeftPub.publish(dw1m);
-    desiredAngularVelocityRightPub.publish(dw2m);
-    measuredAngularVelocityLeftPub.publish(mw1m);
-    measuredAngularVelocityRightPub.publish(mw2m);
-
-    ROS_INFO(" desired: [%6.1f, %6.1f]", wDesiredL, wDesiredR);
-    ROS_INFO("  actual: [%6.1f, %6.1f]", wMeasuredL, wMeasuredR);
-    ROS_INFO("   error: [%6.1f, %6.1f]", errorL, errorR);
-    ROS_INFO("integral: [%6.1f, %6.1f]", motorL.I, motorR.I);
-    ROS_INFO("     PWM: [%6d, %6d]", pwm.PWM1, pwm.PWM2);
   }
 };
 

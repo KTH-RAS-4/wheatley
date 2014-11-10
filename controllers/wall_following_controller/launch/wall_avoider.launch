@@ -1,10 +1,8 @@
 <!-- wall avoider launch file -->
 
 <launch>
-    <group ns="sensors" clear_params="true">
-        <include file="$(find sensors)/launch/distance.launch"/>
-        <include file="$(find sensors)/launch/pose.launch"/>
-    </group>
+    <include file="$(find sensors)/launch/distance.launch"/>
+    <include file="$(find sensors)/launch/pose.launch"/>
 
     <node pkg="wall_following_controller" type="wall_following_controller_node"
         name="wall_avoider" output="screen" clear_params="true">
