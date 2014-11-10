@@ -1,7 +1,7 @@
 <!-- motor controller launch file -->
 
 <launch>
-	<node pkg="sensors" type="pose"
+	<node pkg="sensors" type="pose" ns="sensors"
 		name="pose" output="screen" clear_params="true">
 	</node>
 </launch>
