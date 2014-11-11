@@ -8,6 +8,9 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   message_generation
   ras_arduino_msgs
+  visualization_msgs
+  nav_msgs
+  tf
 )
 
 ## System dependencies are found with CMake's conventions
@@ -79,9 +82,9 @@ generate_messages(
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
+  CATKIN_DEPENDS message_runtime ras_arduino_msgs roscpp visualization_msgs nav_msgs tf
 #  INCLUDE_DIRS include
 #  LIBRARIES sensors
- CATKIN_DEPENDS message_runtime ras_arduino_msgs roscpp
 #  DEPENDS system_lib
 )
 
@@ -104,6 +107,7 @@ include_directories(
 ## Declare a cpp executable
 add_executable(distance_sensors src/distance_sensors.cpp)
 add_executable(pose src/pose_node.cpp)
+add_executable(mapper src/mapper.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
@@ -117,6 +121,11 @@ target_link_libraries(distance_sensors
 target_link_libraries(pose
   ${catkin_LIBRARIES}
 )
+
+target_link_libraries(mapper
+  ${catkin_LIBRARIES}
+)
+
 #############
 ## Install ##
 #############
