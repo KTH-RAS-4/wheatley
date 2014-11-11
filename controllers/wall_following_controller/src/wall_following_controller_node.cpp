@@ -63,37 +63,40 @@ public:
     ros::spin();
   }
 
-
-
   void calc()
   {
     geometry_msgs::Twist twist_out;
 
     float minDistance = 5;
     float minStraight = 0.5;
-
+    //move forward and turn sligthly to right
     if (distance.right_front < minDistance && distance.right_front < distance.right_rear)
     {
         twist_out.linear.x = twist_in.linear.x;
         twist_out.angular.z = 0.15;
         right = 1;
     }
+    //check if it has turn to much to the rigth, and alinght the sensors at margin: minStraight distance
     else if (right == 1 && distance.right_front >  minDistance && distance.right_rear > minDistance)
     {
+        //for over turning, correct by tuning to left. no linear speed until is straigth
         if(distance.right_front > distance.right_rear && abs(distance.right_front-distance.right_rear) > minStraight)
         {
             twist_out.linear.x = 0;
             twist_out.angular.z = -0.15;
         }
+         //only turn to right
         else if(distance.right_front < distance.right_rear && abs(distance.right_front-distance.right_rear) > minStraight)
         {
             twist_out.linear.x = 0;
             twist_out.angular.z = 0.15;
         }
+        //move as twist_in
         else
             twist_out = twist_in;
             right = 0;
     }
+    //
     else if (right == 1 &&  std::abs(distance.right_front-distance.right_rear) < minStraight)
     {
         twist_out = twist_in;

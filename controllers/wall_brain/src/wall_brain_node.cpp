@@ -68,6 +68,7 @@ public:
   void run()
   {
     enum state state = FIND_ALIGNMENT;
+    ROS_INFO("state: FIND_ALIGNMENT");
 
     while (ros::ok())
     {
@@ -79,14 +80,15 @@ public:
           if (findAlignment(0.2))
           {
               state = ALIGN;
-              ros::Duration(0.3).sleep();
+              ros::Duration(0.5).sleep();
           }
           break;
       case ALIGN:
-          if (align())
+          if (align(0.3))
           {
               state = FOLLOW;
-              ros::Duration(0.3).sleep();
+              ros::Duration(0.5).sleep();
+              ROS_INFO("state: FOLLOW");
           }
           break;
       case FOLLOW:
@@ -98,7 +100,8 @@ public:
                   alignment = pose.theta+90;
 
               state = ALIGN;
-              ros::Duration(0.3).sleep();
+              ROS_INFO("state: ALIGN");
+              ros::Duration(0.5).sleep();
           }
           break;
       }
@@ -107,7 +110,7 @@ public:
     }
   }
 
-  bool align()
+  bool align(double speed)
   {
     double error = alignment-pose.theta;
 
@@ -120,7 +123,7 @@ public:
     else
     {
         geometry_msgs::Twist twist;
-        twist.angular.z = CLAMP(0.1*error, -0.5, 0.5);
+        twist.angular.z = CLAMP(0.1*error, -speed, speed);
         motor_twist.publish(twist);
         return false;
     }
@@ -137,7 +140,7 @@ public:
         l2 = 0;
     if (distance.right_front > 15)
         r2 = 0;
-    ROS_INFO("l %.1f r %.1f   l2 %.2f r2 %.2f", l, r, l2, r2);
+    //ROS_INFO("l %.1f r %.1f   l2 %.2f r2 %.2f", l, r, l2, r2);
 
     if ((sgn(l) != sgn(l2) && l != 0 && l2 != 0) ||
         (sgn(r) != sgn(r2) && r != 0 && r2 != 0))
