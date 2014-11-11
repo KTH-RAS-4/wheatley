@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <cmath>
 #include <sys/types.h>
 #include <dirent.h>
 #include <opencv2/core/core.hpp>
@@ -24,6 +25,7 @@ void printMatrix(Mat mat)
 
 int main(int argc, char** argv)
 {
+	/*
 	unsigned char isFile = 0x8;
 	char* path = argv[1];
 	DIR* dir;
@@ -92,6 +94,15 @@ int main(int argc, char** argv)
 	printMatrix(covar);
 	cout << endl << "mean" << endl;
 	printMatrix(mean);
+	*/
+
+	cout << endl;
+	Mat a = (Mat_<float>(3,1) << 1, 2, 3);
+	Mat b = (Mat_<float>(1,3) << 1, 2, 3);
+	Mat c = (Mat_<float>(2,2) << 2, 1, 1, 2);
+	Mat d = (Mat_<float>(3, 3) << 1853.1, 1986.7, 5568.6, 978.9, 1360.7, 1986.7, 794.8, 978.9, 1853.1);
+	float v = determinant(d);
+	cout << v << endl;
 
 	return 0;
 }
