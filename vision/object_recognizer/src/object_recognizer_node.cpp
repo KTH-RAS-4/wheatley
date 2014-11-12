@@ -57,27 +57,33 @@ public:
 
     void imageHandle(const sensor_msgs::ImageConstPtr& msg)
     {
+        static int i = 0;
         cv_bridge::CvImagePtr frame;
 
         try
         {
             frame = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
             resize(frame->image, frame_image, work_size);
+
+            char name[100];
+            std::sprintf(name, "/tmp/images/%d.jpg", i++);
+            cv::imwrite(name, frame->image);
         }
         catch (cv_bridge::Exception& e)
         {
             ROS_ERROR("cv_bridge exception: %s", e.what());
         }
 
-        result = gaussianLikelihood(frame_image, mean_john, sigma_john);
+        /*result = gaussianLikelihood(frame_image, mean_green, sigma_green);
         double min, max;
         minMaxLoc(result, &min, &max);
         result.convertTo(result, CV_8U, 255.0/(max - min), -min * 255.0/(max - min));
 
         imshow(OPENCV_WINDOW, frame_image);
         imshow(DEBUG_WINDOW, result);
+        */
 
-        waitKey(10);
+        waitKey(2000);
     }
 
     Mat gaussianLikelihood(Mat &image_raw, Mat &mean, Mat &sigma)
