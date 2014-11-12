@@ -1,0 +1,9 @@
+base:
+    diameter: 0.21
+    outer_diameter: 0.255
+    
+    wheels:
+        diameter: 0.1
+    
+    motors:
+        tics_per_revolution: 360

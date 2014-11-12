@@ -1,0 +1,8 @@
+<!-- base -->
+
+<launch>
+	<rosparam command="load" file="$(find main)/config/measurements.yaml"/>
+	<include file="$(find main)/launch/world_to_map_tf_broadcaster.launch"/>
+	<include file="$(find sensors)/launch/distance.launch"/>
+	<include file="$(find sensors)/launch/pose.launch"/>
+</launch>
