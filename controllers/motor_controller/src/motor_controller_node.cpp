@@ -146,7 +146,7 @@ public:
     pub_pwm = n.advertise<ras_arduino_msgs::PWM>("/arduino/pwm", 1000);
 
     sub_encode = n.subscribe("/arduino/encoders", 1000, &MotorControllerNode::encoderCallback, this);
-    sub_twist = n.subscribe("/motor_controller/twist", 1000, &MotorControllerNode::twistCallback, this);
+    sub_twist = n.subscribe("twist", 1000, &MotorControllerNode::twistCallback, this);
   }
 
   void encoderCallback(const ras_arduino_msgs::Encoders::ConstPtr &msg)

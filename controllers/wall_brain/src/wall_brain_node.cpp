@@ -48,7 +48,6 @@ public:
     //n.getParam("rate", rate);
     loop_rate = ros::Rate(rate);
 
-
     sub_distance = n.subscribe("/sensors/distance", 1000, &WallBrain::distanceCallback, this);
     sub_pose = n.subscribe("/sensors/pose", 1000, &WallBrain::poseCallback, this);
     motor_twist = n.advertise<geometry_msgs::Twist>("/motor_controller/twist", 1000);
@@ -84,7 +83,7 @@ public:
           }
           break;
       case ALIGN:
-          if (align(0.3))
+          if (align(0.2))//0.3
           {
               state = FOLLOW;
               ros::Duration(0.5).sleep();
@@ -123,7 +122,7 @@ public:
     else
     {
         geometry_msgs::Twist twist;
-        twist.angular.z = CLAMP(0.1*error, -speed, speed);
+        twist.angular.z = CLAMP(0.08*error, -speed, speed);//.1*error
         motor_twist.publish(twist);
         return false;
     }

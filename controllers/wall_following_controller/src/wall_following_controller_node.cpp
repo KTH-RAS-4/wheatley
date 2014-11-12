@@ -132,7 +132,7 @@ public:
     else
         twist_out = twist_in;
 
-    if (distance.front < 4)
+    if (distance.front < 5)
     {
         twist_out.linear.x = 0;
         twist_out.angular.z = 0;
