@@ -1,0 +1,19 @@
+rate: 10
+timeout: 0.15
+output_measured_angular: true
+
+motors:
+    max_angular_speed: !degrees 180
+    max_linear_speed: 1
+
+    gains:
+        P: 2
+        I: 20
+        D: 0.1
+        I_memory: 0
+    transform:
+        constant: 0.088
+        exponent: 2.439
+        min: 33        # 33 when lifted up, 77 on the floor
+        max: 255
+

@@ -1,0 +1,14 @@
+rate: 10
+
+ir-sensors:
+    left-front:  [-0.12  0.08]
+    left-rear:   [-0.12 -0.08]
+    right-front: [0.12   0.08]
+    right-rear:  [0.12  -0.08]
+    front:       [0      0.114]
+    rear:        [0     -0.114]
+
+gains:
+    P: 2
+    I: 20
+    D: 0.1
