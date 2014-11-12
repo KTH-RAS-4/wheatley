@@ -2,12 +2,20 @@
 #include <vector>
 #include <math.h>
 #include <ros/ros.h>
-#include <ras_arudino_msgs/object.h>
-#include <ras_arudino_msgs/objects.h>
+#include <string>
+#include <ras_arduino_msgs/Object.h>
+#include <ras_arduino_msgs/Objects.h>
 
 float object_colors[] = {
+    200, 180, 180,
     116.2592, 127.4758, 82.8304,
     173, 45, 56
+};
+
+std::string color_names[] = {
+    "wall",
+    "green",
+    "red"
 };
 
 class ColorDetectorNode
@@ -28,27 +36,37 @@ public:
     {
     }
 
-    void colorHandle(const ras_arudino_msgs::Objects& msg)
+    void colorHandle(const ras_arduino_msgs::Objects& msg)
     {
-        for (int i = 0; i < sizeof(msg.objects)/sizeof(*msg.objects); i++)
+        std::cout << "---------------------------" << std::endl;
+        for (int i = 0; i < msg.objects.size(); i++)
         {
             int color = findClosestColor(msg.objects[i]);
-            std::cout << color << std::endl;
+            if(color != 0) {
+                std::cout << "Object " << i << ": Color: " << color_names[color] << std::endl;
+            }
         }
+        if (msg.objects.size() == 0)
+        {
+            std::cout << "" << std::endl;
+        }
+        std::cout << "---------------------------" << std::endl;
+
     }
 
-    int findClosestColor(ras_arudino_msgs::Object obj)
+    int findClosestColor(ras_arduino_msgs::Object obj)
     {
-        int n_colors = sizeof(object_colors)/sizeof(*object_colors);
+        int n_colors = (sizeof(object_colors)/sizeof(*object_colors))/3;
         int color;
         float diff = 255*3;
         float newdiff;
 
         for (int i = 0; i < n_colors; i++)
         {
-            newdiff = Math.abs(obj.r-object_colors[i*3])+Math.abs(obj.g-object_colors[i*3+1])+Math.abs(obj.b-object_colors[i*3+2]);
+            newdiff = abs(obj.r-object_colors[i*3])+abs(obj.g-object_colors[i*3+1])+abs(obj.b-object_colors[i*3+2]);
             if (newdiff < diff)
             {
+                diff = newdiff;
                 color = i;
             }
         }
@@ -70,6 +88,6 @@ int main(int argc, char** argv)
 {
     ros::init(argc, argv, "color_detector_node");
     ColorDetectorNode cdn;
-    //ros::spin();
+    ros::spin();
     return 0;
 }

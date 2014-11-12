@@ -133,6 +133,8 @@ cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
     extract_normals.setIndices (inliers_plane);
     extract_normals.filter (*cloud_normals2);
 
+    if(cloud_filtered2->size() == 0)
+        return;
     // Creating the KdTree object for the search method of the extraction
     tree->setInputCloud (cloud_filtered2);
 
