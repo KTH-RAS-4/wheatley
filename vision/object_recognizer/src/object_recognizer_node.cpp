@@ -17,8 +17,11 @@ static const string DEBUG_WINDOW = "Image debug";
 Mat mean_john = (Mat_<float>(1, 3) << 69.2250, 88.1010, 107.1206);
 Mat sigma_john = (Mat_<float>(3, 3) << 2366.6, 2457.3, 2491.7, 2457.3, 2725.9, 2790.8, 2491.7, 2790.8, 2926.9);
 
-Mat mean_green = (Mat_<float>(1, 3) << 36.8559, 102.5171, 88.9574);
-Mat sigma_green = (Mat_<float>(3, 3) << 5568.6, 1986.7, 1853.1, 1986.7, 1360.7, 978.9, 1853.1, 978.9, 794.8);
+Mat mean_cube_green = (Mat_<float>(1, 4) << 0.972656344995489, 0.20100263289924, 0.46319108796594, 141.562112717616);
+Mat sigma_cube_green = (Mat_<float>(4, 4) << 0.000653839729695567, -0.00266341903225608, -0.00187619989376125, 0.749122343286518, -0.00266341903225608, 0.0128838271640458, 0.0116563083889695, -4.32140742183352, -0.00187619989376125, 0.0116563083889695, 0.035108942101794, -6.44534216882738, 0.749122343286518, -4.32140742183352, -6.44534216882738, 2710.56071965939);
+
+Mat mean_wall = (Mat_<float>(1, 4) << 0.885019815723871, 0.278371710768153, 0.167802733922411, 203.088048503664);
+Mat sigma_wall = (Mat_<float>(4, 4) << 0.0294730355218137, -0.0567022778756712, 0.016123850687772, 0.646092507340406, -0.0567022778756712, 0.111735886745609, -0.0317810954783104, -1.27912797018081, 0.016123850687772, -0.0317810954783104, 0.0189863480272751, 0.603175517400294, 0.646092507340406, -1.27912797018081, 0.603175517400294, 918.374047797582);
 
 class ObjectRecognizerNode
 {
@@ -46,13 +49,13 @@ public:
         work_size = Size(320, 240);
 
         namedWindow(OPENCV_WINDOW);
-        namedWindow(DEBUG_WINDOW);
+        //namedWindow(DEBUG_WINDOW);
     }
 
     ~ObjectRecognizerNode()
     {
         destroyWindow(OPENCV_WINDOW);
-        destroyWindow(DEBUG_WINDOW);
+        //destroyWindow(DEBUG_WINDOW);
     }
 
     void imageHandle(const sensor_msgs::ImageConstPtr& msg)
@@ -69,33 +72,38 @@ public:
             ROS_ERROR("cv_bridge exception: %s", e.what());
         }
 
-        result = gaussianLikelihood(frame_image, mean_john, sigma_john);
+        result = gaussianLikelihood(frame_image, mean_cube_green, sigma_cube_green);
         double min, max;
         minMaxLoc(result, &min, &max);
         result.convertTo(result, CV_8U, 255.0/(max - min), -min * 255.0/(max - min));
 
-        imshow(OPENCV_WINDOW, frame_image);
-        imshow(DEBUG_WINDOW, result);
+        imshow(OPENCV_WINDOW, result);
+        //imshow(DEBUG_WINDOW, result);
 
         waitKey(10);
     }
 
     Mat gaussianLikelihood(Mat &image_raw, Mat &mean, Mat &sigma)
     {
-        Mat image;
-        image_raw.convertTo(image, CV_32FC3);
+        Mat image = getAugmentedHSV(image_raw);
+        //cvtColor(image_raw, image, CV_BGR2HSV);
+        //image_raw.convertTo(image, CV_32FC3);
         Mat lvals;
         lvals.create(image.rows, image.cols, CV_32FC1);
 
         // the likelihood equation is divided to save time
-        float term_a = 1.0/((pow(2.0*M_PI, 3.0/2.0))*sqrt(determinant(sigma)));
-        float term_b;
+        float object_a = 1.0/((pow(2.0*M_PI, 4.0/2.0))*sqrt(determinant(sigma)));
+        float object_b;
         Mat sigma_inv = sigma.inv();
+
+        float wall_a = 1.0/((pow(2.0*M_PI, 4.0/2.0))*sqrt(determinant(sigma_wall)));
+        float wall_b;
+        Mat sigma_wall_inv = sigma_wall.inv();
 
         float* _lvals;
         float* _image;
         Mat v;
-        v.create(1, 3, CV_32FC1);
+        v.create(1, 4, CV_32FC1);
         
         for(int i = 0; i < lvals.rows; i++)
         {
@@ -104,14 +112,52 @@ public:
             for(int j = 0; j < lvals.cols; j++)
             {
                 // extract the pixel value
-                v = (Mat_<float>(1, 3) << _image[j*3], _image[j*3+1], _image[j*3+2]);
+                v = (Mat_<float>(1, 4) << _image[j*4], _image[j*4+1], _image[j*4+2], _image[j*4+3]);
 
-                term_b = exp(-0.5*(v-mean).t().dot(sigma_inv*(v-mean).t()));
-                _lvals[j] = term_a*term_b;
+                object_b = exp(-0.5*(v-mean).t().dot(sigma_inv*(v-mean).t()));
+                wall_b = exp(-0.5*(v-mean_wall).t().dot(sigma_wall_inv*(v-mean_wall).t()));
+                //object_b = exp(-0.5*((Mat)((v-mean)*sigma_inv*(v-mean).t())).at<float>(0,0));
+
+                if (object_a*object_b > wall_a*wall_b)
+                {
+                    _lvals[j] = 1;
+                }
+                else
+                {
+                    _lvals[j] = 0;
+                }
             }
         }
 
         return lvals;
+    }
+
+    Mat getAugmentedHSV(Mat &image_raw)
+    {
+        // create augmented hsv matrix
+        Mat hsv;
+        hsv.create(image_raw.rows, image_raw.cols, CV_32FC4);
+        
+        Mat image;
+        cvtColor(image_raw, image, CV_BGR2HSV);
+        image.convertTo(image, CV_32FC3);
+
+        float* _image;
+        float* _hsv;
+        for(int i = 0; i < image.rows; i++)
+        {
+            _image = image.ptr<float>(i);
+            _hsv = hsv.ptr<float>(i);
+            for(int j = 0; j < image.cols; j++)
+            {
+                _hsv[j*4] = cos(_image[j*3]);
+                _hsv[j*4+1] = sin(_image[j*3]);
+                _hsv[j*4+2] = _image[j*3+1];
+                _hsv[j*4+3] = _image[j*3+2];
+            }
+        }
+
+        return hsv;
     }
 };
 
