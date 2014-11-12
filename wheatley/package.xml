@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<package>
+  <name>wheatley</name>
+  <version>1.0.0</version>
+  <description>KTH-RAS 2014 group 4 - main robot package</description>
+
+  <maintainer email="greimel@kth.se">Andreas Greimel</maintainer>
+  <maintainer email="bjh@kth.se">Björn Holm</maintainer>
+  <maintainer email="jacobgre@kth.se">Jacob Greenberg</maintainer>
+  <maintainer email="johntu@kth.se">John Brynte Turesson</maintainer>
+  <maintainer email="marioll@kth.se">Mario Loera Lozano</maintainer>
+
+
+  <!-- One license tag required, multiple allowed, one license per tag -->
+  <!-- Commonly used license strings: -->
+  <!--   BSD, MIT, Boost Software License, GPLv2, GPLv3, LGPLv2.1, LGPLv3 -->
+  <license>TODO</license>
+
+
+  <url type="repository">https://github.com/KTH-RAS-4/wheatley</url>
+
+
+  <!-- Author tags are optional, mutiple are allowed, one per tag -->
+  <!-- Authors do not have to be maintianers, but could be -->
+  <!-- Example: -->
+  <!-- <author email="jane.doe@example.com">Jane Doe</author> -->
+
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <export>
+    <metapackage/>
+  </export>
+</package>
