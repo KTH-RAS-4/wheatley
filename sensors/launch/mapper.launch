@@ -1,0 +1,7 @@
+<!-- mapper launch file -->
+
+<launch>
+	<node pkg="sensors" type="mapper" ns="sensors"
+		name="map" output="screen" clear_params="true">
+	</node>
+</launch>
