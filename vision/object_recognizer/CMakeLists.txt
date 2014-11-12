@@ -125,6 +125,13 @@ target_link_libraries(object_color_trainer
   ${OpenCV_LIBS}
 )
 
+# color detector node
+add_executable(color_detector_node src/color_detector_node.cpp)
+target_link_libraries(color_detector_node
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBS}
+)
+
 #############
 ## Install ##
 #############
