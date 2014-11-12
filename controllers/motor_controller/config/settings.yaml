@@ -3,8 +3,8 @@ timeout: 0.15
 output_measured_angular: true
 
 motors:
-    max-angular-speed: !degrees 180
-    max-linear-speed: 1
+    max_angular_speed: !degrees 180
+    max_linear_speed: 1
 
     gains:
         P: 2
