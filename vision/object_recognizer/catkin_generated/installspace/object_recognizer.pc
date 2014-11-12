@@ -1,0 +1,8 @@
+prefix=/home/john/catkin_ws/install
+
+Name: object_recognizer
+Description: Description of object_recognizer
+Version: 0.0.0
+Cflags: 
+Libs: -L/home/john/catkin_ws/install/lib 
+Requires: 
