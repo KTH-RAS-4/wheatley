@@ -77,17 +77,15 @@ public:
             ROS_ERROR("cv_bridge exception: %s", e.what());
         }
 
-        /*result = gaussianLikelihood(frame_image, mean_green, sigma_green);
+        result = gaussianLikelihood(frame_image, mean_green, sigma_green);
         double min, max;
         minMaxLoc(result, &min, &max);
         result.convertTo(result, CV_8U, 255.0/(max - min), -min * 255.0/(max - min));
 
-        imshow(OPENCV_WINDOW, frame_image);
-        imshow(DEBUG_WINDOW, result);
-        */
+        imshow(OPENCV_WINDOW, result);
+        //imshow(DEBUG_WINDOW, result);
 
-
-        waitKey(2000);
+        waitKey(10);
     }
 
     Mat gaussianLikelihood(Mat &image_raw, Mat &mean, Mat &sigma)
