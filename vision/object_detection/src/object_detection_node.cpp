@@ -1,144 +1,136 @@
 #include <ros/ros.h>
-#include <geometry_msgs/Twist.h>
-#include <sensor_msgs/PointCloud2.h>
 
+#include <pcl/filters/voxel_grid.h>
+#include <sensor_msgs/PointCloud2.h>
+#include <pcl/point_cloud.h>
+#include <pcl_conversions/pcl_conversions.h>
 #include <pcl/ModelCoefficients.h>
 #include <pcl/io/pcd_io.h>
-#include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
-#include <pcl_conversions/pcl_conversions.h>
+#include <pcl/filters/extract_indices.h>
+#include <pcl/filters/passthrough.h>
+#include <pcl/features/normal_3d.h>
 #include <pcl/sample_consensus/method_types.h>
 #include <pcl/sample_consensus/model_types.h>
 #include <pcl/segmentation/sac_segmentation.h>
-#include <pcl/filters/voxel_grid.h>
-#include <pcl/filters/extract_indices.h>
 
-ros::Publisher pub;
+typedef pcl::PointXYZ PointT;
+
+ros::Publisher pub_plane;
+ros::Publisher pub_objects;
 
 void
 cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
 {
     ROS_INFO("Start of Callback");
     // Container for original & filtered data
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_input(new pcl::PointCloud<pcl::PointXYZRGB>);
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZRGB>), cloud_p (new pcl::PointCloud<pcl::PointXYZRGB>), cloud_f (new pcl::PointCloud<pcl::PointXYZRGB>);
+    pcl::PointCloud<PointT>::Ptr cloud(new pcl::PointCloud<PointT>());
+    //pcl::PointCloud<PointT>::Ptr cloud_filtered(new pcl::PointCloud<PointT>());//, cloud_p (new pcl::PointCloud<pcl::PointT>), cloud_f (new pcl::PointCloud<pcl::PointT>);
 
     // Convert to PCL data type
-    pcl::fromROSMsg(*cloud_msg, *cloud_input);
+    pcl::fromROSMsg(*cloud_msg, *cloud);
 
-    pcl::VoxelGrid<pcl::PointXYZRGB> sor;
-    sor.setInputCloud (cloud_input);
-    sor.setLeafSize (0.01f, 0.01f, 0.01f);
-    sor.filter (*cloud_filtered);
+    if(cloud->size() == 0)
+        return;
 
-/*
-    pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients ());
-    pcl::PointIndices::Ptr inliers (new pcl::PointIndices ());
+    /** Segmentation */
+    // All the objects needed
+    pcl::PCDReader reader;
+    pcl::PassThrough<PointT> pass;
+    pcl::VoxelGrid<PointT> sor;
+    pcl::NormalEstimation<PointT, pcl::Normal> ne;
+    pcl::SACSegmentationFromNormals<PointT, pcl::Normal> seg;
+    pcl::ExtractIndices<PointT> extract;
+    pcl::ExtractIndices<pcl::Normal> extract_normals;
+    pcl::search::KdTree<PointT>::Ptr tree (new pcl::search::KdTree<PointT> ());
 
-    // Create the segmentation object
-    pcl::SACSegmentation<pcl::PointXYZRGB> seg;
-    // Optional
-    seg.setOptimizeCoefficients (true);
-    // Mandatory
-    seg.setModelType (pcl::SACMODEL_PLANE);
-    seg.setMethodType (pcl::SAC_RANSAC);
-    seg.setMaxIterations (1000);
-    seg.setDistanceThreshold (0.01);
+    // Datasets
+    pcl::PointCloud<PointT>::Ptr cloud_downsampled (new pcl::PointCloud<PointT>);
+    pcl::PointCloud<PointT>::Ptr cloud_filtered (new pcl::PointCloud<PointT>);
+    pcl::PointCloud<pcl::Normal>::Ptr cloud_normals (new pcl::PointCloud<pcl::Normal>);
+    pcl::PointCloud<PointT>::Ptr cloud_filtered2 (new pcl::PointCloud<PointT>);
+    pcl::PointCloud<pcl::Normal>::Ptr cloud_normals2 (new pcl::PointCloud<pcl::Normal>);
+    pcl::ModelCoefficients::Ptr coefficients_plane (new pcl::ModelCoefficients), coefficients_cylinder (new pcl::ModelCoefficients);
+    pcl::PointIndices::Ptr inliers_plane (new pcl::PointIndices), inliers_cylinder (new pcl::PointIndices);
+
+    // Read in the cloud data
+    reader.read ("table_scene_mug_stereo_textured.pcd", *cloud);
+    std::cerr << "PointCloud has: " << cloud->points.size () << " data points." << std::endl;
 
     // Create the filtering object
-    pcl::ExtractIndices<pcl::PointXYZRGB> extract;
+    sor.setInputCloud (cloud);
+    sor.setLeafSize (0.01f, 0.01f, 0.01f);
+    sor.filter (*cloud_downsampled);
 
-    int i = 0, nr_points = (int) cloud_filtered->points.size ();
-    // While 30% of the original cloud is still there
-    while (cloud_filtered->points.size () > 0.2 * nr_points)
-    {
-      // Segment the largest planar component from the remaining cloud
-      seg.setInputCloud (cloud_filtered);
-      seg.segment (*inliers, *coefficients);
-      if (inliers->indices.size () == 0)
-      {
-        std::cerr << "Could not estimate a planar model for the given dataset." << std::endl;
-        break;
-      }
+    // Build a passthrough filter to remove spurious NaNs
+    pass.setInputCloud (cloud_downsampled);
+    pass.setFilterFieldName ("z");
+    pass.setFilterLimits (0, 1.5);
+    pass.filter (*cloud_filtered);
+    std::cerr << "PointCloud after filtering has: " << cloud_filtered->points.size () << " data points." << std::endl;
 
-      // Extract the inliers
-      extract.setInputCloud (cloud_filtered);
-      extract.setIndices (inliers);
-      extract.setNegative (false);
-      extract.filter (*cloud_p);
-      std::cerr << "PointCloud representing the planar component: " << cloud_p->width * cloud_p->height << " data points." << std::endl;
+    // Estimate point normals
+    ne.setSearchMethod (tree);
+    ne.setInputCloud (cloud_filtered);
+    ne.setKSearch (50);
+    ne.compute (*cloud_normals);
 
-      // Create the filtering object
-      extract.setNegative (true);
-      extract.filter (*cloud_f);
-      cloud_filtered.swap (cloud_f);
-      i++;
-    }*/
+    // Create the segmentation object for the planar model and set all the parameters
+    seg.setOptimizeCoefficients (true);
+    seg.setModelType (pcl::SACMODEL_NORMAL_PLANE);
+    seg.setNormalDistanceWeight (0.1);
+    seg.setMethodType (pcl::SAC_RANSAC);
+    seg.setMaxIterations (100);
+    seg.setDistanceThreshold (0.03);
+    seg.setInputCloud (cloud_filtered);
+    seg.setInputNormals (cloud_normals);
+    // Obtain the plane inliers and coefficients
+    seg.segment (*inliers_plane, *coefficients_plane);
+    std::cerr << "Plane coefficients: " << *coefficients_plane << std::endl;
 
-    // kd-tree object for searches.
-    pcl::search::KdTree<pcl::PointXYZRGB>::Ptr kdtree(new pcl::search::KdTree<pcl::PointXYZRGB>);
-    kdtree->setInputCloud(cloud);
+    // Extract the planar inliers from the input cloud
+    extract.setInputCloud (cloud_filtered);
+    extract.setIndices (inliers_plane);
+    extract.setNegative (false);
 
-    // Color-based region growing clustering object.
-    pcl::RegionGrowingRGB<pcl::PointXYZRGB> clustering;
-    clustering.setInputCloud(cloud_filtered);
-    clustering.setSearchMethod(kdtree);
-    // Here, the minimum cluster size affects also the postprocessing step:
-    // clusters smaller than this will be merged with their neighbors.
-    clustering.setMinClusterSize(100);
-    // Set the distance threshold, to know which points will be considered neighbors.
-    clustering.setDistanceThreshold(10);
-    // Color threshold for comparing the RGB color of two points.
-    clustering.setPointColorThreshold(6);
-    // Region color threshold for the postprocessing step: clusters with colors
-    // within the threshold will be merged in one.
-    clustering.setRegionColorThreshold(5);
-
-    std::vector <pcl::PointIndices> clusters;
-    clustering.extract(clusters);
-
-    // For every cluster...
-    for (std::vector<pcl::PointIndices>::const_iterator i = clusters.begin(); i != clusters.end(); ++i)
-    {
-
-        // ...add all its points to a new cloud...
-        pcl::PointCloud<pcl::PointXYZRGB>::Ptr cluster(new pcl::PointCloud<pcl::PointXYZRGB>);
-        pcl::copyPointCloud(cloud_filtered, i->indices, cluster);
-    }
-
+    // Remove the planar inliers, extract the rest
+    extract.setNegative (true);
+    extract.filter (*cloud_filtered2);
+    extract_normals.setNegative (true);
+    extract_normals.setInputCloud (cloud_normals);
+    extract_normals.setIndices (inliers_plane);
+    extract_normals.filter (*cloud_normals2);
 
 
     // Convert to ROS data type
-    sensor_msgs::PointCloud2::Ptr output(new sensor_msgs::PointCloud2());
-    pcl::toROSMsg(*cloud_filtered, *output);
+    sensor_msgs::PointCloud2 output;
+    pcl::toROSMsg(*cloud_filtered2, output);
+    pub_objects.publish(output);
 
-    pub.publish(output);
+    sensor_msgs::PointCloud2 output_plane;
+    pcl::toROSMsg(*cloud_filtered, output_plane);
+    pub_plane.publish(output);
 }
 
 
 
-int
-main (int argc, char** argv)
+int main (int argc, char** argv)
 {
-  // Initialize ROS
-  ros::init (argc, argv, "object_detection_node");
-  ros::NodeHandle nh;
+    // Initialize ROS
+    ros::init (argc, argv, "object_detection_node");
+    ros::NodeHandle nh;
 
-  // Create a ROS subscriber for the input point cloud
-  ros::Subscriber sub = nh.subscribe ("/camera/depth_registered/points", 1, cloud_cb);
+    // Create a ROS subscriber for the input point cloud
+    ros::Subscriber sub = nh.subscribe ("/camera/depth_registered/points", 1, cloud_cb);
 
 
-  // Create a ROS publisher for the output point cloud
-  pub = nh.advertise<sensor_msgs::PointCloud2> ("/object_detection/cloud", 1);
+    // Create a ROS publisher for the output point cloud
+    pub_plane = nh.advertise<sensor_msgs::PointCloud2> ("/object_detection/plane", 1);
+    pub_objects = nh.advertise<sensor_msgs::PointCloud2> ("/object_detection/objects", 1);
 
-  ros::Rate loop_rate(10.0);
 
-  while(ros::ok()){
-    //ros::spin();
-    ros::spinOnce();
-    loop_rate.sleep();
-  }
-  return 0;
+    ros::spin();
+    return 0;
 }
 
 
