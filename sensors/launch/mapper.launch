@@ -1,14 +1,7 @@
 <!-- mapper launch file -->
 
 <launch>
-    <include file="$(find sensors)/launch/distance.launch"/>
-    <include file="$(find sensors)/launch/pose.launch"/>
-
-    <node pkg="tf" type="static_transform_publisher"
-        name="world_map_tf_broadcaster"
-        args="0 0 0 0 0 0 1 world map 100" />
-
-    <node pkg="sensors" type="mapper" ns="sensors"
-        name="map" output="screen" clear_params="true">
-    </node>
+	<node pkg="sensors" type="mapper" ns="sensors"
+		name="map" output="screen" clear_params="true">
+	</node>
 </launch>
