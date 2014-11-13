@@ -1,0 +1,7 @@
+<!-- broadcaster of the static world to map transformation -->
+
+<launch>
+	<node pkg="tf" type="static_transform_publisher"
+		name="tf_world_to_map_publisher"
+		args="0 0 0 0 0 0 1 world map 100" />
+</launch>
