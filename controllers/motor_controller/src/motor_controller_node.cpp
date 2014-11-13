@@ -75,9 +75,8 @@ public:
 
         double speed = kP*error + kD*D + kI*I;
         int sign = sgn(speed);
-        speed = fabs(speed);
 
-        int pwm = (int) (pow(constant*speed, exponent)+min);
+        int pwm = (int) (pow(constant*fabs(speed), exponent)+min);
         //ROS_INFO("pwm:%d speed:%f", pwm, speed);
 
         pwm = CLAMP(pwm, 0, max);

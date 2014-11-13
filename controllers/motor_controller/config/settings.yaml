@@ -1,5 +1,5 @@
-rate: 10
-timeout: 0.15
+rate: 100
+timeout: 0.5
 output_measured_angular: true
 
 motors:
@@ -7,13 +7,13 @@ motors:
     max_linear_speed: 1
 
     gains:
-        P: 2
-        I: 20
+        P: 10
+        I: 0
         D: 0.1
         I_memory: 0
     transform:
         constant: 0.088
         exponent: 2.439
-        min: 33        # 33 when lifted up, 77 on the floor
+        min: 75        # 33 when lifted up, 77 on the floor
         max: 255
 
