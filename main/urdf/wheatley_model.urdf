@@ -1,0 +1,86 @@
+<?xml version="1.0"?>
+<robot name="Wheatley">
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <cylinder length="0.08" radius="0.1125"/>
+      </geometry>
+	<origin xyz="0 0 0.06"/>
+	<material name="lightgray">
+      	<color rgba="0.83 0.83 0.83 1"/>
+      </material>
+    </visual>
+  </link>
+
+  <link name="top">
+    <visual>
+      <geometry>
+        <box size="0.165 0.075 0.175"/>
+      </geometry>
+	<material name="lightgray">
+	</material>
+    </visual>
+  </link>
+
+  <link name="front">
+    <visual>
+      <geometry>
+        <box size="0.01 0.01 0.01"/>
+      </geometry>
+	<material name="red">
+	  <color rgba="1 0 0 1"/>
+	</material>
+    </visual>
+  </link>
+
+  <link name="lWheel">
+    <visual>
+      <geometry>
+        <cylinder length="0.025" radius="0.05"/>
+      </geometry>
+	  <origin rpy="0 1.57075 0" xyz="0 0 0"/>
+      <material name="black">
+      	<color rgba="0 0 0 1"/>
+      </material>
+    </visual>
+  </link>
+
+  <link name="rWheel">
+    <visual>
+      <geometry>
+        <cylinder length="0.025" radius="0.05"/>
+      </geometry>
+	  <origin rpy="0 1.57075 0" xyz="0 0 0"/>
+      <material name="black">
+	</material>
+    </visual>
+  </link>
+
+  <joint name="base_to_right_leg" type="fixed">
+    <parent link="base_link"/>
+    <child link="top"/>
+	<origin xyz="0 0 0.18"/>
+  </joint>
+
+<joint name="base_to_left_wheel" type="fixed">
+    <parent link="base_link"/>
+    <child link="lWheel"/>
+	<origin xyz="-0.112 0 0.05"/>
+  </joint>
+
+<joint name="base_to_right_wheel" type="fixed">
+    <parent link="base_link"/>
+    <child link="rWheel"/>
+	<origin xyz="0.112 0 0.05"/>
+  </joint>
+
+<joint name="show_front" type="fixed">
+    <parent link="base_link"/>
+    <child link="front"/>
+	<origin xyz="0 0.111 0.105"/>
+  </joint>
+</robot>
+
+        
+
+
