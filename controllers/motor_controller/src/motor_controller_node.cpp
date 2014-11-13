@@ -1,4 +1,3 @@
-
 #include <ros/ros.h>
 #include <ras_arduino_msgs/PWM.h>
 #include <ras_arduino_msgs/Encoders.h>

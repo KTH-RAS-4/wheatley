@@ -1,0 +1,10 @@
+<!-- motor controller launch file -->
+
+<launch>
+	<node pkg="joy" type="joy_node" name="joy" ns="xbox"/>
+
+	<node pkg="xbox" type="xbox_node" name="xbox" output="screen">
+		<remap from="~/twist" to="/motor_controller/twist"/>
+	</node>
+</launch>
+
