@@ -61,6 +61,7 @@ public:
   void run()
   {
     ros::spin();
+    //calc();
   }
 
   void calc()
@@ -69,11 +70,14 @@ public:
 
     float minDistance = 5;
     float minStraight = 0.5;
+    float small_turn = 0.25;//.15
+    ROS_INFO("small_turn:  [%f]", small_turn);
+
     //move forward and turn sligthly to right
     if (distance.right_front < minDistance && distance.right_front < distance.right_rear)
     {
         twist_out.linear.x = twist_in.linear.x;
-        twist_out.angular.z = 0.15;
+        twist_out.angular.z = small_turn;
         right = 1;
     }
     //check if it has turn to much to the rigth, and alinght the sensors at margin: minStraight distance
@@ -83,13 +87,13 @@ public:
         if(distance.right_front > distance.right_rear && abs(distance.right_front-distance.right_rear) > minStraight)
         {
             twist_out.linear.x = 0;
-            twist_out.angular.z = -0.15;
+            twist_out.angular.z = -small_turn;
         }
          //only turn to right
         else if(distance.right_front < distance.right_rear && abs(distance.right_front-distance.right_rear) > minStraight)
         {
             twist_out.linear.x = 0;
-            twist_out.angular.z = 0.15;
+            twist_out.angular.z = small_turn;
         }
         //move as twist_in
         else
@@ -105,7 +109,7 @@ public:
     else if (distance.left_front < minDistance && distance.left_front < distance.left_rear)
     {
         twist_out.linear.x = twist_in.linear.x;
-        twist_out.angular.z = -0.15;
+        twist_out.angular.z = -small_turn;
         left = 1;
     }
     else if (left == 1 && distance.left_front >  minDistance && distance.left_rear > minDistance)
@@ -113,12 +117,12 @@ public:
         if(distance.left_front > distance.left_rear && abs(distance.left_front-distance.left_rear) > minStraight)
         {
             twist_out.linear.x = 0;
-            twist_out.angular.z = 0.15;
+            twist_out.angular.z = small_turn;
         }
         else if(distance.left_front < distance.left_rear && abs(distance.left_front-distance.left_rear) > minStraight)
         {
             twist_out.linear.x = 0;
-            twist_out.angular.z = -0.15;
+            twist_out.angular.z = -small_turn;
         }
         else
             twist_out = twist_in;
@@ -132,7 +136,7 @@ public:
     else
         twist_out = twist_in;
 
-    if (distance.front < 5)
+    if (distance.front < 8)
     {
         twist_out.linear.x = 0;
         twist_out.angular.z = 0;
