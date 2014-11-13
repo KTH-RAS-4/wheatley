@@ -1,7 +1,7 @@
 #include <ros/ros.h>
 #include <geometry_msgs/Twist.h>
 #include <sensor_msgs/Joy.h>
-#include <math.h>
+#include <cmath>
 
 
 class Xbox
@@ -10,54 +10,56 @@ private:
     ros::NodeHandle nh;
     ros::Publisher pub_twist;
     ros::Subscriber sub_joy;
-    geometry_msgs::Twist twist;
+    sensor_msgs::Joy joy;
+    ros::Rate loop_rate;
+    double linearConstant;
+    double angularConstant;
 
 public:
     Xbox()
         : nh("~")
+        , loop_rate(1)
     {
-        init();
+        double rate;
+        nh.getParam("rate", rate);
+        loop_rate = ros::Rate(rate);
+
+        nh.getParam("linear_constant", linearConstant);
+        nh.getParam("angular_constant", angularConstant);
+
+        pub_twist = nh.advertise<geometry_msgs::Twist>("twist", 1);
+        sub_joy = nh.subscribe("joy", 1, &Xbox::joyCallback, this);
     }
 
     ~Xbox()
     {
     }
 
-    void init()
+    void joyCallback(const sensor_msgs::Joy::ConstPtr& msg)
     {
-        pub_twist = nh.advertise<geometry_msgs::Twist>("twist", 1000);
-        sub_joy = nh.subscribe("joy", 1, &Xbox::joyCallback, this);
-    }
-
-    void joyCallback(const sensor_msgs::Joy::ConstPtr& joy)
-    {
-        twist.linear.x = joy->axes[1];
-        twist.angular.z = 2*joy->axes[0];
+        joy = *msg;
+        calc();
     }
 
     void calc()
     {
-        if (twist.linear.x < 0.1 && twist.linear.x > -0.1)
-        {
-            twist.linear.x = 0;
-        }
-        if (twist.angular.z < 0.1 && twist.angular.z > -0.1)
-        {
-            twist.angular.z = 0;
-        }
+        geometry_msgs::Twist twist;
+
+        twist.linear.x = linearConstant * joy.axes[1];
+        twist.angular.z = angularConstant * joy.axes[3];
 
         pub_twist.publish(twist);
     }
 
     void run()
     {
-        ros::Rate loop_rate(10.0);
-        while(ros::ok())
+        ros::spin();
+        /*while(ros::ok())
         {
           ros::spinOnce();
           calc();
           loop_rate.sleep();
-        }
+        }*/
     }
 };
 

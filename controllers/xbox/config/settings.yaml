@@ -1,0 +1,3 @@
+rate: 10
+linear_constant: 0.3
+angular_constant: 2

@@ -1,9 +1,10 @@
 <!-- motor controller launch file -->
 
 <launch>
-	<node pkg="joy" type="joy_node" name="joy" ns="xbox"/>
+	<include file="$(find xbox)/launch/joy.launch"/>
 
 	<node pkg="xbox" type="xbox_node" name="xbox" output="screen">
+		<rosparam command="load" file="$(find xbox)/config/settings.yaml"/>
 		<remap from="~/twist" to="/motor_controller/twist"/>
 	</node>
 </launch>
