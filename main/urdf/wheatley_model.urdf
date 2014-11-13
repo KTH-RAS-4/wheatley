@@ -14,14 +14,14 @@
 			<geometry>
 				<cylinder length="0.08" radius="0.1125"/>
 			</geometry>
-			<material name="metal" />
+			<material name="metal"/>
 		</visual>
 		<visual>
 			<origin xyz="0 0 0.18"/>
 			<geometry>
 				<box size="0.165 0.075 0.175"/>
 			</geometry>
-			<material name="metal" />
+			<material name="metal"/>
 		</visual>
 	</link>
 
@@ -42,7 +42,7 @@
 			<geometry>
 				<cylinder length="0.025" radius="0.05"/>
 			</geometry>
-			<material name="rubber" />
+			<material name="rubber"/>
 		</visual>
 	</link>
 
@@ -52,7 +52,7 @@
 			<geometry>
 				<cylinder length="0.025" radius="0.05"/>
 			</geometry>
-			<material name="rubber" />
+			<material name="rubber"/>
 		</visual>
 	</link>
 
@@ -73,4 +73,12 @@
 		<child link="wheel_right"/>
 		<origin xyz="0.112 0 0.05"/>
 	</joint>
+	
+	
+	
+	<sensor name="sensors/ir/front" update_rate="10">
+		<parent link="base_link"/>
+		<origin xyz="0 0 0" rpy="0 0 0"/>
+		<ray/>
+	</sensor>
 </robot>
