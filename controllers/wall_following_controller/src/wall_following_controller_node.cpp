@@ -1,5 +1,5 @@
 #include <ros/ros.h>
-#include <ras_arduino_msgs/Distance.h>
+#include <sensors/Distance.h>
 #include <geometry_msgs/Twist.h>
 #include <algorithm>
 
@@ -27,7 +27,7 @@ private:
   ros::Subscriber sub_distance;
 
 
-  ras_arduino_msgs::Distance distance;
+  sensors::Distance distance;
 
 public:
   WallFollowingControllerNode()
@@ -53,7 +53,7 @@ public:
     calc();
   }
 
-  void distanceCallback(const ras_arduino_msgs::Distance::ConstPtr &msg)
+  void distanceCallback(const sensors::Distance::ConstPtr &msg)
   {
     distance = *msg;
   }

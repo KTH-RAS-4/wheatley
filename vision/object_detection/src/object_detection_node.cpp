@@ -2,8 +2,8 @@
 #include <visualization_msgs/Marker.h>
 #include <tf/transform_broadcaster.h>
 
-#include <ras_arduino_msgs/Object.h>
-#include <ras_arduino_msgs/Objects.h>
+#include <vision_msgs/Object.h>
+#include <vision_msgs/Objects.h>
 
 #include <pcl/filters/voxel_grid.h>
 #include <sensor_msgs/PointCloud2.h>
@@ -149,7 +149,7 @@ cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
 
 
     int j = 0;
-    ras_arduino_msgs::Objects objects;
+    vision_msgs::Objects objects;
     for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
     {
         pcl::PointCloud<PointT>::Ptr cloud_cluster (new pcl::PointCloud<PointT>(*cloud_filtered2, it->indices));
@@ -175,7 +175,7 @@ cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
         color[1] /= (float) cloud_cluster->size();
         color[2] /= (float) cloud_cluster->size();
 
-        ras_arduino_msgs::Object ob;
+        vision_msgs::Object ob;
         ob.r = color[0];
         ob.g = color[1];
         ob.b = color[2];
@@ -209,7 +209,7 @@ int main (int argc, char** argv)
 
     // Create a ROS publisher for the output point cloud
     pub_plane = nh.advertise<sensor_msgs::PointCloud2> ("/object_detection/plane", 1);
-    pub_objects = nh.advertise<ras_arduino_msgs::Objects> ("/object_detection/objects", 1);
+    pub_objects = nh.advertise<vision_msgs::Objects> ("/object_detection/objects", 1);
     marker_pub = nh.advertise<visualization_msgs::Marker>("visualization_marker", 10);
 
 

@@ -3,8 +3,8 @@
 #include <math.h>
 #include <ros/ros.h>
 #include <string>
-#include <ras_arduino_msgs/Object.h>
-#include <ras_arduino_msgs/Objects.h>
+#include <vision_msgs/Object.h>
+#include <vision_msgs/Objects.h>
 
 float object_colors[] = {
     200, 180, 180,
@@ -36,7 +36,7 @@ public:
     {
     }
 
-    void colorHandle(const ras_arduino_msgs::Objects& msg)
+    void colorHandle(const vision_msgs::Objects& msg)
     {
         std::cout << "---------------------------" << std::endl;
         for (int i = 0; i < msg.objects.size(); i++)
@@ -54,7 +54,7 @@ public:
 
     }
 
-    int findClosestColor(ras_arduino_msgs::Object obj)
+    int findClosestColor(vision_msgs::Object obj)
     {
         int n_colors = (sizeof(object_colors)/sizeof(*object_colors))/3;
         int color;

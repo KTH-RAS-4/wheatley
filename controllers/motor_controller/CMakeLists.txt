@@ -5,8 +5,9 @@ project(motor_controller)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
-  ras_arduino_msgs
   roscpp
+  std_msgs
+  ras_arduino_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -66,6 +67,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate added messages and services with any dependencies listed here
 # generate_messages(
 #   DEPENDENCIES
+#   std_msgs
 #   ras_arduino_msgs
 # )
 
@@ -81,7 +83,7 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES motor_controller
-#  CATKIN_DEPENDS ras_arduino_msgs roscpp
+ CATKIN_DEPENDS roscpp std_msgs ras_arduino_msgs
 #  DEPENDS system_lib
 )
 
@@ -111,12 +113,12 @@ add_executable(average_topic src/average_topic.cpp)
  add_dependencies(average_topic motor_controller_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
- target_link_libraries(motor_controller_node
-   ${catkin_LIBRARIES}
- )
- target_link_libraries(average_topic
-   ${catkin_LIBRARIES}
- )
+target_link_libraries(motor_controller_node
+  ${catkin_LIBRARIES}
+)
+target_link_libraries(average_topic
+  ${catkin_LIBRARIES}
+)
 #############
 ## Install ##
 #############
