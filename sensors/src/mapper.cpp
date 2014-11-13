@@ -1,53 +1,81 @@
 #include <ros/ros.h>
+#include <tf/transform_listener.h>
 #include <sensors/Distance.h>
-#include <visualization_msgs/Marker.h>
-#include <geometry_msgs/Point.h>
+#include <sensor_msgs/PointCloud2.h>
+#include <pcl_ros/point_cloud.h>
+#include <pcl_ros/transforms.h>
+#include <pcl/point_types.h>
 
-ros::Publisher pub_map;
-sensors::Distance distance;
-
-void calc()
+class IrScanner
 {
-    //TODO: really we would like to have gotten the time from somewhere else
-    ros::Time now = ros::Time::now();
+private:
+    ros::NodeHandle nh;
+    ros::Subscriber sub_distance;
+    ros::Publisher pub_ir;
 
-    visualization_msgs::Marker points;
-    points.header.frame_id = "robot";
+    tf::StampedTransform tf_front;
+    tf::StampedTransform tf_back;
+    tf::StampedTransform tf_left_front;
+    tf::StampedTransform tf_left_rear;
+    tf::StampedTransform tf_right_front;
+    tf::StampedTransform tf_right_rear;
 
-    points.header.stamp = now;
-    points.ns = "map_points";
-    points.action = visualization_msgs::Marker::ADD;
-    points.pose.orientation.w = 1.0;
+public:
+    IrScanner()
+        : nh("~")
+    {
+        ros::Time now(0); //get latest
 
-    static int id = 0;
-    points.id = id++;
+        tf::TransformListener tfl;
+        tfl.lookupTransform("sensors/ir/front",       "robot", now, tf_front);
+        tfl.lookupTransform("sensors/ir/back",        "robot", now, tf_back);
+        tfl.lookupTransform("sensors/ir/left_front",  "robot", now, tf_left_front);
+        tfl.lookupTransform("sensors/ir/left_rear",   "robot", now, tf_left_rear);
+        tfl.lookupTransform("sensors/ir/right_front", "robot", now, tf_right_front);
+        tfl.lookupTransform("sensors/ir/right_rear",  "robot", now, tf_right_rear);
 
-    points.type = visualization_msgs::Marker::POINTS;
+        pub_ir = nh.advertise<sensor_msgs::PointCloud2>("", 10);
+        sub_distance = nh.subscribe ("/sensors/distance", 10, &IrScanner::distanceCallback, this);
+    }
 
-    points.scale.x = 0.05;
-    points.scale.y = 0.05;
+    static pcl::PointXYZ toPCL(const tf::Vector3& v)
+    {
+        return pcl::PointXYZ(v.x(), v.y(), v.z());
+    }
 
-    points.color.g = 1.0;
-    points.color.a = 1.0;
+    void distanceCallback(const sensors::Distance::ConstPtr &distance)
+    {
+        //TODO: really we would like to have gotten the time from somewhere else
+        ros::Time now = ros::Time::now();
 
-    points.points.push_back(geometry_msgs::Point());
+        pcl::PointCloud<pcl::PointXYZ> cloud;
+        cloud.width = 1;
+        cloud.height = 6;
 
-    pub_map.publish(points);
-}
+        cloud.push_back(toPCL(tf_front        * tf::Vector3(0, distance->front        , 0)));
+        cloud.push_back(toPCL(tf_back         * tf::Vector3(0, distance->rear         , 0)));
+        cloud.push_back(toPCL(tf_left_front   * tf::Vector3(0, distance->left_front   , 0)));
+        cloud.push_back(toPCL(tf_left_rear    * tf::Vector3(0, distance->left_rear    , 0)));
+        cloud.push_back(toPCL(tf_right_front  * tf::Vector3(0, distance->right_front  , 0)));
+        cloud.push_back(toPCL(tf_right_rear   * tf::Vector3(0, distance->right_rear   , 0)));
 
-void distanceCallback(const sensors::Distance::ConstPtr &msg)
-{
-    distance = *msg;
-    calc();
-}
+        sensor_msgs::PointCloud2 ros_cloud;
+        pcl::toROSMsg(cloud, ros_cloud);
+        ros_cloud.header.frame_id = "robot";
+        ros_cloud.header.stamp = now;
+        pub_ir.publish(ros_cloud);
+    }
+
+    void run()
+    {
+        ros::spin();
+    }
+};
+
 
 int main (int argc, char** argv)
 {
-    ros::init (argc, argv, "mapper");
-    ros::NodeHandle nh("~");
-
-    pub_map = nh.advertise<visualization_msgs::Marker>("", 10);
-    ros::Subscriber sub_distance = nh.subscribe ("/sensors/distance", 1, distanceCallback);
-
-    ros::spin();
+    ros::init(argc, argv, "ir_scanner_node");
+    IrScanner ir_scanner_node;
+    ir_scanner_node.run();
 }

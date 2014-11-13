@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   visualization_msgs
   nav_msgs
   tf
+  pcl_ros
 )
 
 ## System dependencies are found with CMake's conventions
