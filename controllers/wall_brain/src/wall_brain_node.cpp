@@ -103,11 +103,11 @@ public:
       case ALIGN:
           if (align(0.3))
           {
-              state = FOLLOW;
-              ros::Duration(0.2).sleep();
-              ROS_INFO("state: FOLLOW");
-              speaker_msg.arg="state: FOLLOW";
+              speaker_msg.arg="FOLLOW";
               pub_speaker.publish(speaker_msg);
+              state = FOLLOW;
+              ROS_INFO("state: FOLLOW");
+              ros::Duration(0.2).sleep();
           }
           break;
       case FOLLOW:
@@ -118,11 +118,12 @@ public:
               else
                   alignment = theta+M_PI/2;
 
+              speaker_msg.arg="ALIGN";
+              pub_speaker.publish(speaker_msg);
               state = ALIGN;
               ROS_INFO("state: ALIGN");
               ros::Duration(0.2).sleep();
-              speaker_msg.arg="state: ALIGN";
-              pub_speaker.publish(speaker_msg);
+
           }
           break;
 
