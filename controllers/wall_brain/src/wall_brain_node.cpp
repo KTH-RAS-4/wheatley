@@ -7,6 +7,7 @@
 #include <tf/LinearMath/Vector3.h>
 #include <tf/tf.h>
 #include <algorithm>
+#include <sound_play/SoundRequest.h>
 
 template <typename T> int sgn(T val)
 {
@@ -24,11 +25,15 @@ class WallBrain
 {
 private:
   ros::NodeHandle n;
+  ros::NodeHandle n1;
+  ros::Publisher pub_speaker;
   ros::Publisher motor_twist;
   ros::Publisher wall_twist;
+
   ros::Subscriber sub_distance;
   ros::Subscriber sub_pose;
 
+  sound_play::SoundRequest speaker_msg;
   nav_msgs::Odometry pose;
   sensors::Distance distance;
   ros::Rate loop_rate;
@@ -57,6 +62,10 @@ public:
     sub_pose = n.subscribe("/sensors/pose", 1000, &WallBrain::poseCallback, this);
     motor_twist = n.advertise<geometry_msgs::Twist>("/motor_controller/twist", 1000);
     wall_twist = n.advertise<geometry_msgs::Twist>("/wall_avoider/twist", 1000);
+    pub_speaker = n1.advertise<sound_play::SoundRequest>("robotsound", 1000);
+    speaker_msg.command=1;//say only once
+    speaker_msg.sound=-3; //option say what is in the arg
+
   }
 
   void distanceCallback(const sensors::Distance::ConstPtr &msg)
@@ -75,9 +84,10 @@ public:
     enum state state = FIND_ALIGNMENT;
     ROS_INFO("state: FIND_ALIGNMENT");
 
-
+    int a=0;
     while (ros::ok())
     {
+
       ros::spinOnce();
 
       switch (state)
@@ -87,6 +97,7 @@ public:
           {
               state = ALIGN;
               ros::Duration(0.5).sleep();
+
           }
           break;
       case ALIGN:
@@ -95,6 +106,8 @@ public:
               state = FOLLOW;
               ros::Duration(0.2).sleep();
               ROS_INFO("state: FOLLOW");
+              speaker_msg.arg="state: FOLLOW";
+              pub_speaker.publish(speaker_msg);
           }
           break;
       case FOLLOW:
@@ -106,13 +119,19 @@ public:
                   alignment = theta+M_PI/2;
 
               state = ALIGN;
+              ROS_INFO("state: ALIGN");
               ros::Duration(0.2).sleep();
+              speaker_msg.arg="state: ALIGN";
+              pub_speaker.publish(speaker_msg);
           }
           break;
+
       }
 
+
       loop_rate.sleep();
-    }
+
+   }
   }
 
   bool findAlignment(double speed)
@@ -144,7 +163,7 @@ public:
         twist.angular.z = speed;
         motor_twist.publish(twist);
     }
-  }
+ }
 
   double angleDiff(double a, double b)
   {
@@ -154,12 +173,11 @@ public:
       if (a < -M_PI)
           a += 2*M_PI;
       return a;
-  }
+ }
 
   bool align(double speed)
   {
     double error = angleDiff(alignment, theta);
-    ROS_INFO("state: ALIGN ");
 
     if (std::abs(error) < 3*M_PI/180)//error should be in radians. 3 degres=3*3.1415/180 rad = 0.05 rad
     {
@@ -175,7 +193,7 @@ public:
         motor_twist.publish(twist);
         return false;
     }
-  }
+ }
 
   bool follow(double speed, double frontDistance)
   {
@@ -204,8 +222,8 @@ public:
     }
   }
 };
-int main (int argc, char **argv)
-{
+
+int main (int argc, char **argv){
   ros::init(argc, argv, "wall_brain");
   WallBrain my_node;
   my_node.run();
