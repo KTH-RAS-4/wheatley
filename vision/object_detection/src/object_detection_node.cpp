@@ -43,21 +43,20 @@ cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
     if(cloud->size() == 0)
         return;
 
-    /** Set up transform */
-    //"camera_link" transform
-    ros::Time now = ros::Time::now();
-    static tf::TransformBroadcaster br;
-    tf::Transform transform;
-    transform.setOrigin(tf::Vector3(0.0, 0.0, 0.3));
-    tf::Quaternion q;
-    q.setRPY(-3*M_PI/180, 20*M_PI/180, 0);
-    transform.setRotation(q);
-    br.sendTransform(tf::StampedTransform(transform, now, "robot", "camera_link"));
+    /** Send robot to camera_link transform */
+    //ros::Time now = ros::Time::now();
+    //static tf::TransformBroadcaster br;
+    //tf::Transform transform;
+    //transform.setOrigin(tf::Vector3(0.0, 0.0, 0.3));
+    //tf::Quaternion q;
+    //q.setRPY(-3*M_PI/180, 20*M_PI/180, 0);
+    //transform.setRotation(q);
+    //br.sendTransform(tf::StampedTransform(transform, now, "robot", "camera_link"));
 
     /** Set up markers */
     visualization_msgs::Marker points;
     points.header.frame_id = "/camera_depth_optical_frame";
-    points.header.stamp = ros::Time::now();
+    points.header.stamp = cloud_msg->header.stamp;
     points.ns = "points";
     points.action = visualization_msgs::Marker::ADD;
     points.pose.orientation.w = 1.0;
