@@ -1,8 +1,0 @@
-<!-- motor controller launch file -->
-
-<launch>
-	<node pkg="sensors" type="distance_sensors" ns="sensors"
-		name="ir" output="screen" clear_params="true">
-	</node>
-</launch>
-

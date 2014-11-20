@@ -42,7 +42,7 @@ public:
   
   void init()
   {
-    sub_distance = n.subscribe("/sensors/distance", 1000, &WallFollowingControllerNode::distanceCallback, this);
+    sub_distance = n.subscribe("/sensors/ir/distances", 1000, &WallFollowingControllerNode::distanceCallback, this);
     sub_twist = n.subscribe("twist_in", 1000, &WallFollowingControllerNode::twistCallback, this);
     pub_twist = n.advertise<geometry_msgs::Twist>("twist_out", 1000);
   }
@@ -68,8 +68,9 @@ public:
   {
     geometry_msgs::Twist twist_out;
 
-    float minDistance = 5;
-    float minStraight = 0.5;
+    float minDistance = 0.05;
+    float minFrontDistance = 0.08;
+    float minStraight = 0.005;
     float small_turn = 0.35;//.15
     ROS_INFO("small_turn:  [%f]", small_turn);
 
@@ -136,13 +137,13 @@ public:
     else
         twist_out = twist_in;
 
-    if (distance.front < 8)
+    if (distance.front < minFrontDistance)
     {
         twist_out.linear.x = 0;
         twist_out.angular.z = 0;
     }
 
-    //float x = CLAMP(5-distance.right_front, 0, 1);
+    //float x = CLAMP(0.05-distance.right_front, 0, 0.01);
 
     //twist_out.linear.x = twist_in.linear.x; //stop when close in the front
     //twist_out.angular.z = (1-x)*twist_in.angular.z + 2*x;

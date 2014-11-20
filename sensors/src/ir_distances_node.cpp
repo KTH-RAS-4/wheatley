@@ -66,12 +66,13 @@ float poly(int ch, param_t params)
 void adcCallback(const ras_arduino_msgs::ADConverter::ConstPtr &msg)
 {
   sensors::Distance out;
-  out.left_front = round(poly(msg->ch1, param_ch1)*10)/10;
-  out.front = round(poly(msg->ch2, param_ch2)*10)/10;
-  out.left_rear = round(poly(msg->ch3, param_ch3)*10)/10;
-  out.right_rear = round(poly(msg->ch4, param_ch4)*10)/10;
-  out.rear = round(poly(msg->ch5, param_ch5)*10)/10;
-  out.right_front = round(poly(msg->ch6, param_ch6)*10)/10;
+  out.header.stamp = ros::Time::now();
+  out.left_front = round(poly(msg->ch1, param_ch1)*10)/1000;
+  out.front = round(poly(msg->ch2, param_ch2)*10)/1000;
+  out.left_rear = round(poly(msg->ch3, param_ch3)*10)/1000;
+  out.right_rear = round(poly(msg->ch4, param_ch4)*10)/1000;
+  out.rear = round(poly(msg->ch5, param_ch5)*10)/1000;
+  out.right_front = round(poly(msg->ch6, param_ch6)*10)/1000;
 
   pub.publish(out);
 }

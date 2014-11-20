@@ -1,7 +1,0 @@
-<!-- broadcaster of the robot to camera transformation -->
-
-<launch>
-	<node pkg="tf" type="static_transform_publisher"
-		name="tf_robot_to_camera_publisher"
-		args="0 0 0.3 -0.00455 0.174 -0.0258 0.984 robot camera_link 100" />
-</launch>

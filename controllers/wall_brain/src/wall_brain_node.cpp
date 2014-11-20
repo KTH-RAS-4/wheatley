@@ -58,7 +58,7 @@ public:
     //n.getParam("rate", rate);
     loop_rate = ros::Rate(rate);
 
-    sub_distance = n.subscribe("/sensors/distance", 1000, &WallBrain::distanceCallback, this);
+    sub_distance = n.subscribe("/sensors/ir/distances", 1000, &WallBrain::distanceCallback, this);
     sub_pose = n.subscribe("/sensors/pose", 1000, &WallBrain::poseCallback, this);
     motor_twist = n.advertise<geometry_msgs::Twist>("/motor_controller/twist", 1000);
     wall_twist = n.advertise<geometry_msgs::Twist>("/wall_avoider/twist", 1000);
@@ -111,9 +111,9 @@ public:
           }
           break;
       case FOLLOW:
-          if (!follow(0.2, 15))
+          if (!follow(0.2, 0.15))
           {
-              if (distance.right_front > 15)
+              if (distance.right_front > 0.15)
                   alignment = theta-M_PI/2;
               else
                   alignment = theta+M_PI/2;
@@ -142,9 +142,9 @@ public:
 
     double l2 = distance.left_front-distance.left_rear;
     double r2 = distance.right_front-distance.right_rear;
-    if (distance.left_front > 15)
+    if (distance.left_front > 0.15)
         l2 = 0;
-    if (distance.right_front > 15)
+    if (distance.right_front > 0.15)
         r2 = 0;
     //ROS_INFO("l %.1f r %.1f   l2 %.2f r2 %.2f", l, r, l2, r2);
 
@@ -199,7 +199,7 @@ public:
   bool follow(double speed, double frontDistance)
   {
       geometry_msgs::Twist twist;
-    if (distance.front > 30)
+    if (distance.front > 0.30)
     {
         //geometry_msgs::Twist twist;
         twist.linear.x = speed;

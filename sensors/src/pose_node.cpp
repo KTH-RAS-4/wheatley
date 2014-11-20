@@ -30,7 +30,7 @@ public:
         : nh("~")
         , x(0)
         , y(0)
-        , theta(M_PI/2)
+        , theta(0)
     {
         pub_pose = nh.advertise<nav_msgs::Odometry> ("", 1);
         sub_encoders = nh.subscribe ("/arduino/encoders", 1, &PoseNode::encoderCallback, this);

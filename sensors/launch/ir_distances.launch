@@ -1,0 +1,6 @@
+<launch>
+	<node pkg="sensors" type="ir_distances" ns="sensors/ir"
+		name="distances" output="screen">
+	</node>
+</launch>
+
