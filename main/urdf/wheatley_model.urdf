@@ -7,8 +7,8 @@
 	<material name="rubber">
 		<color rgba="0 0 0 1"/>
 	</material>
-	
-	<link name="base_link">
+
+	<link name="robot">
 		<visual>
 			<origin xyz="0 0 0.06"/>
 			<geometry>
@@ -56,29 +56,58 @@
 		</visual>
 	</link>
 
-	<joint name="base_to_front_marker" type="fixed">
-		<parent link="base_link"/>
+	<joint name="robot_to_front_marker" type="fixed">
+		<parent link="robot"/>
 		<child link="front_marker"/>
 		<origin xyz="0 0.111 0.105"/>
 	</joint>
 
-	<joint name="base_to_left_wheel" type="fixed">
-		<parent link="base_link"/>
+	<joint name="robot_to_left_wheel" type="fixed">
+		<parent link="robot"/>
 		<child link="wheel_left"/>
 		<origin xyz="-0.112 0 0.05"/>
 	</joint>
 
-	<joint name="base_to_right_wheel" type="fixed">
-		<parent link="base_link"/>
+	<joint name="robot_to_right_wheel" type="fixed">
+		<parent link="robot"/>
 		<child link="wheel_right"/>
 		<origin xyz="0.112 0 0.05"/>
 	</joint>
 	
 	
-	
 	<sensor name="sensors/ir/front" update_rate="10">
-		<parent link="base_link"/>
-		<origin xyz="0 0 0" rpy="0 0 0"/>
+		<parent link="robot"/>
+		<origin xyz="0 0.112 0" rpy="0 0 0"/>
+		<ray/>
+	</sensor>
+
+	<sensor name="sensors/ir/back" update_rate="10">
+		<parent link="robot"/>
+		<origin xyz="0 -0.112 0" rpy="0 0 3.14159"/>
+		<ray/>
+	</sensor>
+
+	<sensor name="sensors/ir/left_front" update_rate="10">
+		<parent link="robot"/>
+		<origin xyz="-11.9 8.2 0" rpy="0 0 1.57075"/>
+		<ray/>
+	</sensor>
+
+	<sensor name="sensors/ir/left_rear" update_rate="10">
+		<parent link="robot"/>
+		<origin xyz="-11.9 -8.2 0" rpy="0 0 1.57075"/>
+		<ray/>
+	</sensor>
+
+	<sensor name="sensors/ir/right_front" update_rate="10">
+		<parent link="robot"/>
+		<origin xyz="11.9 8.2 0" rpy="0 0 -1.57075"/>
+		<ray/>
+	</sensor>
+
+	<sensor name="sensors/ir/right_rear" update_rate="10">
+		<parent link="robot"/>
+		<origin xyz="11.9 -8.2 0" rpy="0 0 1.57075"/>
 		<ray/>
 	</sensor>
 </robot>

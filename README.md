@@ -1,7 +1,15 @@
 # Wheatley
 The main ROS package for the robot built by group 4 of KTH-RAS fall 2014.
 
-#sub-packages
+#packages
+
+##main
+Contains all the launch for bringing everything up.
+Bringing up the basic stuff (arduino, motor_controller, sensors, robot_model) is currently done with:
+```bash
+roslaunch main base.launch
+roslaunch main primesense.launch
+```
 
 ##controllers
 Motor controllers, wall following...

@@ -101,7 +101,7 @@ public:
           }
           break;
       case ALIGN:
-          if (align(0.3))
+          if (align(0.2))
           {
               speaker_msg.arg="FOLLOW";
               pub_speaker.publish(speaker_msg);
@@ -111,7 +111,7 @@ public:
           }
           break;
       case FOLLOW:
-          if (!follow(0.3, 15))
+          if (!follow(0.2, 15))
           {
               if (distance.right_front > 15)
                   alignment = theta-M_PI/2;

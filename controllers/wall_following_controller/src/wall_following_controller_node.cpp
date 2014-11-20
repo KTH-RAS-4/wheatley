@@ -70,7 +70,7 @@ public:
 
     float minDistance = 5;
     float minStraight = 0.5;
-    float small_turn = 0.25;//.15
+    float small_turn = 0.35;//.15
     ROS_INFO("small_turn:  [%f]", small_turn);
 
     //move forward and turn sligthly to right

@@ -1,6 +1,6 @@
 rate: 100
 timeout: 0.5
-output_measured_angular: true
+output_measured_angular: false
 
 motors:
     max_angular_speed: !degrees 180
