@@ -106,16 +106,20 @@ include_directories(
 
 ## Declare a cpp executable
 add_executable(object_detection_node src/object_detection_node.cpp)
+add_executable(cloud_preprocessing_node src/cloud_preprocessing_node.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 add_dependencies(object_detection_node object_detection_generate_messages_cpp)
+add_dependencies(cloud_preprocessing_node object_detection_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(object_detection_node
   ${catkin_LIBRARIES}
 )
-
+target_link_libraries(cloud_preprocessing_node
+  ${catkin_LIBRARIES}
+)
 #############
 ## Install ##
 #############
