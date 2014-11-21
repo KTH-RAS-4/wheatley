@@ -23,10 +23,12 @@ class ColorDetectorNode
     ros::NodeHandle handle;
     ros::Subscriber color_sub;
 
+
 public:
     ColorDetectorNode()
     {
         color_sub = handle.subscribe("object_detection/objects", 1, &ColorDetectorNode::colorHandle, this);
+
 
         std::vector<float> v(3, 3);
         printVector(v);
