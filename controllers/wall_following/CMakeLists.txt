@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(wall_following_controller)
+project(wall_following)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -8,6 +8,7 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   geometry_msgs
   roscpp
+  std_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -106,16 +107,23 @@ include_directories(
 # )
 
 ## Declare a cpp executable
- add_executable(wall_following_controller_node src/wall_following_controller_node.cpp)
+add_executable(wall_avoider_node src/wall_avoider_node.cpp)
+add_executable(wall_brain_node src/wall_brain_node.cpp)
+
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
- add_dependencies(wall_following_controller_node wall_following_controller_generate_messages_cpp)
+add_dependencies(wall_avoider_node wall_following_controller_generate_messages_cpp)
+add_dependencies(wall_brain_node wall_following_controller_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
- target_link_libraries(wall_following_controller_node
-   ${catkin_LIBRARIES}
- )
+target_link_libraries(wall_avoider_node
+  ${catkin_LIBRARIES}
+)
+
+target_link_libraries(wall_brain_node
+  ${catkin_LIBRARIES}
+)
 
 #############
 ## Install ##
