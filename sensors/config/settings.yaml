@@ -1,0 +1,8 @@
+ir:
+    max_distance_cutoff:
+        front:       0.40
+        rear:        0.40
+        left_front:  0.16
+        left_rear:   0.16
+        right_front: 0.16
+        right_rear:  0.16

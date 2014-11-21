@@ -1,4 +1,6 @@
 <launch>
+	<rosparam command="load" ns="sensors" clear_params="true"
+		file="$(find sensors)/config/settings.yaml"/>
 	<node pkg="sensors" type="ir_points" ns="sensors/ir"
 		name="points" output="screen">
 	</node>
