@@ -9,6 +9,8 @@
 #include <sensor_msgs/point_cloud_conversion.h>
 #include <map>
 
+#include <sensors/SensorClouds.h>
+
 #include <tf/transform_listener.h>
 
 #include <occupancy_grid_utils/ray_tracer.h>
@@ -76,16 +78,16 @@ public:
     MapNode()
     {
         ROS_INFO("Running");
-        grid_construction_interval_ = 0.3;
-        history_length_ = 100;
+        grid_construction_interval_ = 0.1;
+        history_length_ = 10000;
         fixed_frame_ = "map";
-        resolution_ = 0.05;
+        resolution_ = 0.03;
         sensor_frame_ = "robot";
         local_grid_size_ = 5.0;
         grid_pub_ = handle.advertise<nm::OccupancyGrid>("/map", 1);
 
-        //sub_pointcloud = handle.subscribe("/object_detection/others", 1, &MapNode::mapIr, this);
-        sub_ir = handle.subscribe("/sensors/ir/points", 1, &MapNode::mapIr, this);
+        //sub_pointcloud = handle.subscribe("/object_detection/preprocessed", 1, &MapNode::mapPointCloud, this);
+        sub_ir = handle.subscribe("/sensors/ir/point_clouds", 1, &MapNode::mapIr, this);
         //sub_pose = handle.subscribe("/sensors/pose", 1, &MapNode::mapPose, this);
         build_grid_timer_ = handle.createWallTimer(ros::WallDuration(grid_construction_interval_), &MapNode::buildGrid, this);
         clouds_ = CloudBuffer(history_length_);
@@ -97,11 +99,9 @@ public:
 
     void buildGrid(const ros::WallTimerEvent& scan) {
         if (last_cloud_) {
-            ROS_INFO ("Build grid");
-
             {
             Lock lock(mutex_);
-            clouds_.push_back(last_cloud_);
+            //clouds_.push_back(last_cloud_);
             last_cloud_.reset();
             }
 
@@ -128,9 +128,10 @@ public:
             gu::OverlayClouds overlay = gu::createCloudOverlay(fake_grid, fixed_frame_, 0.1, 10, 2);
             vector<CloudConstPtr> clouds(clouds_.begin(), clouds_.end());
             BOOST_FOREACH  (CloudConstPtr cloud, clouds_) {
-                //ROS_INFO ("Add cloud");
-                gu::addCloud(&overlay, cloud);
+                gu::addCloud(&overlay, cloud, cloud->hasEndpoint);
             }
+
+
             nm::OccupancyGrid::ConstPtr grid = gu::getGrid(overlay);
 
             ROS_DEBUG_NAMED ("build_grid", "Done building grid");
@@ -144,10 +145,52 @@ public:
 
     }
 
-    void mapIr(const sensor_msgs::PointCloud2 &msg)
+    void mapIr(const sensors::SensorClouds &msg)
     {
-        try {
+        std::vector<sensor_msgs::PointCloud2> clouds = msg.point_clouds;
+        std::vector<u_int8_t> hasEndpoint = msg.hasEndpoint;
 
+        for(int pc = 0; pc < 6; pc++) {
+            sensor_frame_ = clouds[pc].header.frame_id;
+            try {
+                // We'll need the transform between sensor and fixed frames at the time when the scan was taken
+                if (!tf_.waitForTransform(fixed_frame_, sensor_frame_, clouds[pc].header.stamp, ros::Duration(1.0)))
+                {
+                    ROS_WARN_STREAM ("Timed out waiting for transform from " << sensor_frame_ << " to "
+                                     << fixed_frame_ << " at " << clouds[pc].header.stamp.toSec());
+                    return;
+                }
+
+                // Figure out current sensor position
+                tf::Pose identity(tf::createIdentityQuaternion(), tf::Vector3(0, 0, 0));
+                tf::Stamped<tf::Pose> odom_pose;
+                tf_.transformPose(fixed_frame_, tf::Stamped<tf::Pose> (identity, ros::Time(), sensor_frame_), odom_pose);
+
+                sm::PointCloud sensor_frame_cloud;
+                sensor_msgs::convertPointCloud2ToPointCloud(clouds[pc], sensor_frame_cloud);
+
+
+                // Construct and save LocalizedCloud
+                CloudPtr loc_cloud(new gu::LocalizedCloud());
+                loc_cloud->hasEndpoint = hasEndpoint[pc];
+                loc_cloud->cloud.points = sensor_frame_cloud.points;
+                tf::poseTFToMsg(odom_pose, loc_cloud->sensor_pose);
+                loc_cloud->header.frame_id = fixed_frame_;
+                Lock lock(mutex_);
+                last_cloud_=loc_cloud;
+                clouds_.push_back(last_cloud_);
+            }
+            catch (tf::TransformException& e) {
+              ROS_INFO ("Not saving scan due to tf lookup exception: %s",
+                        e.what());
+            }
+        }
+    }
+
+    void mapPointCloud(const vision_msgs::PreprocessedClouds &msg)
+    {
+        sensor_msgs::PointCloud2 cloud = msg.others;
+        try {
             // We'll need the transform between sensor and fixed frames at the time when the scan was taken
             if (!tf_.waitForTransform(fixed_frame_, sensor_frame_, msg.header.stamp, ros::Duration(1.0)))
             {
@@ -166,14 +209,12 @@ public:
             laser_geometry::LaserProjection projector_;
             projector_.transformLaserScanToPointCloud (fixed_frame_, scan, fixed_frame_cloud, tf_);*/
 
-            // Now transform back into sensor frame at a single time point
-            /*sm::PointCloud sensor_frame_cloud;
-            tf_.transformPointCloud (sensor_frame_, scan.header.stamp, fixed_frame_cloud, fixed_frame_,
-                                   sensor_frame_cloud);*/
 
+            sm::PointCloud cloud_legacy;
+            sensor_msgs::convertPointCloud2ToPointCloud(cloud, cloud_legacy);
 
             sm::PointCloud sensor_frame_cloud;
-            sensor_msgs::convertPointCloud2ToPointCloud(msg, sensor_frame_cloud);
+            tf_.transformPointCloud (sensor_frame_, cloud_legacy, sensor_frame_cloud);
 
             // Construct and save LocalizedCloud
             CloudPtr loc_cloud(new gu::LocalizedCloud());
@@ -189,16 +230,11 @@ public:
         }
     }
 
-    void mapPointCloud(const vision_msgs::PreprocessedClouds &msg)
-    {
-
-    }
-
 };
 
 int main(int argc, char** argv)
 {
-    ros::init(argc, argv, "color_detector_node");
+    ros::init(argc, argv, "mapping_node");
     MapNode mn;
     ros::spin();
     return 0;

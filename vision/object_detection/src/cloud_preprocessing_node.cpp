@@ -64,7 +64,7 @@ void cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
 
     // Create the filtering object
     vgrid.setInputCloud (cloud);
-    vgrid.setLeafSize (0.005f, 0.005f, 0.005f);
+    vgrid.setLeafSize (0.01f, 0.01f, 0.01f);
     vgrid.filter (*cloud_downsampled);
 
     // Build a passthrough filter to remove spurious NaNs

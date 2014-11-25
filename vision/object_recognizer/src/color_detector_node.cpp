@@ -164,6 +164,7 @@ public:
 
     void objectHandle(const vision_msgs::Objects& msg)
     {
+
         int new_objects = 0;
         //Insert objects into collection
         for (int i = 0; i < msg.objects.size(); i++)
