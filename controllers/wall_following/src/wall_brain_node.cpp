@@ -62,9 +62,8 @@ public:
     sub_pose = n.subscribe("/sensors/pose", 1000, &WallBrain::poseCallback, this);
     motor_twist = n.advertise<geometry_msgs::Twist>("/motor_controller/twist", 1000);
     wall_twist = n.advertise<geometry_msgs::Twist>("/wall_avoider/twist", 1000);
-    pub_speaker = n1.advertise<sound_play::SoundRequest>("robotsound", 1000);
-    speaker_msg.command=1;//say only once
-    speaker_msg.sound=-3; //option say what is in the arg
+
+
 
   }
 
@@ -102,9 +101,7 @@ public:
           break;
       case ALIGN:
           if (align(0.2))
-          {
-              speaker_msg.arg="FOLLOW";
-              pub_speaker.publish(speaker_msg);
+            {
               state = FOLLOW;
               ROS_INFO("state: FOLLOW");
               ros::Duration(0.2).sleep();
@@ -116,10 +113,7 @@ public:
               if (distance.right_front > 0.15)
                   alignment = theta-M_PI/2;
               else
-                  alignment = theta+M_PI/2;
-
-              speaker_msg.arg="ALIGN";
-              pub_speaker.publish(speaker_msg);
+                  alignment = theta+M_PI/2;             
               state = ALIGN;
               ROS_INFO("state: ALIGN");
               ros::Duration(0.2).sleep();
@@ -131,8 +125,7 @@ public:
 
 
       loop_rate.sleep();
-
-   }
+    }
   }
 
   bool findAlignment(double speed)

@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
   nav_msgs
   tf
   pcl_ros
+  sensor_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -52,6 +53,7 @@ find_package(catkin REQUIRED COMPONENTS
 add_message_files(
   FILES
   Distance.msg
+  SensorClouds.msg
 )
 
 ## Generate services in the 'srv' folder
@@ -72,6 +74,7 @@ add_message_files(
 generate_messages(
   DEPENDENCIES
   ras_arduino_msgs
+  sensor_msgs
 )
 
 ###################################
