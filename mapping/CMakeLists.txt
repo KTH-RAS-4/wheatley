@@ -1,16 +1,15 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(object_detection)
+project(mapping)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
-  pcl_ros
+  geometry_msgs
   roscpp
   sensor_msgs
-  pcl_conversions
-  ras_arduino_msgs
-  tf
+  vision_msgs
+  occupancy_grid_utils
 )
 
 ## System dependencies are found with CMake's conventions
@@ -70,7 +69,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate added messages and services with any dependencies listed here
 # generate_messages(
 #   DEPENDENCIES
-#   std_msgs  # Or other packages containing msgs
+#   geometry_msgs#   sensor_msgs#   vision_msgs
 # )
 
 ###################################
@@ -84,8 +83,8 @@ find_package(catkin REQUIRED COMPONENTS
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
 #  INCLUDE_DIRS include
-#  LIBRARIES object_detection
-#  CATKIN_DEPENDS libpcl-all-dev pcl_ros roscpp
+#  LIBRARIES mapping
+#  CATKIN_DEPENDS geometry_msgs roscpp sensor_msgs vision_msgs
 #  DEPENDS system_lib
 )
 
@@ -95,37 +94,28 @@ catkin_package(
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
-# include_directories(include)
+ include_directories(include)
 include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
 ## Declare a cpp library
-# add_library(object_detection
-#   src/${PROJECT_NAME}/object_detection.cpp
+# add_library(mapping
+#   src/${PROJECT_NAME}/mapping.cpp
 # )
 
 ## Declare a cpp executable
-add_executable(object_detection_node src/object_detection_node.cpp)
-add_executable(cloud_preprocessing_node src/cloud_preprocessing_node.cpp)
-add_executable(object_camera_transform_node src/object_camera_transform_node.cpp)
+add_executable(mapping_node src/mapping_node.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
-add_dependencies(object_detection_node object_detection_generate_messages_cpp)
-add_dependencies(object_camera_transform_node object_detection_generate_messages_cpp)
-add_dependencies(cloud_preprocessing_node object_detection_generate_messages_cpp)
+ add_dependencies(mapping_node mapping_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(object_detection_node
-  ${catkin_LIBRARIES}
-)
-target_link_libraries(object_camera_transform_node
-  ${catkin_LIBRARIES}
-)
-target_link_libraries(cloud_preprocessing_node
-  ${catkin_LIBRARIES}
-)
+ target_link_libraries(mapping_node
+   ${catkin_LIBRARIES}
+ )
+
 #############
 ## Install ##
 #############
@@ -141,7 +131,7 @@ target_link_libraries(cloud_preprocessing_node
 # )
 
 ## Mark executables and/or libraries for installation
-# install(TARGETS object_detection object_detection_node
+# install(TARGETS mapping mapping_node
 #   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 #   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 #   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
@@ -166,7 +156,7 @@ target_link_libraries(cloud_preprocessing_node
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_object_detection.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_mapping.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()

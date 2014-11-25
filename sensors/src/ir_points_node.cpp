@@ -26,6 +26,9 @@ private:
     double cutoff_right_front;
     double cutoff_right_rear;
 
+    int counter;
+    pcl::PointCloud<pcl::PointXYZ> cloud_per_second;
+
 public:
     IrPointsNode()
         : nh("~")
@@ -50,6 +53,8 @@ public:
         nhp.getParam("left_rear",   cutoff_left_rear);
         nhp.getParam("right_front", cutoff_right_front);
         nhp.getParam("right_rear",  cutoff_right_rear);
+
+        counter = 0;
 
         pub_ir = nh.advertise<sensor_msgs::PointCloud2>("", 10);
         sub_distance = nh.subscribe ("/sensors/ir/distances", 10, &IrPointsNode::distanceCallback, this);

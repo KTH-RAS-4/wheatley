@@ -1,25 +1,9 @@
 #include <ros/ros.h>
-#include <visualization_msgs/Marker.h>
-#include <visualization_msgs/MarkerArray.h>
-#include <tf/transform_listener.h>
+/*#include <tf/transform_listener.h>
 #include <pcl_ros/transforms.h>
-#include <geometry_msgs/PointStamped.h>
 
 #include <vision_msgs/Object.h>
 #include <vision_msgs/Objects.h>
-#include <vision_msgs/PreprocessedClouds.h>
-
-#include <sensor_msgs/PointCloud2.h>
-#include <pcl/point_cloud.h>
-#include <pcl/point_types.h>
-#include <pcl_conversions/pcl_conversions.h>
-
-#include <pcl/io/pcd_io.h>
-#include <pcl/filters/project_inliers.h>
-#include <pcl/filters/crop_box.h>
-
-#include <pcl/kdtree/kdtree.h>
-#include <pcl/segmentation/extract_clusters.h>
 
 typedef pcl::PointXYZRGB PointT;
 
@@ -28,12 +12,7 @@ class CameraTransformNode {
 
 private:
     ros::NodeHandle nh;
-    ros::Publisher pub_objects;
-    ros::Publisher marker_pub;
     ros::Subscriber sub;
-
-    visualization_msgs::Marker points;
-    visualization_msgs::Marker walls;
 
     tf::TransformListener tfl;
 
@@ -50,7 +29,7 @@ public:
         marker_pub = nh.advertise<visualization_msgs::MarkerArray>("/object_detection/markers", 10);
 
 
-        /** Set up markers */
+        /** Set up markers *
         points.header.frame_id = walls.header.frame_id = "/map";
         points.ns = walls.ns = "points_and_lines";
         points.action = walls.action = visualization_msgs::Marker::ADD;
@@ -105,7 +84,7 @@ public:
         proj.setModelType (pcl::SACMODEL_PLANE);
         proj.setModelCoefficients (coefficients_plane);
         proj.setInputCloud (cloud_filtered2);
-        proj.filter (*cloud_projected);*/
+        proj.filter (*cloud_projected);*
 
         //Generate clusters
         std::vector<pcl::PointIndices> cluster_indices;
@@ -124,8 +103,7 @@ public:
 
         int j = 0;
         vision_msgs::Objects objects;
-        objects.header = preprocessed_msg->plane.header;
-        objects.header.frame_id = "/map";
+        objects.
         for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
         {
             pcl::PointCloud<PointT>::Ptr cloud_cluster (new pcl::PointCloud<PointT>(*cloud_others, it->indices));
@@ -155,7 +133,7 @@ public:
                     w2.z = centroid[2];
 
                     walls.points.push_back(w);
-                    walls.points.push_back(w2);*/
+                    walls.points.push_back(w2);*
                     break;
                 }
             }
@@ -214,15 +192,15 @@ public:
         ros::spin();
     }
 };
-
+*/
 
 
 int main (int argc, char** argv)
 {
     // Initialize ROS
-    ros::init (argc, argv, "object_detection_node");
-    CameraTransformNode node;
-    node.run();
+    //ros::init (argc, argv, "object_detection_node");
+    //CameraTransformNode node;
+    //node.run();
     return 0;
 }
 

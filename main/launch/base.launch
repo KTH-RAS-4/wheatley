@@ -5,8 +5,11 @@
 	<include file="$(find main)/launch/tf_world_to_map.launch"/>
 	<include file="$(find main)/launch/robot_model.launch"/>
 	<include file="$(find main)/launch/arduino.launch"/>
+	<include file="$(find xbox)/launch/xbox.launch"/>
 	<include file="$(find sensors)/launch/ir_distances.launch"/>
 	<include file="$(find sensors)/launch/ir_points.launch"/>
 	<include file="$(find sensors)/launch/pose.launch"/>
 	<include file="$(find motor_controller)/launch/motor_controller.launch"/>
+	<include file="$(find sound_play)/soundplay_node.launch"/>
+	
 </launch>

@@ -6,45 +6,74 @@
 #include <vision_msgs/Object.h>
 #include <vision_msgs/Objects.h>
 #include <map>
+#include <ras_msgs/RAS_Evidence.h>
+//#include <std_msgs/String.h>
+#include <sound_play/SoundRequest.h>
 
 using namespace std;
 
-float object_colors[] = {
+float object_color_array[] = {
     180, 150, 130,
-    220, 220, 220,
-    116.2592, 127.4758, 82.8304,
     200, 90, 100,
+    116.2592, 127.4758, 82.8304,
     220, 120, 120,
-    250, 150, 140
+    250, 150, 140,
+    170, 120, 90,
+    140, 170, 10
 };
+
+map<int, string > object_color_map;
 
 int relevant_iterations = 10;
+sensor_msgs::Image currentImage;
 
-std::string color_names[] = {
-    "wall",
-    "wall",
-    "green cube",
-    "red cube",
-    "red ball",
-    "patrick"
+string object_types[] = {
+    "Wall",
+    "Red Cube",
+    "Green Cube",
+    "Red Ball",
+    "Patric",
+    "Blue Cube",
+    "Yellow Cube",
+    "Yellow Ball",
+    "Green Cylinder",
+    "Blue Triangle",
+    "Purple Cross"
 };
+
+ros::Publisher pub_evidence;
+ros::Publisher pub_speaker;
 
 class StoredObject
 {
     vision_msgs::Object object;
     map<int, bool> occ;
+    bool identified;
+    string type;
 
 public:
     StoredObject(vision_msgs::Object object, int iteration) {
         this->object = object;
         occ[iteration] = true;
+        identified = false;
+        type = "nothing";
+
+        //Init color map
+        object_color_map[0] = "Wall";
+        object_color_map[1] = "Red Cube";
+        object_color_map[2] = "Green Cube";
+        object_color_map[3] = "Red Ball";
+        object_color_map[4] = "Patrick";
+        object_color_map[5] = "Wall";
+        object_color_map[6] = "Green Cylinder";
+
     }
     ~StoredObject() {
 
     }
 
     bool compare(vision_msgs::Object other) {
-        if(abs(other.x - object.x) < 0.01 && abs(other.y - object.y) < 0.01 && abs(other.z - object.z) < 0.01) {
+        if(abs(other.x - object.x) < 0.03 && abs(other.y - object.y) < 0.03 && abs(other.z - object.z) < 0.03) {
             return true;
         } else {
             return false;
@@ -68,15 +97,53 @@ public:
         }
         return counter;
     }
+
+    void publish() {
+        if(!identified) {
+            identified = true;
+            cout << "Found " << type << " (" << object.x << ", " << object.y << ", " << object.z << ")" << " - Color (" << object.r << ", " << object.g << ", " << object.b << ")" << endl;
+
+            ras_msgs::RAS_Evidence evidence;
+            evidence.group_number = 4;
+            evidence.stamp = ros::Time::now();
+            evidence.image_evidence = currentImage;
+            evidence.object_id = this->type;
+            pub_evidence.publish(evidence);
+
+            sound_play::SoundRequest message;
+            message.sound = -3;
+            message.command = 1;
+            message.arg = "I see a " + type;
+            pub_speaker.publish(message);
+        } else {
+            cout << "Found " << type << " again" << endl;
+        }
+
+    }
+
     vision_msgs::Object getObject() {
         return this->object;
+    }
+
+    string getType(int color) {
+        if(this->type == "nothing") {
+            this->type = object_color_map.find(color)->second;
+        }
+        return this->type;
+    }
+    string getType() {
+        return this->type;
+    }
+    bool isIdentified() {
+        return this->identified;
     }
 };
 
 class ColorDetectorNode
 {
     ros::NodeHandle handle;
-    ros::Subscriber object_sub;
+    ros::Subscriber sub_object;
+    ros::Subscriber sub_image;
     list<StoredObject> object_collector;
     int iteration;
 
@@ -84,7 +151,11 @@ public:
     ColorDetectorNode()
     {
         iteration = 0;
-        object_sub = handle.subscribe("object_detection/objects", 1, &ColorDetectorNode::objectHandle, this);
+        pub_evidence = handle.advertise<ras_msgs::RAS_Evidence> ("/evidence", 1);
+        //pub_speaker = handle.advertise<std_msgs::String> ("/espeak/string", 1);
+        pub_speaker = handle.advertise<sound_play::SoundRequest>("robotsound", 1);
+        sub_image = handle.subscribe("camera/rgb/image_raw", 1, &ColorDetectorNode::storeImage, this);
+        sub_object = handle.subscribe("object_detection/objects", 1, &ColorDetectorNode::objectHandle, this);
     }
 
     ~ColorDetectorNode()
@@ -108,13 +179,15 @@ public:
             int obj_iter = 0;
             if((obj_iter = it->occurrencyCount(iteration)) > (relevant_iterations / 2)) {
                 vision_msgs::Object obj = it->getObject();
-                int color = findClosestColor(obj);
-                if (color_names[color ]!= "wall") {
-                    cout << "Found " << color_names[color] << " (" << obj.r << ", " << obj.g << ", " << obj.b << ")" << endl;
+
+                string type = it->getType(findClosestColor(obj));
+
+                if (type != "Wall") {
+                    it->publish();
                 } else {
                     cout << "Found wall (" << obj.r << ", " << obj.g << ", " << obj.b << ")" << endl;
                 }
-            } else if (obj_iter == 0) {
+            } else if (obj_iter == 0 && !it->isIdentified()) {
                 it = object_collector.erase(it);
             }
         }
@@ -134,18 +207,22 @@ public:
         return true;
     }
 
+    void storeImage(const sensor_msgs::Image& msg) {
+        currentImage = msg;
+    }
+
 
 
     int findClosestColor(vision_msgs::Object obj)
     {
-        int n_colors = (sizeof(object_colors)/sizeof(*object_colors))/3;
+        int n_colors = (sizeof(object_color_array)/sizeof(*object_color_array))/3;
         int color;
         float diff = 255*3;
         float newdiff;
 
         for (int i = 0; i < n_colors; i++)
         {
-            newdiff = abs(obj.r-object_colors[i*3])+abs(obj.g-object_colors[i*3+1])+abs(obj.b-object_colors[i*3+2]);
+            newdiff = abs(obj.r-object_color_array[i*3])+abs(obj.g-object_color_array[i*3+1])+abs(obj.b-object_color_array[i*3+2]);
             if (newdiff < diff)
             {
                 diff = newdiff;
