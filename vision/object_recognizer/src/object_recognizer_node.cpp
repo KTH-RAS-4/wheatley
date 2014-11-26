@@ -90,7 +90,7 @@ public:
         Temp.convertTo(Temp, CV_32FC1);
 
         // apply gaussian filter
-        GaussianBlur(Temp, Temp, Size(5, 5), 1.4, 0, BORDER_DEFAULT);
+        GaussianBlur(Temp, Temp, Size(3, 3), 1.4, 0, BORDER_DEFAULT);
 
         int cols = Temp.cols;
         int rows = Temp.rows;
@@ -329,11 +329,68 @@ public:
         }
         }
 
+        // trace edge lines
+        Result.copyTo(Temp);
+        frame_image.convertTo(Result, CV_32FC3);
+        vector<vector<int> > lines;
+        int line_threshold = 5;
+        int npoints;
+        int pi, pj;
+        _Angles = Angles.ptr<float>(0);
+        _Temp = Temp.ptr<float>(0);
+        _Result = Result.ptr<float>(0);
+        for(int i = 1; i < rows-1; i++)
+        {
+            for(int j = 1; j < cols-1; j++)
+            {
+                if (_Temp[i*cols+j] == 1)
+                {
+                    vector<int> line = vector<int>();
+                    line.push_back(i);
+                    line.push_back(j);
+                    pi = i;
+                    pj = j;
+                    npoints = 0;
+                    while (_Temp[pi*cols+pj] == 1)
+                    {
+                        _Temp[pi*cols+pj] = 0;
+                        for(int k = -1; k <= 1; k++)
+                        {
+                            for(int l = -1; l <= 1; l++)
+                            {
+                                if (_Temp[(pi+k)*cols+(pj+l)] == 1)
+                                {
+                                    line.push_back(pi+k);
+                                    line.push_back(pj+l);
+                                    npoints++;
+                                    pi = pi+k;
+                                    pj = pj+l;
+                                    k = 2;
+                                    l = 2;
+                                }
+                            }
+                        }
+                    }
+                    // remove non lines
+                    if (npoints > line_threshold)
+                    {
+                        lines.push_back(line);
+                        for (vector<int>::iterator lineit = line.begin(); lineit != line.end(); lineit+=2)
+                        {
+                            _Result[((*lineit)*cols+(*(lineit+1)))*3] = 0;
+                            _Result[((*lineit)*cols+(*(lineit+1)))*3+1] = 255;
+                            _Result[((*lineit)*cols+(*(lineit+1)))*3+2] = 0;
+                        }
+                    }
+                }
+            }
+        }
 
+        cout << "lines: " << lines.size() << endl;
 
-        double min, max;
-        minMaxLoc(Result, &min, &max);
-        Result.convertTo(Result, CV_8U, 255.0/(max - min), -min * 255.0/(max - min));
+        //double min, max;
+        //minMaxLoc(Result, &min, &max);
+        Result.convertTo(Result, CV_8UC3);//, 255.0/(max - min), -min * 255.0/(max - min));
 
         imshow(OPENCV_WINDOW, Result);
 
