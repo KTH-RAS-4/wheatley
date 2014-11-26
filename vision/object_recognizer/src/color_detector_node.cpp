@@ -43,6 +43,7 @@ string object_types[] = {
 
 ros::Publisher pub_evidence;
 ros::Publisher pub_speaker;
+ros::Publisher pub_object;
 
 class StoredObject
 {
@@ -115,6 +116,9 @@ public:
             message.command = 1;
             message.arg = "I see a " + type;
             pub_speaker.publish(message);
+
+            pub_object.publish(this->object);
+
         } else {
             cout << "Found " << type << " again" << endl;
         }
@@ -128,6 +132,7 @@ public:
     string getType(int color) {
         if(this->type == "nothing") {
             this->type = object_color_map.find(color)->second;
+            this->object.type = this->type;
         }
         return this->type;
     }
@@ -154,6 +159,7 @@ public:
         pub_evidence = handle.advertise<ras_msgs::RAS_Evidence> ("/evidence", 1);
         //pub_speaker = handle.advertise<std_msgs::String> ("/espeak/string", 1);
         pub_speaker = handle.advertise<sound_play::SoundRequest>("robotsound", 1);
+        pub_object = handle.advertise<vision_msgs::Object>("/object_recognition/objects", 100);
         sub_image = handle.subscribe("camera/rgb/image_raw", 1, &ColorDetectorNode::storeImage, this);
         sub_object = handle.subscribe("object_detection/objects", 1, &ColorDetectorNode::objectHandle, this);
     }

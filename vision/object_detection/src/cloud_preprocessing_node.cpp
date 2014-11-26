@@ -73,6 +73,10 @@ void cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
     pass.setFilterLimits (0, 1.5);
     pass.filter (*cloud_filtered);
 
+
+    if(cloud_filtered->size() == 0)
+        return;
+
     // Estimate point normals
     ne.setSearchMethod (tree);
     ne.setInputCloud (cloud_filtered);

@@ -126,6 +126,10 @@ public:
         vision_msgs::Objects objects;
         objects.header = preprocessed_msg->plane.header;
         objects.header.frame_id = "/map";
+
+        while (!tfl.waitForTransform("camera_rgb_optical_frame", "map", objects.header.stamp, ros::Duration(1)))
+            ROS_ERROR("Couldn't find transform from 'camera_rgb_optical_frame' to 'map', retrying...");
+
         for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
         {
             pcl::PointCloud<PointT>::Ptr cloud_cluster (new pcl::PointCloud<PointT>(*cloud_others, it->indices));
