@@ -23,6 +23,7 @@ private:
 
     ros::Publisher pub_pose;
     ros::Subscriber sub_encoders;
+    ros::Subscriber sub_pose_correction;
     tf::TransformBroadcaster pub_transform;
 
 public:
@@ -33,6 +34,7 @@ public:
         , theta(0)
     {
         pub_pose = nh.advertise<nav_msgs::Odometry> ("", 1);
+        sub_pose_correction = nh.subscribe ("/wall_brain/pose_correction", 1, &PoseNode::correctionCallback, this);
         sub_encoders = nh.subscribe ("/arduino/encoders", 1, &PoseNode::encoderCallback, this);
 
         loadParameters();
@@ -45,6 +47,13 @@ public:
         nh.getParam("/base/motors/tics_per_revolution", ticsPerRevolution);
         radiansPerTick = (wheelDiameter/baseDiameter) / 2 / 180 * M_PI;
         distancePerTick = M_PI * wheelDiameter / ticsPerRevolution;
+    }
+
+    void correctionCallback(const nav_msgs::Odometry &msg)
+    {
+
+        theta = msg.pose.pose.orientation.z;
+
     }
 
     void encoderCallback(const ras_arduino_msgs::Encoders::ConstPtr &msg)
