@@ -8,6 +8,7 @@
 #include <tf/tf.h>
 #include <algorithm>
 #include <sound_play/SoundRequest.h>
+#include <nav_msgs/Odometry.h>
 
 template <typename T> int sgn(T val)
 {
@@ -29,6 +30,7 @@ private:
   ros::Publisher pub_speaker;
   ros::Publisher motor_twist;
   ros::Publisher wall_twist;
+  ros::Publisher pub_pose_correction;
 
   ros::Subscriber sub_distance;
   ros::Subscriber sub_pose;
@@ -39,6 +41,9 @@ private:
   ros::Rate loop_rate;
   double alignment;
   double theta;
+  bool wall_ahead;
+  bool right_turn;
+  bool left_turn;
 
 public:
   WallBrain()
@@ -62,6 +67,7 @@ public:
     sub_pose = n.subscribe("/sensors/pose", 1000, &WallBrain::poseCallback, this);
     motor_twist = n.advertise<geometry_msgs::Twist>("/motor_controller/twist", 1000);
     wall_twist = n.advertise<geometry_msgs::Twist>("/wall_avoider/twist", 1000);
+    pub_pose_correction = n.advertise<nav_msgs::Odometry>("/wall_brain/pose_correction",1000);
 
 
 
@@ -111,9 +117,15 @@ public:
           if (!follow(0.2, 0.15))
           {
               if (distance.right_front > 0.15)
+              {
                   alignment = theta-M_PI/2;
-              else
-                  alignment = theta+M_PI/2;             
+                  left_turn = true;
+              } else
+              {
+                  alignment = theta+M_PI/2;
+                  right_turn = true;
+              }
+              wall_ahead = true; //Fix a wall ahead query that returns bool.
               state = ALIGN;
               ROS_INFO("state: ALIGN");
               ros::Duration(0.2).sleep();
@@ -173,13 +185,51 @@ public:
   {
     double error = angleDiff(alignment, theta);
 
-    if (std::abs(error) < 3*M_PI/180)//error should be in radians. 3 degres=3*3.1415/180 rad = 0.05 rad
+    if (std::abs(error) < 1*M_PI/180)//error should be in radians. 3 degres=3*3.1415/180 rad = 0.05 rad
     {
-        ROS_INFO("state: ****************TURNED 90 DEGREES COMPLETE ******************");
-        geometry_msgs::Twist twist;
-        motor_twist.publish(twist);
-        return true;
+        ROS_INFO("Alignment before: %f, after: %f, error: %f", theta, alignment, std::abs(error));
+        if (right_turn && wall_ahead)
+        {
+            if (distance.left_front-distance.left_rear < 0.005)
+            {
+                nav_msgs::Odometry corr;
+                corr.pose.pose.orientation.z = alignment;
+                pub_pose_correction.publish(corr);
+                right_turn = wall_ahead = false;
+                return true;
+            } else
+            {
+                ROS_INFO("Correcting right turn");
+                geometry_msgs::Twist twist;
+                twist.angular.z = CLAMP(10*distance.left_front-distance.left_rear, -speed, speed);
+                motor_twist.publish(twist);
+                return false;
+            }
+        } else if (left_turn && wall_ahead)
+        {
+            if (distance.left_front-distance.left_rear < 0.005)
+            {
+                nav_msgs::Odometry corr;
+                corr.pose.pose.orientation.z = alignment;
+                pub_pose_correction.publish(corr);
+                left_turn = wall_ahead = false;
+                return true;
+            } else
+            {
+                ROS_INFO("Correcting left turn");
+                geometry_msgs::Twist twist;
+                twist.angular.z = CLAMP(10*distance.left_front-distance.left_rear, -speed, speed);
+                motor_twist.publish(twist);
+                return false;
+            }
+        } else {
+            ROS_INFO("state: ****************TURNED 90 DEGREES COMPLETE ******************");
+            geometry_msgs::Twist twist;
+            motor_twist.publish(twist);
+            return true;
+        }
     }
+
     else
     {
         geometry_msgs::Twist twist;
