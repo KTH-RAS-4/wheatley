@@ -8,6 +8,8 @@
 #include <tf/tf.h>
 #include <algorithm>
 #include <sound_play/SoundRequest.h>
+#include <executor/State.h>
+
 
 template <typename T> int sgn(T val)
 {
@@ -19,36 +21,40 @@ template <typename T> T CLAMP(const T& value, const T& low, const T& high)
   return value < low ? low : (value > high ? high : value);
 }
 
-enum state { FOLLOW, ALIGN, FIND_ALIGNMENT };
+enum state { FORWARD, LEFT, RIGHT, STOP };
+enum state stat;
 
-class WallBrain
+class Executor
 {
 private:
   ros::NodeHandle n;
   ros::NodeHandle n1;
-  ros::Publisher pub_speaker;
   ros::Publisher motor_twist;
   ros::Publisher wall_twist;
+  ros::Publisher pub_task_done;
 
   ros::Subscriber sub_distance;
   ros::Subscriber sub_pose;
+  ros::Subscriber sub_action;
 
   sound_play::SoundRequest speaker_msg;
   nav_msgs::Odometry pose;
   sensors::Distance distance;
+  executor::State STATE;
   ros::Rate loop_rate;
   double alignment;
   double theta;
+  double desiredTheta;
 
 public:
-  WallBrain()
+  Executor()
     : n("~")
     , loop_rate(10)
   {
     init();
   }
 
-  ~WallBrain()
+  ~Executor()
   {
   }
 
@@ -58,14 +64,36 @@ public:
     //n.getParam("rate", rate);
     loop_rate = ros::Rate(rate);
 
-    sub_distance = n.subscribe("/sensors/ir/distances", 1000, &WallBrain::distanceCallback, this);
-    sub_pose = n.subscribe("/sensors/pose", 1000, &WallBrain::poseCallback, this);
+    sub_distance = n.subscribe("/sensors/ir/distances", 1000, &Executor::distanceCallback, this);
+    sub_pose = n.subscribe("/sensors/pose", 1000, &Executor::poseCallback, this);
+    sub_action = n.subscribe("/nav/order", 1000, &Executor::orderCallback, this);
+    pub_task_done = n.advertise<executor::State>("executor/done",1000);
     motor_twist = n.advertise<geometry_msgs::Twist>("/motor_controller/twist", 1000);
     wall_twist = n.advertise<geometry_msgs::Twist>("/wall_avoider/twist", 1000);
 
 
 
   }
+
+  void orderCallback(const executor::State::ConstPtr &msg)
+    {
+    STATE = *msg;
+    if (STATE.state == "LEFT")
+      {
+        stat = LEFT;
+        alignment = theta+M_PI/2;
+      } else if (STATE.state == "RIGHT")
+      {
+        stat = RIGHT;
+        alignment = theta-M_PI/2;
+      } else if (STATE.state == "FORWARD")
+    {
+        stat = FORWARD;
+    } else
+    {
+        stat = STOP;
+    }
+    }
 
   void distanceCallback(const sensors::Distance::ConstPtr &msg)
   {
@@ -80,44 +108,48 @@ public:
 
   void run()
   {
-    enum state state = FIND_ALIGNMENT;
-    ROS_INFO("state: FIND_ALIGNMENT");
+    stat = STOP;
+    geometry_msgs::Twist twist;
 
     int a=0;
     while (ros::ok())
     {
 
       ros::spinOnce();
-
-      switch (state)
+      switch (stat)
       {
-      case FIND_ALIGNMENT:
-          if (findAlignment(0.2))
-          {
-              state = ALIGN;
-              ros::Duration(0.5).sleep();
-
-          }
-          break;
-      case ALIGN:
-          if (align(0.2))
-            {
-              state = FOLLOW;
-              ROS_INFO("state: FOLLOW");
-              ros::Duration(0.2).sleep();
-          }
-          break;
-      case FOLLOW:
+      case FORWARD:
+          ROS_INFO("FORWARD");
           if (!follow(0.16, 0.15))
           {
-              if (distance.right_front > 0.2)
-                  alignment = theta-M_PI/2;
-              else
-                  alignment = theta+M_PI/2;             
-              state = ALIGN;
-              ROS_INFO("state: ALIGN");
-              ros::Duration(0.2).sleep();
+            ros::Duration(0.5).sleep();
+            pub_task_done.publish(STATE);
+            stat = STOP;
+          }
+          break;
+      case STOP:
+        ROS_INFO("STOP");
+        twist.linear.x = 0;
+        twist.angular.z = 0;
+        wall_twist.publish(twist);
+        break;
 
+      case LEFT:
+        ROS_INFO("LEFT");
+          if (align(0.2))
+        {
+            ros::Duration(0.5).sleep();
+            pub_task_done.publish(STATE);
+            stat = STOP;
+        }
+        break;
+      case RIGHT:
+      ROS_INFO("RIGHT");
+	  if (align(0.2))
+          {
+              ros::Duration(0.5).sleep();
+              pub_task_done.publish(STATE);
+              stat = STOP;
           }
           break;
 
@@ -128,36 +160,6 @@ public:
     }
   }
 
-  bool findAlignment(double speed)
-  {
-    static double l = 0;
-    static double r = 0;
-
-    double l2 = distance.left_front-distance.left_rear;
-    double r2 = distance.right_front-distance.right_rear;
-    if (distance.left_front > 0.15)
-        l2 = 0;
-    if (distance.right_front > 0.15)
-        r2 = 0;
-    //ROS_INFO("l %.1f r %.1f   l2 %.2f r2 %.2f", l, r, l2, r2);
-
-    if ((sgn(l) != sgn(l2) && l != 0 && l2 != 0) ||
-        (sgn(r) != sgn(r2) && r != 0 && r2 != 0))
-    {
-        alignment = theta;
-        geometry_msgs::Twist twist;
-        motor_twist.publish(twist);
-        return true;
-    }
-    else
-    {
-        l = l2;
-        r = r2;
-        geometry_msgs::Twist twist;
-        twist.angular.z = speed;
-        motor_twist.publish(twist);
-    }
- }
 
   double angleDiff(double a, double b)
   {
@@ -173,9 +175,8 @@ public:
   {
     double error = angleDiff(alignment, theta);
 
-    if (std::abs(error) < 3*M_PI/180)//error should be in radians. 3 degres=3*3.1415/180 rad = 0.05 rad
+    if (std::abs(error) < 3*M_PI/180)
     {
-        ROS_INFO("state: ****************TURNED 90 DEGREES COMPLETE ******************");
         geometry_msgs::Twist twist;
         motor_twist.publish(twist);
         return true;
@@ -202,7 +203,7 @@ public:
     else if (distance.front > frontDistance)
     {
         //geometry_msgs::Twist twist;
-        twist.linear.x = 0.10;
+        twist.linear.x = speed/2;
         wall_twist.publish(twist);
         return true;
     }
@@ -219,6 +220,6 @@ public:
 
 int main (int argc, char **argv){
   ros::init(argc, argv, "wall_brain");
-  WallBrain my_node;
+  Executor my_node;
   my_node.run();
 }

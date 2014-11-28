@@ -102,7 +102,7 @@ public:
         grid_construction_interval_ = 0.1;
         history_length_ = 10000;
         fixed_frame_ = "map";
-        resolution_ = 0.02;
+        resolution_ = 0.01;
         robot_frame = "robot";
         local_grid_size_ = 5.0;
 
@@ -110,7 +110,7 @@ public:
         object_pub_ = handle.advertise<visualization_msgs::MarkerArray>("/map_objects/", 100);
 
         //sub_pointcloud = handle.subscribe("/object_detection/preprocessed", 1, &MapNode::mapPointCloud, this);
-        sub_ir = handle.subscribe("/sensors/ir/point_clouds", 100, &MapNode::mapIr, this);
+        //sub_ir = handle.subscribe("/sensors/ir/point_clouds", 100, &MapNode::mapIr, this);
         sub_cloud = handle.subscribe("/object_detection/preprocessed", 100, &MapNode::mapCloud, this);
         sub_objects = handle.subscribe("/object_recognition/objects", 100, &MapNode::insertObject, this);
 
@@ -246,16 +246,7 @@ public:
                         e.what());
             }
         }
-        tf::Point identity(0,0,0);
-        gm::PointStamped identity_msg;
-        identity_msg.header.frame_id = "robot";
-        identity_msg.header.stamp = clouds[0].header.stamp;
-        tf::pointTFToMsg(identity, identity_msg.point);
 
-        gm::PointStamped transformed;
-        tf_.transformPoint("map", identity_msg, transformed);
-
-        gu::addKnownFreePoint(&map, transformed.point, 0.12);
     }
 
     void mapPointCloud(const vision_msgs::PreprocessedClouds &msg)
@@ -295,6 +286,8 @@ public:
         Lock lock(mutex_);
         //last_cloud_=loc_cloud;
         gu::addCloud(&map, loc_cloud, true);
+
+
     }
 
     gm::Pose getPose(ros::Time stamp, string source_frame)
@@ -367,6 +360,20 @@ public:
 
             gu::addKnownOccupiedPoint(&map, pw, 0.01);
         }
+
+        if (!tf_.waitForTransform("map", "robot", stamp, ros::Duration(0.1)))
+            return;
+
+        tf::Point identity(0,0,0);
+        gm::PointStamped identity_msg;
+        identity_msg.header.frame_id = "robot";
+        identity_msg.header.stamp = stamp;
+        tf::pointTFToMsg(identity, identity_msg.point);
+
+        gm::PointStamped transformed;
+        tf_.transformPoint("map", identity_msg, transformed);
+
+        gu::addKnownFreePoint(&map, transformed.point, 0.12);
     }
 
 

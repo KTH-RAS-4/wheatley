@@ -70,7 +70,7 @@ public:
         transform_ids[5] = "ir_right_rear";
 
         pub_ir = nh.advertise<sensor_msgs::PointCloud2>("", 10);
-        pub_ir_point_clouds = nh.advertise<sensors::SensorClouds>("/sensors/ir/point_clouds", 10);
+        pub_ir_point_clouds = nh.advertise<sensors::SensorClouds>("/sensors/ir/point_clouds", 100);
         sub_distance = nh.subscribe ("/sensors/ir/distances", 10, &IrPointsNode::distanceCallback, this);
     }
 
