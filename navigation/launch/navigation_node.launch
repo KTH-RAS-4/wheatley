@@ -1,0 +1,10 @@
+<!---->
+
+<launch>
+	<include file="$(find wall_following)/wall_avoider.launch"/>
+	<node pkg="navigation" type="navigation_node"
+			name="navigater" output="screen" clear_params="true">
+		<rosparam command="load" file="$(find navigation)/config/settings.yaml"/>
+		<remap from="~/twist_out" to="/wall_avoider/twist"/>
+	</node>
+</launch>
