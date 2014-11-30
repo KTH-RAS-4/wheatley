@@ -53,7 +53,7 @@ public:
         pub_twist = nh.advertise<geometry_msgs::Twist>("twist_out", 10);
         pub_path = nh.advertise<nav_msgs::Path>("planned_path", 1);
         pub_map = nh.advertise<nav_msgs::OccupancyGrid>("map_out", 1);
-        timer_pathfinding = nh.createTimer(ros::Duration(rate), &Navigater::run_pathfinding, this);
+        timer_pathfinding = nh.createTimer(ros::Rate(rate), &Navigater::run_pathfinding, this);
     }
 
     void callback_map(const nav_msgs::OccupancyGrid::ConstPtr& msg)
@@ -78,7 +78,7 @@ public:
             return;
 
         ros::Time now = time.current_real;
-        gu::Cell robot_cell = getCell(now, robot_frame, inflated_map);
+        gu::Cell robot_cell = getCell(ros::Time(0), robot_frame, inflated_map);
         gu::Cell goal_cell = gu::pointCell(inflated_map.info, goal);
         boost::optional<gu::AStarResult> astar = gu::shortestPathAStar(inflated_map, robot_cell, goal_cell);
 
@@ -103,12 +103,13 @@ public:
                 else
                     next = gu::cellCenter(inflated_map.info, path[i+1]);
 
+
                 geometry_msgs::PoseStamped pose;
                 pose.pose.position = curr;
                 tf::Point currTF, nextTF;
                 tf::pointMsgToTF(curr, currTF);
                 tf::pointMsgToTF(next, nextTF);
-                tf::Quaternion q = tf::shortestArcQuat(currTF, nextTF);
+                tf::Quaternion q = tf::shortestArcQuatNormalize2(currTF, nextTF);
                 tf::quaternionTFToMsg(q, pose.pose.orientation);
                 pose.header.frame_id = inflated_map.header.frame_id;
                 pose.header.stamp = now; //TODO: should maybe be the approximate time in the future

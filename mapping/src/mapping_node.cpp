@@ -66,6 +66,8 @@ private:
     double resolution_;
     string fixed_frame_;
     string robot_frame;
+    double robot_outer_diameter;
+    double mark_pose_explored_rate;
     double grid_construction_interval_;
     double local_grid_size_;
 
@@ -77,6 +79,7 @@ private:
     ros::Publisher grid_pub_;
     ros::Publisher object_pub_;
     ros::WallTimer build_grid_timer_;
+    ros::Timer mark_pose_explored_timer_;
     boost::mutex mutex_;
 
     /****************************************
@@ -100,7 +103,9 @@ public:
     {
         ROS_INFO("Running");
         grid_construction_interval_ = 0.1;
+        mark_pose_explored_rate = 10;
         history_length_ = 10000;
+        robot_outer_diameter = 0.255;
         fixed_frame_ = "map";
         resolution_ = 0.01;
         robot_frame = "robot";
@@ -110,10 +115,11 @@ public:
         object_pub_ = handle.advertise<visualization_msgs::MarkerArray>("/map_objects/", 100);
 
         //sub_pointcloud = handle.subscribe("/object_detection/preprocessed", 1, &MapNode::mapPointCloud, this);
-        //sub_ir = handle.subscribe("/sensors/ir/point_clouds", 100, &MapNode::mapIr, this);
+        sub_ir = handle.subscribe("/sensors/ir/point_clouds", 100, &MapNode::mapIr, this);
         sub_cloud = handle.subscribe("/object_detection/preprocessed", 100, &MapNode::mapCloud, this);
         sub_objects = handle.subscribe("/object_recognition/objects", 100, &MapNode::insertObject, this);
 
+        mark_pose_explored_timer_ = handle.createTimer(ros::Rate(mark_pose_explored_rate), &MapNode::mapMarkPoseExplored, this);
         build_grid_timer_ = handle.createWallTimer(ros::WallDuration(grid_construction_interval_), &MapNode::echoGrid, this);
 
         init();
@@ -246,7 +252,13 @@ public:
                         e.what());
             }
         }
+    }
 
+    void mapMarkPoseExplored(const ros::TimerEvent& time)
+    {
+        ros::Time now = time.current_real;
+        if (tf_.waitForTransform(fixed_frame_, robot_frame, now, ros::Duration(0.1)))
+            gu::addKnownFreePoint(&map, getPose(now, robot_frame).position, robot_outer_diameter/2);
     }
 
     void mapPointCloud(const vision_msgs::PreprocessedClouds &msg)
@@ -283,24 +295,11 @@ public:
         loc_cloud->cloud.points = cloud_legacy_transformed.points;
         loc_cloud->sensor_pose = getPose(stamp, camera_frame);
         loc_cloud->header.frame_id = fixed_frame_;
+
         Lock lock(mutex_);
-        //last_cloud_=loc_cloud;
         gu::addCloud(&map, loc_cloud, true);
 
-
-    }
-
-    gm::Pose getPose(ros::Time stamp, string source_frame)
-    {
-        return getPose(stamp, source_frame, fixed_frame_);
-    }
-    gm::Pose getPose(ros::Time stamp, string source_frame, string target_frame)
-    {
-        tf::Stamped<tf::Pose> pose;
-        tf_.transformPose(target_frame, tf::Stamped<tf::Pose> (identity, stamp, source_frame), pose);
-        gm::Pose pose_msg;
-        tf::poseTFToMsg(pose, pose_msg);
-        return pose_msg;
+        //last_cloud_=loc_cloud;
     }
 
     void mapCloud(const vision_msgs::PreprocessedClouds &msg)
@@ -360,22 +359,21 @@ public:
 
             gu::addKnownOccupiedPoint(&map, pw, 0.01);
         }
-
-        if (!tf_.waitForTransform("map", "robot", stamp, ros::Duration(0.1)))
-            return;
-
-        tf::Point identity(0,0,0);
-        gm::PointStamped identity_msg;
-        identity_msg.header.frame_id = "robot";
-        identity_msg.header.stamp = stamp;
-        tf::pointTFToMsg(identity, identity_msg.point);
-
-        gm::PointStamped transformed;
-        tf_.transformPoint("map", identity_msg, transformed);
-
-        gu::addKnownFreePoint(&map, transformed.point, 0.12);
     }
 
+
+    gm::Pose getPose(ros::Time stamp, string source_frame)
+    {
+        return getPose(stamp, source_frame, fixed_frame_);
+    }
+    gm::Pose getPose(ros::Time stamp, string source_frame, string target_frame)
+    {
+        tf::Stamped<tf::Pose> pose;
+        tf_.transformPose(target_frame, tf::Stamped<tf::Pose> (identity, stamp, source_frame), pose);
+        gm::Pose pose_msg;
+        tf::poseTFToMsg(pose, pose_msg);
+        return pose_msg;
+    }
 
     void run()
     {

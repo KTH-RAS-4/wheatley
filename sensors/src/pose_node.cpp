@@ -53,7 +53,7 @@ public:
     {
         theta = tf::getYaw(msg.pose.pose.orientation);
 
-        publishOdometry(msg.header.stamp);
+        //publishOdometry(msg.header.stamp);
     }
 
     void encoderCallback(const ras_arduino_msgs::Encoders::ConstPtr &msg)
