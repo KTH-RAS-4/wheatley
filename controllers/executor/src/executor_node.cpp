@@ -9,6 +9,10 @@
 #include <algorithm>
 #include <sound_play/SoundRequest.h>
 #include <executor/State.h>
+#include <math.h>
+#include <tf/transform_listener.h>
+
+
 
 
 template <typename T> int sgn(T val)
@@ -32,6 +36,7 @@ private:
   ros::Publisher motor_twist;
   ros::Publisher wall_twist;
   ros::Publisher pub_task_done;
+  ros::Publisher pub_pose_correction;
 
   ros::Subscriber sub_distance;
   ros::Subscriber sub_pose;
@@ -41,10 +46,28 @@ private:
   nav_msgs::Odometry pose;
   sensors::Distance distance;
   executor::State STATE;
+
+  tf::StampedTransform tf_left_front;
+  tf::StampedTransform tf_left_rear;
+  tf::StampedTransform tf_right_front;
+  tf::StampedTransform tf_right_rear;
+
+
+  tf::TransformListener tfl;
   ros::Rate loop_rate;
   double alignment;
   double theta;
   double desiredTheta;
+  double leftDiff [];
+  double rightDiff[];
+  double lR;
+  double lL;
+  double avgLeftDiff;
+  double avgRightDiff;
+  bool poseCorrL;
+  bool poseCorrR;
+  int count;
+
 
 public:
   Executor()
@@ -60,7 +83,7 @@ public:
 
   void init()
   {
-    double rate = 10;
+    double rate = 100;
     //n.getParam("rate", rate);
     loop_rate = ros::Rate(rate);
 
@@ -70,10 +93,18 @@ public:
     pub_task_done = n.advertise<executor::State>("executor/done",1000);
     motor_twist = n.advertise<geometry_msgs::Twist>("/motor_controller/twist", 1000);
     wall_twist = n.advertise<geometry_msgs::Twist>("/wall_avoider/twist", 1000);
+    pub_pose_correction = n.advertise<nav_msgs::Odometry> ("/wall_brain/pose_correction", 1);
 
-
+    ros::Time now(0);
+    tfl.lookupTransform("robot", "ir_left_front",  now, tf_left_front);
+    tfl.lookupTransform("robot", "ir_left_rear",  now, tf_left_rear);
+    tfl.lookupTransform("robot", "ir_right_front",  now, tf_right_front);
+    tfl.lookupTransform("robot", "ir_right_rear",  now, tf_right_rear);
+    lL = tf_left_front.getOrigin().distance(tf_left_rear.getOrigin());
+    lR = tf_right_front.getOrigin().distance(tf_right_rear.getOrigin());
 
   }
+
 
   void orderCallback(const executor::State::ConstPtr &msg)
     {
@@ -81,23 +112,53 @@ public:
     if (STATE.state == "LEFT")
       {
         stat = LEFT;
-        alignment = theta+M_PI/2;
+        desiredTheta = fmod(desiredTheta + M_PI/2,(double) 2*M_PI);
+        alignment = desiredTheta;
       } else if (STATE.state == "RIGHT")
       {
         stat = RIGHT;
-        alignment = theta-M_PI/2;
+        desiredTheta = fmod (desiredTheta - M_PI/2, (double) 2*M_PI);
+        alignment = desiredTheta;
       } else if (STATE.state == "FORWARD")
-    {
-        stat = FORWARD;
-    } else
-    {
-        stat = STOP;
-    }
+      {
+          stat = FORWARD;
+      } else
+      {
+          stat = STOP;
+      }
     }
 
   void distanceCallback(const sensors::Distance::ConstPtr &msg)
   {
     distance = *msg;
+    if (poseCorrL)
+    {
+        leftDiff[count] = atan((distance.left_front-distance.left_rear)/lL);
+        count ++;
+        if (count >= 10)
+        {
+            double sumL;
+            for(int i = 1; i < count; i++)
+            {
+               sumL += leftDiff[i];
+            }
+            avgLeftDiff = sumL / (double) count;
+        }
+    } else if (poseCorrR)
+    {
+        rightDiff[count] = atan((distance.right_front-distance.right_rear)/lR);
+        count ++;
+        if (count >= 10)
+        {
+            double sumR;
+            for(int i = 1; i < count; i++)
+            {
+               sumR += rightDiff[i];
+            }
+            avgRightDiff = sumR / (double) count;
+        }
+    }
+
   }
 
   void poseCallback(const nav_msgs::Odometry::ConstPtr &msg)
@@ -106,8 +167,29 @@ public:
       theta = tf::getYaw(msg->pose.pose.orientation);
   }
 
+  void publishOdometry(ros::Time now, double diff)
+  {
+      //publish "robot" transform
+      tf::Transform transform;
+      tf::Quaternion q;
+      q.setRPY(0, 0, desiredTheta + diff);
+      transform.setRotation(q);
+
+      //publish pose
+      nav_msgs::Odometry pose;
+      pose.header.stamp = now;
+      //TODO: this is what we would like to do, but rviz Odometry marker doesn't work then
+      //pose.header.frame_id = "robot";
+      //pose.pose.pose.orientation.w = 1;
+      pose.header.frame_id = "map";
+      pose.pose.pose.orientation.z = q.z();
+
+      pub_pose_correction.publish(pose);
+      ROS_INFO("Corrected pose");
+  }
   void run()
   {
+    desiredTheta = 0;
     stat = STOP;
     geometry_msgs::Twist twist;
 
@@ -122,7 +204,6 @@ public:
           ROS_INFO("FORWARD");
           if (!follow(0.16, 0.15))
           {
-            ros::Duration(0.5).sleep();
             pub_task_done.publish(STATE);
             stat = STOP;
           }
@@ -137,19 +218,39 @@ public:
       case LEFT:
         ROS_INFO("LEFT");
           if (align(0.2))
-        {
-            ros::Duration(0.5).sleep();
-            pub_task_done.publish(STATE);
-            stat = STOP;
+        {           
+            poseCorrR = true;
+            if (count >= 10)
+            {
+                if (avgRightDiff < (10*M_PI)/180)
+                {
+                    ros::Time now;
+                    publishOdometry(now, avgRightDiff);
+                }
+                pub_task_done.publish(STATE);
+                poseCorrR = false;
+                count = 0;
+                stat = STOP;
+            }
         }
         break;
       case RIGHT:
       ROS_INFO("RIGHT");
 	  if (align(0.2))
           {
-              ros::Duration(0.5).sleep();
-              pub_task_done.publish(STATE);
-              stat = STOP;
+              poseCorrL = true;
+              if (count >= 10)
+              {
+                  if (avgLeftDiff < (10*M_PI)/180)
+                  {
+                      ros::Time now;
+                      publishOdometry(now, avgLeftDiff);
+                  }
+                  pub_task_done.publish(STATE);
+                  poseCorrL = false;
+                  count = 0;
+                  stat = STOP;
+              }
           }
           break;
 
@@ -179,6 +280,7 @@ public:
     {
         geometry_msgs::Twist twist;
         motor_twist.publish(twist);
+        ros::Duration(0.5).sleep();
         return true;
     }
     else
@@ -213,6 +315,7 @@ public:
         twist.linear.x = 0;
         geometry_msgs::Twist twist;
         wall_twist.publish(twist);
+        ros::Duration(0.5).sleep();
         return false;
     }
   }
