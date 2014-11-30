@@ -15,11 +15,16 @@ using namespace std;
 float object_color_array[] = {
     180, 150, 130,
     200, 90, 100,
-    116.2592, 127.4758, 82.8304,
+    88, 120, 68, //Green Cube
     220, 120, 120,
-    250, 150, 140,
+    250, 150, 140,  //Patrick
     170, 120, 90,
-    140, 170, 10
+    140, 170, 10,
+    220, 220, 220,
+    111, 105, 102,
+    220, 175, 130,  //Yellow Cube
+    205, 120, 155,  //Purple Cross
+    55, 85, 50      //Green Cube
 };
 
 map<int, string > object_color_map;
@@ -67,6 +72,11 @@ public:
         object_color_map[4] = "Patrick";
         object_color_map[5] = "Wall";
         object_color_map[6] = "Green Cylinder";
+        object_color_map[7] = "Wall";
+        object_color_map[8] = "Wall";
+        object_color_map[9] = "Yellow Cube";
+        object_color_map[10] = "Purple Cross";
+        object_color_map[11] = "Green Cube";
 
     }
     ~StoredObject() {

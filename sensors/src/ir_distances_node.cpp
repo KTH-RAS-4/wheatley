@@ -83,8 +83,8 @@ int main (int argc, char** argv)
   ros::NodeHandle nh("~");
 
   init();
-  pub = nh.advertise<sensors::Distance> ("", 1);
-  ros::Subscriber sub = nh.subscribe ("/arduino/adc", 1, adcCallback);
+  pub = nh.advertise<sensors::Distance> ("", 100);
+  ros::Subscriber sub = nh.subscribe ("/arduino/adc", 100, adcCallback);
 
   ros::spin();
 }

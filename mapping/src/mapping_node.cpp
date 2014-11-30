@@ -52,6 +52,8 @@ private:
     ros::Subscriber sub_pointcloud;
     ros::Subscriber sub_objects;
     ros::Subscriber sub_ir;
+    ros::Subscriber sub_cloud;
+
 
 
 
@@ -100,15 +102,16 @@ public:
         grid_construction_interval_ = 0.1;
         history_length_ = 10000;
         fixed_frame_ = "map";
-        resolution_ = 0.02;
+        resolution_ = 0.01;
         robot_frame = "robot";
         local_grid_size_ = 5.0;
 
         grid_pub_ = handle.advertise<nm::OccupancyGrid>("/map", 100);
         object_pub_ = handle.advertise<visualization_msgs::MarkerArray>("/map_objects/", 100);
 
-        sub_pointcloud = handle.subscribe("/object_detection/preprocessed", 1, &MapNode::mapPointCloud, this);
-        sub_ir = handle.subscribe("/sensors/ir/point_clouds", 100, &MapNode::mapIr, this);
+        //sub_pointcloud = handle.subscribe("/object_detection/preprocessed", 1, &MapNode::mapPointCloud, this);
+        //sub_ir = handle.subscribe("/sensors/ir/point_clouds", 100, &MapNode::mapIr, this);
+        sub_cloud = handle.subscribe("/object_detection/preprocessed", 100, &MapNode::mapCloud, this);
         sub_objects = handle.subscribe("/object_recognition/objects", 100, &MapNode::insertObject, this);
 
         build_grid_timer_ = handle.createWallTimer(ros::WallDuration(grid_construction_interval_), &MapNode::echoGrid, this);
@@ -243,16 +246,7 @@ public:
                         e.what());
             }
         }
-        tf::Point identity(0,0,0);
-        gm::PointStamped identity_msg;
-        identity_msg.header.frame_id = "robot";
-        identity_msg.header.stamp = clouds[0].header.stamp;
-        tf::pointTFToMsg(identity, identity_msg.point);
 
-        gm::PointStamped transformed;
-        tf_.transformPoint("map", identity_msg, transformed);
-
-        gu::addKnownFreePoint(&map, transformed.point, 0.12);
     }
 
     void mapPointCloud(const vision_msgs::PreprocessedClouds &msg)
@@ -292,6 +286,8 @@ public:
         Lock lock(mutex_);
         //last_cloud_=loc_cloud;
         gu::addCloud(&map, loc_cloud, true);
+
+
     }
 
     gm::Pose getPose(ros::Time stamp, string source_frame)
@@ -306,6 +302,80 @@ public:
         tf::poseTFToMsg(pose, pose_msg);
         return pose_msg;
     }
+
+    void mapCloud(const vision_msgs::PreprocessedClouds &msg)
+    {
+        sm::PointCloud2 cloudFloor = msg.plane;
+        string camera_frame = cloudFloor.header.frame_id;
+        ros::Time stamp = cloudFloor.header.stamp;
+
+        sm::PointCloud2 cloudWall = msg.others;
+
+        try
+        {
+            // We'll need the transform between sensor and fixed frames at the time when the scan was taken
+            if (!tf_.waitForTransform(fixed_frame_, camera_frame, stamp, ros::Duration(0.1)))
+            {
+                ROS_WARN_STREAM ("Timed out waiting for transform from " << camera_frame << " to "
+                                 << fixed_frame_ << " at " << stamp.toSec());
+                return;
+            }
+        }
+        catch (tf::TransformException& e)
+        {
+            ROS_INFO ("Not saving scan due to tf lookup exception: %s", e.what());
+            return;
+        }
+
+        sm::PointCloud cloudFloor_legacy;
+        sm::convertPointCloud2ToPointCloud(cloudFloor, cloudFloor_legacy);
+
+        sm::PointCloud cloudFloor_legacy_transformed;
+        tf_.transformPointCloud(fixed_frame_, cloudFloor_legacy, cloudFloor_legacy_transformed);
+
+        for (int n=0; n < cloudFloor_legacy_transformed.points.size(); n++)
+        {
+            gm::Point32 pf_t = cloudFloor_legacy_transformed.points[n];
+            gm::Point pf;
+            pf.x = pf_t.x;
+            pf.y = pf_t.y;
+            pf.z = pf_t.z;
+
+            gu::addKnownFreePoint(&map, pf, 0.01);
+        }
+
+        sm::PointCloud cloudWall_legacy;
+        sm::convertPointCloud2ToPointCloud(cloudWall, cloudWall_legacy);
+
+        sm::PointCloud cloudWall_legacy_transformed;
+        tf_.transformPointCloud(fixed_frame_, cloudWall_legacy, cloudWall_legacy_transformed);
+
+        for (int n=0; n < cloudWall_legacy_transformed.points.size(); n++)
+        {
+            gm::Point32 pw_t = cloudWall_legacy_transformed.points[n];
+            gm::Point pw;
+            pw.x = pw_t.x;
+            pw.y = pw_t.y;
+            pw.z = pw_t.z;
+
+            gu::addKnownOccupiedPoint(&map, pw, 0.01);
+        }
+
+        if (!tf_.waitForTransform("map", "robot", stamp, ros::Duration(0.1)))
+            return;
+
+        tf::Point identity(0,0,0);
+        gm::PointStamped identity_msg;
+        identity_msg.header.frame_id = "robot";
+        identity_msg.header.stamp = stamp;
+        tf::pointTFToMsg(identity, identity_msg.point);
+
+        gm::PointStamped transformed;
+        tf_.transformPoint("map", identity_msg, transformed);
+
+        gu::addKnownFreePoint(&map, transformed.point, 0.12);
+    }
+
 
     void run()
     {

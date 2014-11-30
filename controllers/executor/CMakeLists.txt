@@ -1,19 +1,16 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(sensors)
+project(executor)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
+  geometry_msgs
   roscpp
-  message_generation
-  ras_arduino_msgs
-  visualization_msgs
-  std_msgs
-  nav_msgs
-  tf
-  pcl_ros
   sensor_msgs
+  std_msgs
+  message_generation
+  tf
 )
 
 ## System dependencies are found with CMake's conventions
@@ -52,8 +49,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate messages in the 'msg' folder
 add_message_files(
   FILES
-  Distance.msg
-  SensorClouds.msg
+  State.msg
 )
 
 ## Generate services in the 'srv' folder
@@ -71,11 +67,12 @@ add_message_files(
 # )
 
 ## Generate added messages and services with any dependencies listed here
-generate_messages(
-  DEPENDENCIES
-  ras_arduino_msgs
-  sensor_msgs
-)
+ generate_messages(
+   DEPENDENCIES
+   geometry_msgs
+   sensor_msgs
+   std_msgs
+ )
 
 ###################################
 ## catkin specific configuration ##
@@ -87,9 +84,9 @@ generate_messages(
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-  CATKIN_DEPENDS message_runtime ras_arduino_msgs roscpp visualization_msgs std_msgs nav_msgs tf
-#  INCLUDE_DIRS include
-#  LIBRARIES sensors
+#  INCLUDE_DIRS
+#  LIBRARIES
+  CATKIN_DEPENDS geometry_msgs roscpp sensor_msgs std_msgs message_runtime tf
 #  DEPENDS system_lib
 )
 
@@ -105,31 +102,18 @@ include_directories(
 )
 
 ## Declare a cpp library
-# add_library(sensors
-#   src/${PROJECT_NAME}/sensors.cpp
+# add_library(executor
+#   src/${PROJECT_NAME}/executor.cpp
 # )
 
 ## Declare a cpp executable
-add_executable(pose src/pose_node.cpp)
-add_executable(ir_distances src/ir_distances_node.cpp)
-add_executable(ir_points src/ir_points_node.cpp)
+add_executable(executor_node src/executor_node.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
-add_dependencies(pose pose_generate_messages_cpp)
-add_dependencies(ir_distances pose_generate_messages_cpp)
-add_dependencies(ir_points pose_generate_messages_cpp)
+add_dependencies(executor_node executor_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(pose
+target_link_libraries(executor_node
   ${catkin_LIBRARIES}
 )
-
-target_link_libraries(ir_distances
-  ${catkin_LIBRARIES}
-)
-
-target_link_libraries(ir_points
-  ${catkin_LIBRARIES}
-)
-

@@ -15,8 +15,7 @@
 #include <pcl_conversions/pcl_conversions.h>
 
 #include <pcl/io/pcd_io.h>
-#include <pcl/filters/project_inliers.h>
-#include <pcl/filters/crop_box.h>
+#include <pcl/segmentation/region_growing_rgb.h>
 
 #include <pcl/kdtree/kdtree.h>
 #include <pcl/segmentation/extract_clusters.h>
@@ -24,7 +23,7 @@
 typedef pcl::PointXYZRGB PointT;
 
 
-class CameraTransformNode {
+class ObjectDetectionNode {
 
 private:
     ros::NodeHandle nh;
@@ -38,15 +37,15 @@ private:
     tf::TransformListener tfl;
 
 public:
-    CameraTransformNode() {
+    ObjectDetectionNode() {
         ros::Time now(0);
 
         while (!tfl.waitForTransform("camera_depth_optical_frame", "world", now, ros::Duration(1)))
             ROS_ERROR("Couldn't find transform from 'robot' to 'ir_front', retrying...");
 
-        sub = nh.subscribe ("/object_detection/preprocessed", 1, &CameraTransformNode::preprocessed_cb, this);
+        sub = nh.subscribe ("/object_detection/preprocessed", 1, &ObjectDetectionNode::preprocessed_cb, this);
 
-        pub_objects = nh.advertise<vision_msgs::Objects> ("/object_detection/objects", 1);
+        pub_objects = nh.advertise<vision_msgs::Objects> ("/object_detection/objects", 10);
         marker_pub = nh.advertise<visualization_msgs::MarkerArray>("/object_detection/markers", 10);
 
 
@@ -74,7 +73,7 @@ public:
         walls.color.a = 1.0;
     }
 
-    ~CameraTransformNode() {
+    ~ObjectDetectionNode() {
 
     }
 
@@ -90,33 +89,32 @@ public:
         points.points.clear();
         walls.points.clear();
 
-        //tfl.lookupTransform("world", "camera_depth_optical_frame", preprocessed_msg->plane.header.stamp, map_transform);
-
-
-
         pcl::fromROSMsg(preprocessed_msg->plane, *cloud_plane);
         pcl::fromROSMsg(preprocessed_msg->others, *cloud_others);
 
         if(cloud_plane->size() == 0 || cloud_others->size() == 0)
             return;
 
-        //Projects points onto floor
-        /*pcl::ProjectInliers<PointT> proj;
-        proj.setModelType (pcl::SACMODEL_PLANE);
-        proj.setModelCoefficients (coefficients_plane);
-        proj.setInputCloud (cloud_filtered2);
-        proj.filter (*cloud_projected);*/
-
         //Generate clusters
         std::vector<pcl::PointIndices> cluster_indices;
-        pcl::EuclideanClusterExtraction<PointT> ec;
+        /*pcl::EuclideanClusterExtraction<PointT> ec;
         ec.setClusterTolerance (0.02);
         ec.setMinClusterSize (10);
         ec.setMaxClusterSize (150);
         //tree->setInputCloud (cloud_others);
         ec.setSearchMethod (tree);
         ec.setInputCloud (cloud_others);
-        ec.extract (cluster_indices);
+        ec.extract (cluster_indices);*/
+
+        pcl::RegionGrowingRGB<pcl::PointXYZRGB> reg;
+        reg.setInputCloud (cloud_others);
+        reg.setSearchMethod (tree);
+        reg.setDistanceThreshold (0.02);
+        reg.setPointColorThreshold (5);
+        reg.setRegionColorThreshold (7);
+        reg.setMinClusterSize (20);
+
+        reg.extract (cluster_indices);
 
         tree->setInputCloud(cloud_plane);
         std::vector<int> pointIdxNKNSearch(1);
@@ -127,8 +125,10 @@ public:
         objects.header = preprocessed_msg->plane.header;
         objects.header.frame_id = "/map";
 
-        while (!tfl.waitForTransform("camera_rgb_optical_frame", "map", objects.header.stamp, ros::Duration(1)))
+        /*if (!tfl.waitForTransform("camera_rgb_optical_frame", "map", objects.header.stamp, ros::Duration(1))) {
             ROS_ERROR("Couldn't find transform from 'camera_rgb_optical_frame' to 'map', retrying...");
+            return;
+        }*/
 
         for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
         {
@@ -189,16 +189,16 @@ public:
             p.point.y = centroid[1];
             p.point.z = centroid[2];
 
-            tfl.transformPoint("map", p, p_transformed);
+            //tfl.transformPoint("map", p, p_transformed);
 
-            ob.x = p_transformed.point.x;
-            ob.y = p_transformed.point.y;
-            ob.z = p_transformed.point.z;
+            ob.x = p.point.x;
+            ob.y = p.point.y;
+            ob.z = p.point.z;
             ob.r = color[0];
             ob.g = color[1];
             ob.b = color[2];
 
-            points.points.push_back(p_transformed.point);
+            points.points.push_back(p.point);
             objects.objects.push_back(ob);
 
             //std::cout << "Centroid:" << centroid << std::endl;
@@ -225,7 +225,7 @@ int main (int argc, char** argv)
 {
     // Initialize ROS
     ros::init (argc, argv, "object_detection_node");
-    CameraTransformNode node;
+    ObjectDetectionNode node;
     node.run();
     return 0;
 }

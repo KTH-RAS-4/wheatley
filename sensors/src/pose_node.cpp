@@ -51,9 +51,9 @@ public:
 
     void correctionCallback(const nav_msgs::Odometry &msg)
     {
+        theta = tf::getYaw(msg.pose.pose.orientation);
 
-        theta = msg.pose.pose.orientation.z;
-
+        publishOdometry(msg.header.stamp);
     }
 
     void encoderCallback(const ras_arduino_msgs::Encoders::ConstPtr &msg)
@@ -66,6 +66,11 @@ public:
         x -= deltaDistance*std::cos(theta);
         y -= deltaDistance*std::sin(theta);
 
+        publishOdometry(now);
+    }
+
+    void publishOdometry(ros::Time now)
+    {
         //publish "robot" transform
         tf::Transform transform;
         transform.setOrigin(tf::Vector3(x, y, 0));
