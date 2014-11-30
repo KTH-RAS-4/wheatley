@@ -58,8 +58,8 @@ private:
   double alignment;
   double theta;
   double desiredTheta;
-  double leftDiff [];
-  double rightDiff[];
+  double leftDiff [10];
+  double rightDiff[10];
   double lR;
   double lL;
   double avgLeftDiff;
@@ -96,12 +96,18 @@ public:
     pub_pose_correction = n.advertise<nav_msgs::Odometry> ("/wall_brain/pose_correction", 1);
 
     ros::Time now(0);
+
+    while (!tfl.waitForTransform("ir_front", "robot", now, ros::Duration(1)))
+        ROS_ERROR("Couldn't find transform from 'robot' to 'ir_front', retrying...");
+
     tfl.lookupTransform("robot", "ir_left_front",  now, tf_left_front);
     tfl.lookupTransform("robot", "ir_left_rear",  now, tf_left_rear);
     tfl.lookupTransform("robot", "ir_right_front",  now, tf_right_front);
     tfl.lookupTransform("robot", "ir_right_rear",  now, tf_right_rear);
     lL = tf_left_front.getOrigin().distance(tf_left_rear.getOrigin());
     lR = tf_right_front.getOrigin().distance(tf_right_rear.getOrigin());
+
+    poseCorrL = poseCorrR = false;
 
   }
 
@@ -112,19 +118,28 @@ public:
     if (STATE.state == "LEFT")
       {
         stat = LEFT;
+        ROS_INFO("LEFT");
         desiredTheta = fmod(desiredTheta + M_PI/2,(double) 2*M_PI);
+        if (desiredTheta>M_PI/2) desiredTheta-=2*M_PI;
         alignment = desiredTheta;
+        ROS_INFO("Before state, DesiredTheta: %f, Theta: %f",desiredTheta*180/M_PI, theta*180/M_PI);
       } else if (STATE.state == "RIGHT")
       {
         stat = RIGHT;
+        ROS_INFO("RIGHT");
         desiredTheta = fmod (desiredTheta - M_PI/2, (double) 2*M_PI);
+        if (desiredTheta>M_PI/2) desiredTheta-=2*M_PI;
         alignment = desiredTheta;
+        ROS_INFO("Before state, DesiredTheta: %f, Theta: %f",desiredTheta*180/M_PI, theta*180/M_PI);
       } else if (STATE.state == "FORWARD")
       {
           stat = FORWARD;
+          ROS_INFO("FORWARD");
+          ROS_INFO("Before state, DesiredTheta: %f, Theta: %f",desiredTheta*180/M_PI, theta*180/M_PI);
       } else
       {
           stat = STOP;
+          ROS_INFO("STOP");
       }
     }
 
@@ -146,7 +161,7 @@ public:
         }
     } else if (poseCorrR)
     {
-        rightDiff[count] = atan((distance.right_front-distance.right_rear)/lR);
+        rightDiff[count] = atan((distance.right_rear-distance.right_front)/lR);
         count ++;
         if (count >= 10)
         {
@@ -169,23 +184,20 @@ public:
 
   void publishOdometry(ros::Time now, double diff)
   {
-      //publish "robot" transform
-      tf::Transform transform;
       tf::Quaternion q;
       q.setRPY(0, 0, desiredTheta + diff);
-      transform.setRotation(q);
 
       //publish pose
       nav_msgs::Odometry pose;
       pose.header.stamp = now;
-      //TODO: this is what we would like to do, but rviz Odometry marker doesn't work then
-      //pose.header.frame_id = "robot";
-      //pose.pose.pose.orientation.w = 1;
       pose.header.frame_id = "map";
+      pose.pose.pose.orientation.x = q.x();
+      pose.pose.pose.orientation.y = q.y();
       pose.pose.pose.orientation.z = q.z();
+      pose.pose.pose.orientation.w = q.w();
 
       pub_pose_correction.publish(pose);
-      ROS_INFO("Corrected pose");
+      ROS_INFO("Corrected pose to: %f", (desiredTheta + diff)*180/M_PI);
   }
   void run()
   {
@@ -201,63 +213,73 @@ public:
       switch (stat)
       {
       case FORWARD:
-          ROS_INFO("FORWARD");
           if (!follow(0.16, 0.15))
           {
             pub_task_done.publish(STATE);
+            ROS_INFO("After state, DesiredTheta: %f, Theta: %f",desiredTheta*180/M_PI, theta*180/M_PI);
             stat = STOP;
           }
           break;
       case STOP:
-        ROS_INFO("STOP");
         twist.linear.x = 0;
         twist.angular.z = 0;
         wall_twist.publish(twist);
         break;
 
       case LEFT:
-        ROS_INFO("LEFT");
-          if (align(0.2))
-        {           
+      {
+        //TODO: check that the distance to the wall, on the last measurement from both sensors is reasonable
+        static bool align_done = false;
+        if (!align_done && align(0.2))
+        {
+            count = 0;
             poseCorrR = true;
-            if (count >= 10)
-            {
-                if (avgRightDiff < (10*M_PI)/180)
-                {
-                    ros::Time now;
-                    publishOdometry(now, avgRightDiff);
-                }
-                pub_task_done.publish(STATE);
-                poseCorrR = false;
-                count = 0;
-                stat = STOP;
-            }
+            align_done = true;
+        }
+
+        if (align_done && count >= 10)
+        {
+            if (std::abs(avgRightDiff) < (10*M_PI)/180)
+                publishOdometry(ros::Time(), avgRightDiff);
+
+            pub_task_done.publish(STATE);
+            ROS_INFO("AvgRightDiff: %f",avgRightDiff);
+            ROS_INFO("After state, DesiredTheta: %.1f, Theta: %.1f",desiredTheta*180/M_PI, theta*180/M_PI);
+            stat = STOP;
+            poseCorrR = false;
+            align_done = false;
         }
         break;
+      }
       case RIGHT:
-      ROS_INFO("RIGHT");
-	  if (align(0.2))
-          {
-              poseCorrL = true;
-              if (count >= 10)
-              {
-                  if (avgLeftDiff < (10*M_PI)/180)
-                  {
-                      ros::Time now;
-                      publishOdometry(now, avgLeftDiff);
-                  }
-                  pub_task_done.publish(STATE);
-                  poseCorrL = false;
-                  count = 0;
-                  stat = STOP;
-              }
-          }
-          break;
+      {
+        //TODO: check that the distance to the wall, on the last measurement from both sensors is reasonable
+        static bool align_done = false;
+        if (!align_done && align(0.2))
+        {
+            count = 0;
+            poseCorrL = true;
+            align_done = true;
+        }
 
+        if (align_done && count >= 10)
+        {
+            if (std::abs(avgLeftDiff) < (10*M_PI)/180)
+                publishOdometry(ros::Time(), avgLeftDiff);
+
+            pub_task_done.publish(STATE);
+            ROS_INFO("AvgRightDiff: %f",avgLeftDiff);
+            ROS_INFO("After state, DesiredTheta: %.1f, Theta: %.1f",desiredTheta*180/M_PI, theta*180/M_PI);
+            stat = STOP;
+            poseCorrL = false;
+            align_done = false;
+        }
+        break;
       }
 
 
       loop_rate.sleep();
+      }
     }
   }
 
@@ -276,7 +298,7 @@ public:
   {
     double error = angleDiff(alignment, theta);
 
-    if (std::abs(error) < 3*M_PI/180)
+    if (std::abs(error) < 1*M_PI/180)
     {
         geometry_msgs::Twist twist;
         motor_twist.publish(twist);

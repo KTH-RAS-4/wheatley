@@ -52,8 +52,6 @@ public:
     void correctionCallback(const nav_msgs::Odometry &msg)
     {
         theta = tf::getYaw(msg.pose.pose.orientation);
-
-        //publishOdometry(msg.header.stamp);
     }
 
     void encoderCallback(const ras_arduino_msgs::Encoders::ConstPtr &msg)
