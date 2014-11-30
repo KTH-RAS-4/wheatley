@@ -1,7 +1,6 @@
 <!---->
 
 <launch>
-	<include file="$(find wall_following)/wall_avoider.launch"/>
     <node pkg="wall_following" type="wall_brain_node"
         name="wall_brain" output="screen" clear_params="true">
     </node>

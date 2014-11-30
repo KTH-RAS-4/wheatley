@@ -1,8 +1,9 @@
 <launch>
-	<rosparam command="load" ns="sensors" clear_params="true"
-		file="$(find sensors)/config/settings.yaml"/>
-	<node pkg="sensors" type="ir_points" ns="sensors/ir"
-		name="points" output="screen">
-	</node>
+	<group ns="sensors">
+		<rosparam command="load" file="$(find sensors)/config/settings.yaml"/>
+		<node pkg="sensors" type="ir_points" ns="ir"
+			name="points" output="screen">
+		</node>
+	</group>
 </launch>
 
