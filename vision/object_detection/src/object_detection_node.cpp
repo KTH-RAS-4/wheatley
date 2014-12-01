@@ -160,7 +160,7 @@ public:
 
                     walls.points.push_back(w);
                     walls.points.push_back(w2);*/
-                    break;
+                    continue;
                 }
             }
 

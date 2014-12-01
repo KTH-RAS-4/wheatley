@@ -132,10 +132,10 @@ public:
         if(cloud_filtered->size() == 0)
             return;
 
-        sor.setInputCloud (cloud_filtered);
+        /*sor.setInputCloud (cloud_filtered);
         sor.setMeanK (50);
         sor.setStddevMulThresh (1.0);
-        sor.filter (*cloud_filtered2);
+        sor.filter (*cloud_filtered2);*/
 
 
         sensor_msgs::PointCloud2 output_others;

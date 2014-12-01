@@ -18,21 +18,21 @@ using namespace cv;
 
 // objects
 int WALL = 0x0;
-int FLOOR = 0x1;
+int ORANGE = 0x1;
 int YELLOW = 0x2;
 int PURPLE = 0x3;
 int BLUE = 0x4;
 int GREEN = 0x5;
-int BLUE = 0x6;
+int RED = 0x6;
 
 int objects_list[] = {
     WALL,
-    FLOOR,
+    ORANGE,
     YELLOW,
     PURPLE,
     BLUE,
     GREEN,
-    BLUE
+    RED
 };
 
 // types
@@ -57,22 +57,22 @@ float object_color_array[] = {
 
 // hue min max values
 float object_color_hue[] = {
-    0, 360, // wall
-    10, 20, // floor
-    18, 22, // yellow
-    120, 160, // purple
-    60, 120, // blue
-    30, 60, // green
-    0, 10 // red
-}
+    -20, 360, // wall
+    10, 20, // orange
+    30, 50, // yellow
+    250, 320, // purple
+    100, 250, // blue
+    50, 100, // green
+    -15, 10 // red
+};
 
 // saturation min max values
 float object_color_saturation[] = {
-    0, 10, // wall
-    10, 255 // floor
-}
+    0, 80, // wall
+    80, 255 // not wall
+};
 
-float 
+
 
 map<int, string > object_color_map;
 
@@ -127,7 +127,7 @@ public:
         object_color_map[9] = "Blue Cube";*/
 
         object_color_map[WALL] = "Wall";
-        object_color_map[FLOOR] = "Floor";
+        object_color_map[ORANGE] = "Patrick";
         object_color_map[YELLOW] = "Yellow";
         object_color_map[GREEN] = "Green";
         object_color_map[BLUE] = "Blue";
@@ -197,7 +197,7 @@ public:
 
     string getType(int type) {
         if(this->type == "nothing") {
-            if (object != -1)
+            if (type != -1)
             {
                 int object = type & 0xF;
                 int shape = type & 0xF0;
@@ -208,6 +208,7 @@ public:
                 this->type = "Undefined";
             }
             this->object.type = this->type;
+        }
         return this->type;
     }
     string getType() {
@@ -267,7 +268,7 @@ public:
                 if (type != "Wall") {
                     it->publish();
                 } else {
-                    cout << "Found wall (" << obj.r << ", " << obj.g << ", " << obj.b << "), GrayColor: " << (.11*obj.r + .59*obj.g + 0.3*obj.b) << endl;
+                    //cout << "Found wall (" << obj.r << ", " << obj.g << ", " << obj.b << "), GrayColor: " << (.11*obj.r + .59*obj.g + 0.3*obj.b) << endl;
                 }
             } else if (obj_iter == 0 && !it->isIdentified()) {
                 it = object_collector.erase(it);
@@ -327,22 +328,27 @@ public:
         int type = -1;
 
         // extract hsv
-        Mat hsv = Mat(1, 1, CV_32FC3, Scalar(obj.b, obj.g, obj.r));
-        cvtColor(hsv, hsv, CV_BGR2HSV);
+        Mat bgr = Mat(1, 1, CV_32FC3, Scalar(obj.b, obj.g, obj.r));
+        Mat hsv;
+        cvtColor(bgr, hsv, CV_BGR2HSV);
         Vec<float, 3> pix = hsv.at<Vec<float, 3> >(0,0);
-        int h = (int) pix[0];
-        int s = (int) pix[1];
-        int v = (int) pix[2];
+        float h = pix[0];
+        float s = pix[1] * 255;
+        float v = pix[2];
+
+        if(h > 340)
+            h -= 360;
 
         int object;
         int shape;
-        for (int i = 0; i <= objects_list.length; i++)
+
+        for (int i = 0; i <= (sizeof(objects_list)/sizeof(*objects_list)); i++)
         {
             // object / color detection
             object = objects_list[i];
             if (h >= object_color_hue[object*2] && h <= object_color_hue[object*2+1])
             {
-                if ((object == WALL || object == FLOOR))
+                if (object == WALL)
                 { 
                     if (s >= object_color_saturation[object*2] && s <= object_color_saturation[object*2+1])
                     {
@@ -358,6 +364,7 @@ public:
             // TODO: shape detection
             // type = type | shape;
         }
+        ROS_INFO_STREAM("Found object " << type << ", (" << h << ", " << s << ", " << v << ")");
 
         return type;
     }
