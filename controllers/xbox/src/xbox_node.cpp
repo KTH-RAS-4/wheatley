@@ -71,7 +71,7 @@ public:
 
         // publish FORWARD/LEFT/RIGHT
 
-        static std::string prev_cmd = "STOP";
+        static std::string prev_cmd = "";
         std::string cmd;
         if (joy.buttons[0] || joy.axes[7] == -1)
             cmd = "STOP";
@@ -82,7 +82,7 @@ public:
         else if (joy.buttons[3] || joy.axes[7] == 1)
             cmd = "FORWARD";
 
-        if (prev_cmd != cmd)
+        if (prev_cmd != cmd && cmd != "")
         {
             prev_cmd = cmd;
             std_msgs::String msg_cmd;
