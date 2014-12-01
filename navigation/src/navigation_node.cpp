@@ -1,5 +1,5 @@
 #include <ros/ros.h>
-#include <ros/timer.h>
+#include <ros/wall_timer.h>
 #include <nav_msgs/OccupancyGrid.h>
 #include <nav_msgs/Path.h>
 #include <occupancy_grid_utils/ray_tracer.h>
@@ -27,7 +27,7 @@ private:
     ros::Publisher pub_path;
     ros::Publisher pub_map;
     tf::TransformListener tfl;
-    ros::Timer timer_pathfinding;
+    ros::WallTimer timer_pathfinding;
     string fixed_frame;
     string robot_frame;
     double robot_diameter;
@@ -53,7 +53,7 @@ public:
         pub_twist = nh.advertise<geometry_msgs::Twist>("twist_out", 10);
         pub_path = nh.advertise<nav_msgs::Path>("planned_path", 1);
         pub_map = nh.advertise<nav_msgs::OccupancyGrid>("map_out", 1);
-        timer_pathfinding = nh.createTimer(ros::Rate(rate), &Navigater::run_pathfinding, this);
+        timer_pathfinding = nh.createWallTimer(ros::WallDuration(1/rate), &Navigater::run_pathfinding, this);
     }
 
     void callback_map(const nav_msgs::OccupancyGrid::ConstPtr& msg)
@@ -72,12 +72,11 @@ public:
         active = true;
     }
 
-    void run_pathfinding(const ros::TimerEvent& time)
+    void run_pathfinding(const ros::WallTimerEvent&)
     {
         if (!active)
             return;
 
-        ros::Time now = time.current_real;
         gu::Cell robot_cell = getCell(ros::Time(0), robot_frame, inflated_map);
         gu::Cell goal_cell = gu::pointCell(inflated_map.info, goal);
         boost::optional<gu::AStarResult> astar = gu::shortestPathAStar(inflated_map, robot_cell, goal_cell);
@@ -129,10 +128,11 @@ public:
         {
             ROS_FATAL_STREAM("couldn't find parameter "<<nh.resolveName(name));
             ros::shutdown();
-            exit(1);
+            exit(0);
         }
         T value;
         nh.getParam(name, value);
+        ROS_INFO_STREAM("loaded parameter "<<nh.resolveName(name)<<": "<<value);
         return value;
     }
 

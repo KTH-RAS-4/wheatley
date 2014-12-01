@@ -1,5 +1,5 @@
 #include <ros/ros.h>
-#include <ros/timer.h>
+#include <ros/wall_timer.h>
 #include <geometry_msgs/Twist.h>
 #include <sensor_msgs/Joy.h>
 #include <std_msgs/String.h>
@@ -13,7 +13,7 @@ private:
     ros::Publisher pub_twist;
     ros::Publisher pub_direction;
     ros::Subscriber sub_joy;
-    ros::Timer timer_min_rate;
+    ros::WallTimer timer_min_rate;
     sensor_msgs::Joy joy;
     double linearConstant;
     double angularConstant;
@@ -32,7 +32,7 @@ public:
         pub_direction = nh.advertise<std_msgs::String>("direction", 1);
 
         sub_joy = nh.subscribe("joy", 1, &Xbox::joyCallback, this);
-        timer_min_rate = nh.createTimer(ros::Rate(min_rate), &Xbox::timer, this);
+        timer_min_rate = nh.createWallTimer(ros::WallDuration(1/min_rate), &Xbox::timer, this);
     }
 
     ~Xbox()
@@ -45,7 +45,7 @@ public:
         calc();
     }
 
-    void timer(const ros::TimerEvent&)
+    void timer(const ros::WallTimerEvent&)
     {
         calc();
     }
