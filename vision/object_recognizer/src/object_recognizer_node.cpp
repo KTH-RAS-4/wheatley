@@ -27,6 +27,11 @@ Mat sigma_wall = (Mat_<float>(4, 4) << 0.0294730355218137, -0.0567022778756712, 
 Mat filter_mask = (Mat_<float>(3, 3) << 1, 2, 1, 2, 4, 2, 1, 2, 1);
 float filter_weight = 16; // TODO: calculate this
 
+// constants
+float EDGE_THRESHOLD = 50; // edge threshold
+float EIGEN_THRESHOLD = 70000; // corner threshold
+int LINE_THRESHOLD = 6; // minimum number of points in a line
+
 Mat Gx = (Mat_<float>(3, 3) << -1, 0, 1, -2, 0, 2, -1, 0, 1);
 Mat Gy = (Mat_<float>(3, 3) << 1, 2, 1, 0, 0, 0, -1, -2, -1);
 
@@ -39,6 +44,10 @@ class ObjectRecognizerNode
     Mat frame_image;
     Mat Temp;
     Mat Result;
+    Mat Angles;
+    Mat Strength;
+    Mat Magnitude;
+    Mat Gradients;
     int match_method;
     int cols;
     int rows;
@@ -66,6 +75,7 @@ public:
         //destroyWindow(DEBUG_WINDOW);
     }
 
+private:
     void imageHandle(const sensor_msgs::ImageConstPtr& msg)
     {
         static int i = 0;
@@ -95,13 +105,12 @@ public:
         int cols = Temp.cols;
         int rows = Temp.rows;
 
-        float edge_threshold = 50;
-
         //Result.copyTo(Temp);
         //Result = Mat(Temp.rows, Temp.cols, CV_32FC1);
-        Mat Angles = Mat(rows, cols, CV_32FC1);
-        Mat Strength = Mat(rows, cols, CV_32FC1);
-        Mat Magnitude = Mat(rows, cols, CV_32FC1);
+        Angles = Mat(rows, cols, CV_32FC1);
+        Strength = Mat(rows, cols, CV_32FC1);
+        Magnitude = Mat(rows, cols, CV_32FC1);
+        Gradients = Mat(rows, cols, CV_32FC2);
         float gx, gy, angle, edge_strength, edge_magnitude;
         float* _Gx = Gx.ptr<float>(0);
         float* _Gy = Gy.ptr<float>(0);
@@ -109,11 +118,13 @@ public:
         float* _Angles;
         float* _Strength;
         float* _Magnitude;
+        float* _Gradients;
         for(int i = 0; i < rows; i++)
         {
             _Angles = Angles.ptr<float>(i);
             _Strength = Strength.ptr<float>(i);
             _Magnitude = Magnitude.ptr<float>(i);
+            _Gradients = Gradients.ptr<float>(i);
             for(int j = 0; j < cols; j++)
             {
                 gx = 0;
@@ -165,6 +176,8 @@ public:
 
                 _Strength[j] = edge_strength;
                 _Magnitude[j] = edge_magnitude;
+                _Gradients[j*2] = gx;
+                _Gradients[j*2+1] = gy;
             }
         }
 
@@ -179,7 +192,7 @@ public:
             _Magnitude = Magnitude.ptr<float>(i);
             for(int j = 1; j < cols-1; j++)
             {
-                if (_Magnitude[j] > edge_threshold)
+                if (_Magnitude[j] > EDGE_THRESHOLD)
                 {
                     edge_strength = _Strength[i*cols+j];
                     if (_Angles[j] == 1)
@@ -244,7 +257,7 @@ public:
                     {
                         // check top
                         edge_strength = _Strength[(i-1)*cols+j];
-                        if (angle == _Angles[(i-1)*cols+j] && _Magnitude[(i-1)*cols+j] > edge_threshold && edge_strength > _Strength[(i-1)*cols+j-1] && edge_strength > _Strength[(i-1)*cols+j+1])
+                        if (angle == _Angles[(i-1)*cols+j] && _Magnitude[(i-1)*cols+j] > EDGE_THRESHOLD && edge_strength > _Strength[(i-1)*cols+j-1] && edge_strength > _Strength[(i-1)*cols+j+1])
                         {
                             _Result[(i-1)*cols+j-1] = 0;
                             _Result[(i-1)*cols+j+1] = 0;
@@ -252,7 +265,7 @@ public:
                         }
                         // check bottom
                         edge_strength = _Strength[(i+1)*cols+j];
-                        if (angle == _Angles[(i+1)*cols+j] && _Magnitude[(i+1)*cols+j] > edge_threshold && edge_strength > _Strength[(i+1)*cols+j-1] && edge_strength > _Strength[(i+1)*cols+j+1])
+                        if (angle == _Angles[(i+1)*cols+j] && _Magnitude[(i+1)*cols+j] > EDGE_THRESHOLD && edge_strength > _Strength[(i+1)*cols+j-1] && edge_strength > _Strength[(i+1)*cols+j+1])
                         {
                             _Result[(i+1)*cols+j-1] = 0;
                             _Result[(i+1)*cols+j+1] = 0;
@@ -263,7 +276,7 @@ public:
                     {
                         // check top left
                         edge_strength = _Strength[(i-1)*cols+j-1];
-                        if (angle == _Angles[(i-1)*cols+j-1] && _Magnitude[(i-1)*cols+j-1] > edge_threshold && edge_strength > _Strength[i*cols+j-2] && edge_strength > _Strength[(i-2)*cols+j])
+                        if (angle == _Angles[(i-1)*cols+j-1] && _Magnitude[(i-1)*cols+j-1] > EDGE_THRESHOLD && edge_strength > _Strength[i*cols+j-2] && edge_strength > _Strength[(i-2)*cols+j])
                         {
                             _Result[i*cols+j-2] = 0;
                             _Result[(i-2)*cols+j] = 0;
@@ -273,7 +286,7 @@ public:
                         }
                         // check bottom right
                         edge_strength = _Strength[(i+1)*cols+j+1];
-                        if (angle == _Angles[(i+1)*cols+j+1] && _Magnitude[(i+1)*cols+j+1] > edge_threshold && edge_strength > _Strength[(i+2)*cols+j] && edge_strength > _Strength[i*cols+j+2])
+                        if (angle == _Angles[(i+1)*cols+j+1] && _Magnitude[(i+1)*cols+j+1] > EDGE_THRESHOLD && edge_strength > _Strength[(i+2)*cols+j] && edge_strength > _Strength[i*cols+j+2])
                         {
                             _Result[(i+2)*cols+j] = 0;
                             _Result[i*cols+j+2] = 0;
@@ -286,7 +299,7 @@ public:
                     {
                         // check left
                         edge_strength = _Strength[i*cols+j-1];
-                        if (angle == _Angles[i*cols+j-1] && _Magnitude[i*cols+j-1] > edge_threshold && edge_strength > _Strength[(i-1)*cols+j-1] && edge_strength > _Strength[(i+1)*cols+j-1])
+                        if (angle == _Angles[i*cols+j-1] && _Magnitude[i*cols+j-1] > EDGE_THRESHOLD && edge_strength > _Strength[(i-1)*cols+j-1] && edge_strength > _Strength[(i+1)*cols+j-1])
                         {
                             _Result[(i-1)*cols+j-1] = 0;
                             _Result[(i+1)*cols+j-1] = 0;
@@ -294,7 +307,7 @@ public:
                         }
                         // check right
                         edge_strength = _Strength[i*cols+j+1];
-                        if (angle == _Angles[i*cols+j+1] && _Magnitude[i*cols+j+1] > edge_threshold && edge_strength > _Strength[(i-1)*cols+j+1] && edge_strength > _Strength[(i+1)*cols+j+1])
+                        if (angle == _Angles[i*cols+j+1] && _Magnitude[i*cols+j+1] > EDGE_THRESHOLD && edge_strength > _Strength[(i-1)*cols+j+1] && edge_strength > _Strength[(i+1)*cols+j+1])
                         {
                             _Result[(i-1)*cols+j+1] = 0;
                             _Result[(i+1)*cols+j+1] = 0;
@@ -305,7 +318,7 @@ public:
                     {
                         // check top right
                         edge_strength = _Strength[(i-1)*cols+j+1];
-                        if (angle == _Angles[(i-1)*cols+j+1] && _Magnitude[(i-1)*cols+j+1] > edge_threshold && edge_strength > _Strength[(i-2)*cols+j] && edge_strength > _Strength[i*cols+j+2])
+                        if (angle == _Angles[(i-1)*cols+j+1] && _Magnitude[(i-1)*cols+j+1] > EDGE_THRESHOLD && edge_strength > _Strength[(i-2)*cols+j] && edge_strength > _Strength[i*cols+j+2])
                         {
                             _Result[(i-2)*cols+j] = 0;
                             _Result[i*cols+j+2] = 0;
@@ -315,7 +328,7 @@ public:
                         }
                         // check bottom left
                         edge_strength = _Strength[(i+1)*cols+j-1];
-                        if (angle == _Angles[(i+1)*cols+j-1] && _Magnitude[(i+1)*cols+j-1] > edge_threshold && edge_strength > _Strength[i*cols+j-2] && edge_strength > _Strength[(i+2)*cols+j])
+                        if (angle == _Angles[(i+1)*cols+j-1] && _Magnitude[(i+1)*cols+j-1] > EDGE_THRESHOLD && edge_strength > _Strength[i*cols+j-2] && edge_strength > _Strength[(i+2)*cols+j])
                         {
                             _Result[i*cols+j-2] = 0;
                             _Result[(i+2)*cols+j] = 0;
@@ -333,7 +346,6 @@ public:
         Result.copyTo(Temp);
         frame_image.convertTo(Result, CV_32FC3);
         vector<vector<int> > lines;
-        int line_threshold = 5;
         int npoints;
         int pi, pj;
         _Angles = Angles.ptr<float>(0);
@@ -372,7 +384,7 @@ public:
                         }
                     }
                     // remove non lines
-                    if (npoints > line_threshold)
+                    if (npoints >= LINE_THRESHOLD)
                     {
                         lines.push_back(line);
                         for (vector<int>::iterator lineit = line.begin(); lineit != line.end(); lineit+=2)
@@ -386,144 +398,52 @@ public:
             }
         }
 
-        cout << "lines: " << lines.size() << endl;
+        // corner detection
+        Mat C = Mat(2, 2, CV_32FC1);
+        Mat Eigen;
+        float* _C = C.ptr<float>(0);
+        float* _Eigen;
+        float corners = 0;
+        _Gradients = Gradients.ptr<float>(0);
+        for(int i = 1; i < rows-1; i++)
+        {
+            _Result = Result.ptr<float>(i);
+            for(int j = 1; j < cols-1; j++)
+            {
+                // fill with zeros
+                _C[0] = _C[1] = _C[2] = _C[3] = 0;
+                for(int k = -1; k <= 1; k++)
+                {
+                    for(int l = -1; l <= 1; l++)
+                    {
+                        gx = _Gradients[((i+k)*cols+j+l)*2];
+                        gy = _Gradients[((i+k)*cols+j+l)*2+1];
+                        _C[0] += gx*gx;
+                        _C[1] += gx*gy;
+                        _C[2] += gx*gy;
+                        _C[3] += gy*gy;
+                    }
+                }
+                // calculate eigen values
+                eigen(C, Eigen, -1, -1);
+                _Eigen = Eigen.ptr<float>(0);
+                if (_Eigen[0] > EIGEN_THRESHOLD && _Eigen[1] > EIGEN_THRESHOLD)
+                {
+                    rectangle(Result, cvPoint(j-2,i-2), cvPoint(j+2,i+2), CV_RGB(255, 0, 0), 1, 8);
+                    corners++;
+                }
+            }
+        }
+
+        cout << "lines: " << lines.size() << " corners: " << corners << endl;
 
         //double min, max;
         //minMaxLoc(Result, &min, &max);
-        Result.convertTo(Result, CV_8UC3);//, 255.0/(max - min), -min * 255.0/(max - min));
+        Result.convertTo(Result, CV_8UC3);//CV_8U, 255.0/(max - min), -min * 255.0/(max - min));
 
         imshow(OPENCV_WINDOW, Result);
 
         waitKey(10);
-    }
-
-    float getVectorAngle(float x, float y)
-    {
-        if (x != 0 || y != 0) {
-            float angle = atan(-y/abs(x));
-            if (x < 0) {
-                if (angle < 0) {
-                    angle = -angle;
-                } else {
-                    angle = M_PI-angle;
-                }
-            } else {
-                if (angle < 0) {
-                    angle += M_PI;
-                }
-            }
-            return angle;
-        }
-        return 0;
-    }
-
-    void checkLightestDarkest(float val, float& lightest, float& darkest)
-    {
-        if (val > lightest)
-        {
-            lightest = val;
-        }
-        if (val < darkest)
-        {
-            darkest = val;
-        }
-    }
-
-    bool isLocalMaximum32FC1(float* mat, int rows, int cols, int row, int col)
-    {
-        bool maximum = true;
-        for (int i=-1; i<=1; i++)
-        {
-            for (int j=-1; j<=1; j++)
-            {
-                if (mat[row*cols+col] < mat[(row+i)*cols+col+j])
-                {
-                    maximum = false;
-                    i = 2;
-                    j = 2;
-                }
-            }
-        }
-        return maximum;
-    }
-
-    Mat gaussianLikelihood(Mat &image_raw, Mat &mean, Mat &sigma)
-    {
-        Mat image = getAugmentedHSV(image_raw);
-        //cvtColor(image_raw, image, CV_BGR2HSV);
-        //image_raw.convertTo(image, CV_32FC3);
-        Mat lvals;
-        lvals.create(image.rows, image.cols, CV_32FC1);
-
-        // the likelihood equation is divided to save time
-        float object_a = 1.0/((pow(2.0*M_PI, 4.0/2.0))*sqrt(determinant(sigma)));
-        float object_b;
-        Mat sigma_inv = sigma.inv();
-
-        float wall_a = 1.0/((pow(2.0*M_PI, 4.0/2.0))*sqrt(determinant(sigma_wall)));
-        float wall_b;
-        Mat sigma_wall_inv = sigma_wall.inv();
-
-        float* _lvals;
-        float* _image;
-        Mat v;
-        v.create(1, 4, CV_32FC1);
-        
-        for(int i = 0; i < lvals.rows; i++)
-        {
-            _lvals = lvals.ptr<float>(i);
-            _image = image.ptr<float>(i);
-            for(int j = 0; j < lvals.cols; j++)
-            {
-                // extract the pixel value
-                v = (Mat_<float>(1, 4) << _image[j*4], _image[j*4+1], _image[j*4+2], _image[j*4+3]);
-
-                object_b = exp(-0.5*((Mat)((v-mean)*sigma_inv*(v-mean).t())).at<float>(0,0));
-                wall_b = exp(-0.5*((Mat)((v-mean_wall)*sigma_wall_inv*(v-mean_wall).t())).at<float>(0,0));
-                //object_b = exp(-0.5*((Mat)((v-mean)*sigma_inv*(v-mean).t())).at<float>(0,0));
-
-                _lvals[j] = object_a*object_b;
-                /*if (object_a*object_b >= 0.1)
-                {
-                    _lvals[j] = 1;
-                }
-                else
-                {
-                    _lvals[j] = 0;
-                }*/
-            }
-        }
-
-        return lvals;
-    }
-
-    Mat getAugmentedHSV(Mat &image_raw)
-    {
-        // create augmented hsv matrix
-        Mat hsv;
-        hsv.create(image_raw.rows, image_raw.cols, CV_32FC4);
-        
-        Mat image;
-        cvtColor(image_raw, image, CV_BGR2HSV);
-        image.convertTo(image, CV_32FC3);
-
-        float deg2rad = M_PI/180;
-        float* _image;
-        float* _hsv;
-        for(int i = 0; i < image.rows; i++)
-        {
-            _image = image.ptr<float>(i);
-            _hsv = hsv.ptr<float>(i);
-            for(int j = 0; j < image.cols; j++)
-            {
-                _hsv[j*4] = cos(_image[j*3]*deg2rad);
-                _hsv[j*4+1] = sin(_image[j*3]*deg2rad);
-                _hsv[j*4+2] = _image[j*3+1];
-                _hsv[j*4+3] = _image[j*3+2];
-            }
-        }
-
-        return hsv;
     }
 };
 
