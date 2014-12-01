@@ -62,7 +62,7 @@ public:
         twist.linear.x = linearConstant * joy.axes[1];
         twist.angular.z = angularConstant * joy.axes[3];
 
-        bool stop = twist.linear.x == 0 && twist.angular.y == 0;
+        bool stop = twist.linear.x == 0 && twist.angular.z == 0;
 
         if (!(stop && stopped))
             pub_twist.publish(twist);
