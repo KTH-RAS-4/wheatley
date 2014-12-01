@@ -13,18 +13,19 @@
 using namespace std;
 
 float object_color_array[] = {
-    180, 150, 130,
-    200, 90, 100,
-    88, 120, 68, //Green Cube
-    220, 120, 120,
-    250, 150, 140,  //Patrick
-    170, 120, 90,
-    140, 170, 10,
     220, 220, 220,
-    111, 105, 102,
+    200, 90, 100,   //Red Cube
+    88, 120, 68,    //Green Cube
+    220, 120, 120,  //Red Sphere
+    250, 150, 140,  //Patrick
+    //170, 120, 90,
+    140, 170, 10,   //Green Cylinder
+    //220, 220, 220,
+    //111, 105, 102,
     220, 175, 130,  //Yellow Cube
-    205, 120, 155,  //Purple Cross
-    55, 85, 50      //Green Cube
+    125, 801, 155,  //Purple Cross
+    55, 85, 50,     //Green Cube
+    100, 120, 160   //Blue Cube
 };
 
 map<int, string > object_color_map;
@@ -70,13 +71,14 @@ public:
         object_color_map[2] = "Green Cube";
         object_color_map[3] = "Red Ball";
         object_color_map[4] = "Patrick";
-        object_color_map[5] = "Wall";
-        object_color_map[6] = "Green Cylinder";
-        object_color_map[7] = "Wall";
-        object_color_map[8] = "Wall";
-        object_color_map[9] = "Yellow Cube";
-        object_color_map[10] = "Purple Cross";
-        object_color_map[11] = "Green Cube";
+        //object_color_map[5] = "Wall";
+        object_color_map[5] = "Green Cylinder";
+        //object_color_map[7] = "Wall";
+        //object_color_map[8] = "Wall";
+        object_color_map[6] = "Yellow Cube";
+        object_color_map[7] = "Purple Cross";
+        object_color_map[8] = "Green Cube";
+        object_color_map[9] = "Blue Cube";
 
     }
     ~StoredObject() {
@@ -112,7 +114,8 @@ public:
     void publish() {
         if(!identified) {
             identified = true;
-            cout << "Found " << type << " (" << object.x << ", " << object.y << ", " << object.z << ")" << " - Color (" << object.r << ", " << object.g << ", " << object.b << ")" << endl;
+            cout << "Found " << type << //" (" << object.x << ", " << object.y << ", " << object.z << ")" <<
+                    " - Color (" << object.r << ", " << object.g << ", " << object.b << "), GrayColor: " << (.11*object.r + .59*object.g + 0.3*object.b) << endl;
 
             ras_msgs::RAS_Evidence evidence;
             evidence.group_number = 4;
@@ -202,7 +205,7 @@ public:
                 if (type != "Wall") {
                     it->publish();
                 } else {
-                    cout << "Found wall (" << obj.r << ", " << obj.g << ", " << obj.b << ")" << endl;
+                    cout << "Found wall (" << obj.r << ", " << obj.g << ", " << obj.b << "), GrayColor: " << (.11*obj.r + .59*obj.g + 0.3*obj.b) << endl;
                 }
             } else if (obj_iter == 0 && !it->isIdentified()) {
                 it = object_collector.erase(it);
@@ -236,6 +239,13 @@ public:
         int color;
         float diff = 255*3;
         float newdiff;
+
+        int threshold = 15;
+        float average = (obj.r + obj.g + obj.b) / 3;
+        if(abs(obj.r-average) < threshold && abs(obj.g-average) < threshold && abs(obj.b-average) < threshold)  {
+            return 0;
+        }
+
 
         for (int i = 0; i < n_colors; i++)
         {

@@ -109,9 +109,9 @@ public:
         pcl::RegionGrowingRGB<pcl::PointXYZRGB> reg;
         reg.setInputCloud (cloud_others);
         reg.setSearchMethod (tree);
-        reg.setDistanceThreshold (0.02);
-        reg.setPointColorThreshold (5);
-        reg.setRegionColorThreshold (7);
+        reg.setDistanceThreshold (0.05);
+        reg.setPointColorThreshold (10);
+        reg.setRegionColorThreshold (10);
         reg.setMinClusterSize (20);
 
         reg.extract (cluster_indices);

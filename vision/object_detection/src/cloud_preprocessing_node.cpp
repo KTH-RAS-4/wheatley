@@ -140,6 +140,7 @@ public:
 
         sensor_msgs::PointCloud2 output_others;
         pcl::toROSMsg(*cloud_filtered, output_others);
+        output_others.header.stamp = cloud_msg->header.stamp;
         pub_others.publish(output_others);
 
         sensor_msgs::PointCloud2 output_plane;
