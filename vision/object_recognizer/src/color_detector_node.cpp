@@ -9,8 +9,35 @@
 #include <ras_msgs/RAS_Evidence.h>
 //#include <std_msgs/String.h>
 #include <sound_play/SoundRequest.h>
+#include <opencv2/core/core.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/highgui/highgui.hpp>
 
 using namespace std;
+using namespace cv;
+
+// objects
+int WALL = 0x0;
+int FLOOR = 0x1;
+int YELLOW = 0x2;
+int PURPLE = 0x3;
+int BLUE = 0x4;
+int GREEN = 0x5;
+int BLUE = 0x6;
+
+int objects_list[] = {
+    WALL,
+    FLOOR,
+    YELLOW,
+    PURPLE,
+    BLUE,
+    GREEN,
+    BLUE
+};
+
+// types
+int CIRCLE = 0x10;
+int COMPLEX = 0x30;
 
 float object_color_array[] = {
     220, 220, 220,
@@ -27,6 +54,25 @@ float object_color_array[] = {
     55, 85, 50,     //Green Cube
     100, 120, 160   //Blue Cube
 };
+
+// hue min max values
+float object_color_hue[] = {
+    0, 360, // wall
+    10, 20, // floor
+    18, 22, // yellow
+    120, 160, // purple
+    60, 120, // blue
+    30, 60, // green
+    0, 10 // red
+}
+
+// saturation min max values
+float object_color_saturation[] = {
+    0, 10, // wall
+    10, 255 // floor
+}
+
+float 
 
 map<int, string > object_color_map;
 
@@ -66,7 +112,7 @@ public:
         type = "nothing";
 
         //Init color map
-        object_color_map[0] = "Wall";
+        /*object_color_map[0] = "Wall";
         object_color_map[1] = "Red Cube";
         object_color_map[2] = "Green Cube";
         object_color_map[3] = "Red Ball";
@@ -78,8 +124,15 @@ public:
         object_color_map[6] = "Yellow Cube";
         object_color_map[7] = "Purple Cross";
         object_color_map[8] = "Green Cube";
-        object_color_map[9] = "Blue Cube";
+        object_color_map[9] = "Blue Cube";*/
 
+        object_color_map[WALL] = "Wall";
+        object_color_map[FLOOR] = "Floor";
+        object_color_map[YELLOW] = "Yellow";
+        object_color_map[GREEN] = "Green";
+        object_color_map[BLUE] = "Blue";
+        object_color_map[PURPLE] = "Purple";
+        object_color_map[RED] = "Red";
     }
     ~StoredObject() {
 
@@ -142,11 +195,19 @@ public:
         return this->object;
     }
 
-    string getType(int color) {
+    string getType(int type) {
         if(this->type == "nothing") {
-            this->type = object_color_map.find(color)->second;
+            if (object != -1)
+            {
+                int object = type & 0xF;
+                int shape = type & 0xF0;
+                this->type = object_color_map.find(object)->second;
+            }
+            else
+            {
+                this->type = "Undefined";
+            }
             this->object.type = this->type;
-        }
         return this->type;
     }
     string getType() {
@@ -200,7 +261,8 @@ public:
             if((obj_iter = it->occurrencyCount(iteration)) > (relevant_iterations / 2)) {
                 vision_msgs::Object obj = it->getObject();
 
-                string type = it->getType(findClosestColor(obj));
+                //string type = it->getType(findClosestColor(obj));
+                string type = it->getType(findObjectType(obj));
 
                 if (type != "Wall") {
                     it->publish();
@@ -258,6 +320,46 @@ public:
         }
 
         return color;
+    }
+
+    int findObjectType(vision_msgs::Object obj)
+    {
+        int type = -1;
+
+        // extract hsv
+        Mat hsv = Mat(1, 1, CV_32FC3, Scalar(obj.b, obj.g, obj.r));
+        cvtColor(hsv, hsv, CV_BGR2HSV);
+        Vec<float, 3> pix = hsv.at<Vec<float, 3> >(0,0);
+        int h = (int) pix[0];
+        int s = (int) pix[1];
+        int v = (int) pix[2];
+
+        int object;
+        int shape;
+        for (int i = 0; i <= objects_list.length; i++)
+        {
+            // object / color detection
+            object = objects_list[i];
+            if (h >= object_color_hue[object*2] && h <= object_color_hue[object*2+1])
+            {
+                if ((object == WALL || object == FLOOR))
+                { 
+                    if (s >= object_color_saturation[object*2] && s <= object_color_saturation[object*2+1])
+                    {
+                        type = object;
+                    }
+                }
+                else
+                {
+                    type = object;
+                }
+            }
+
+            // TODO: shape detection
+            // type = type | shape;
+        }
+
+        return type;
     }
 };
 
