@@ -124,7 +124,7 @@ boost::optional<Path> extractPath(ResultPtr res, const Cell& dest)
   return p;
 }
 
-    
+
 
 struct QueueItem
 {
@@ -174,7 +174,7 @@ ResultPtr singleSourceShortestPaths (const nm::OccupancyGrid& g, const Cell& src
     const Cell cell = indexCell(g.info, i.ind);
     const double dist = i.potential;
     const double dist_in_meters = dist*g.info.resolution;
-    if (t.max_distance_ && 
+    if (t.max_distance_ &&
         (*t.max_distance_ < (t.use_cells_ ? dist : dist_in_meters)))
         break;
     if (t.goals_) {
@@ -182,7 +182,7 @@ ResultPtr singleSourceShortestPaths (const nm::OccupancyGrid& g, const Cell& src
       if (remaining_goals.empty())
         break;
     }
-    
+
     for (int dx=-1; dx<=1; dx++) {
       for (int dy=-1; dy<=1; dy++) {
         if ((dx==0) && (dy==0))
@@ -335,7 +335,7 @@ optional<AStarResult> shortestPathAStar(const nm::OccupancyGrid& g, const Cell& 
 
   optional<AStarResult> res;
   ROS_DEBUG_STREAM_NAMED ("shortest_path", "Computing shortest path from " << src << " to " << dest);
-  
+
   while (!open_list.empty()) {
     const PQItem current = open_list.top();
     open_list.pop();
@@ -351,7 +351,7 @@ optional<AStarResult> shortestPathAStar(const nm::OccupancyGrid& g, const Cell& 
       res->second = current.g_cost;
       break;
     }
-      
+
     for (int d=-1; d<=1; d+=2) {
       for (int vertical=0; vertical<2; vertical++) {
         const int cx = c.x + d*(1-vertical);
@@ -361,7 +361,12 @@ optional<AStarResult> shortestPathAStar(const nm::OccupancyGrid& g, const Cell& 
           if (withinBounds(g.info, c2)) {
             const index_t ind = cellIndex(g.info, c2);
             if (g.data[ind]==UNOCCUPIED && !seen[ind]) {
-              open_list.push(PQItem(ind, current.g_cost + resolution,
+              Cell c1 = indexCell(g.info, current.parent_ind);
+              Cell c2 = indexCell(g.info, current.ind);
+              Cell c3 = indexCell(g.info, ind);
+              bool needsToTurn = c2.x-c1.x != c3.x-c2.x || c2.y-c1.y != c3.y-c2.y;
+
+              open_list.push(PQItem(ind, current.g_cost + resolution + (needsToTurn?5:0),
                                     resolution*manhattanHeuristic(c2, dest),
                                     current.ind));
             }
@@ -413,7 +418,7 @@ optional<AStarResult> shortestPath(const nm::OccupancyGrid& g, const Cell& src, 
 
   optional<AStarResult> res;
   ROS_DEBUG_STREAM_NAMED ("shortest_path", "Computing shortest path from " << src << " to " << dest);
-  
+
   while (!open_list.empty()) {
     const PQItem current = open_list.top();
     open_list.pop();
@@ -429,7 +434,7 @@ optional<AStarResult> shortestPath(const nm::OccupancyGrid& g, const Cell& src, 
       // Todo fill in path
       break;
     }
-      
+
     for (int d=-1; d<=1; d+=2) {
       for (int vertical=0; vertical<2; vertical++) {
         const int cx = c.x + d*(1-vertical);
@@ -505,7 +510,7 @@ NavigationFunction shortestPathResultToMessage (ResultPtr res)
   NavigationFunction msg;
   msg.info = res->info;
   msg.source = res->src_ind;
-  
+
   const index_t num_cells=res->back_pointers.size();
   ROS_ASSERT (num_cells == res->potential.size());
   msg.valid.resize(num_cells);
@@ -529,10 +534,10 @@ NavigationFunction shortestPathResultToMessage (ResultPtr res)
       msg.back_pointers[i] = 234567;
     }
   }
-  
+
   return msg;
 }
 
 
-  
+
 } // namespace occupancy_grid_utils
