@@ -15,11 +15,16 @@ using namespace std;
 float object_color_array[] = {
     180, 150, 130,
     200, 90, 100,
-    116.2592, 127.4758, 82.8304,
+    88, 120, 68, //Green Cube
     220, 120, 120,
-    250, 150, 140,
+    250, 150, 140,  //Patrick
     170, 120, 90,
-    140, 170, 10
+    140, 170, 10,
+    220, 220, 220,
+    111, 105, 102,
+    220, 175, 130,  //Yellow Cube
+    205, 120, 155,  //Purple Cross
+    55, 85, 50      //Green Cube
 };
 
 map<int, string > object_color_map;
@@ -43,6 +48,7 @@ string object_types[] = {
 
 ros::Publisher pub_evidence;
 ros::Publisher pub_speaker;
+ros::Publisher pub_object;
 
 class StoredObject
 {
@@ -66,6 +72,11 @@ public:
         object_color_map[4] = "Patrick";
         object_color_map[5] = "Wall";
         object_color_map[6] = "Green Cylinder";
+        object_color_map[7] = "Wall";
+        object_color_map[8] = "Wall";
+        object_color_map[9] = "Yellow Cube";
+        object_color_map[10] = "Purple Cross";
+        object_color_map[11] = "Green Cube";
 
     }
     ~StoredObject() {
@@ -115,6 +126,9 @@ public:
             message.command = 1;
             message.arg = "I see a " + type;
             pub_speaker.publish(message);
+
+            pub_object.publish(this->object);
+
         } else {
             cout << "Found " << type << " again" << endl;
         }
@@ -128,6 +142,7 @@ public:
     string getType(int color) {
         if(this->type == "nothing") {
             this->type = object_color_map.find(color)->second;
+            this->object.type = this->type;
         }
         return this->type;
     }
@@ -154,6 +169,7 @@ public:
         pub_evidence = handle.advertise<ras_msgs::RAS_Evidence> ("/evidence", 1);
         //pub_speaker = handle.advertise<std_msgs::String> ("/espeak/string", 1);
         pub_speaker = handle.advertise<sound_play::SoundRequest>("robotsound", 1);
+        pub_object = handle.advertise<vision_msgs::Object>("/object_recognition/objects", 100);
         sub_image = handle.subscribe("camera/rgb/image_raw", 1, &ColorDetectorNode::storeImage, this);
         sub_object = handle.subscribe("object_detection/objects", 1, &ColorDetectorNode::objectHandle, this);
     }

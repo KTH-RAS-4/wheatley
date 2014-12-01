@@ -23,6 +23,7 @@ private:
 
     ros::Publisher pub_pose;
     ros::Subscriber sub_encoders;
+    ros::Subscriber sub_pose_correction;
     tf::TransformBroadcaster pub_transform;
 
 public:
@@ -33,6 +34,7 @@ public:
         , theta(0)
     {
         pub_pose = nh.advertise<nav_msgs::Odometry> ("", 1);
+        sub_pose_correction = nh.subscribe ("/wall_brain/pose_correction", 1, &PoseNode::correctionCallback, this);
         sub_encoders = nh.subscribe ("/arduino/encoders", 1, &PoseNode::encoderCallback, this);
 
         loadParameters();
@@ -47,6 +49,11 @@ public:
         distancePerTick = M_PI * wheelDiameter / ticsPerRevolution;
     }
 
+    void correctionCallback(const nav_msgs::Odometry &msg)
+    {
+        theta = tf::getYaw(msg.pose.pose.orientation);
+    }
+
     void encoderCallback(const ras_arduino_msgs::Encoders::ConstPtr &msg)
     {
         ros::Time now = ros::Time::now();
@@ -57,6 +64,11 @@ public:
         x -= deltaDistance*std::cos(theta);
         y -= deltaDistance*std::sin(theta);
 
+        publishOdometry(now);
+    }
+
+    void publishOdometry(ros::Time now)
+    {
         //publish "robot" transform
         tf::Transform transform;
         transform.setOrigin(tf::Vector3(x, y, 0));

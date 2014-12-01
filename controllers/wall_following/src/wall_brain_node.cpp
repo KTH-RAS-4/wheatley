@@ -108,9 +108,9 @@ public:
           }
           break;
       case FOLLOW:
-          if (!follow(0.2, 0.15))
+          if (!follow(0.16, 0.15))
           {
-              if (distance.right_front > 0.15)
+              if (distance.right_front > 0.2)
                   alignment = theta-M_PI/2;
               else
                   alignment = theta+M_PI/2;             

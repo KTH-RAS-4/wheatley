@@ -1,0 +1,7 @@
+<!---->
+
+<launch>
+    <node pkg="wall_following" type="wall_brain_node"
+        name="wall_brain" output="screen" clear_params="true">
+    </node>
+</launch>

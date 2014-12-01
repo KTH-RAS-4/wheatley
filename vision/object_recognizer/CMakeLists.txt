@@ -10,6 +10,8 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   std_msgs
   image_transport
+  ras_arduino_msgs
+  message_generation
 )
 
 ## System dependencies are found with CMake's conventions
