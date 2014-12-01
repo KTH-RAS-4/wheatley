@@ -127,6 +127,25 @@ void addKnownFreePoint (OverlayClouds* overlay, const gm::Point& p, const double
   }
 }
 
+void addKnownOccupiedPoint (OverlayClouds* overlay, const gm::Point& p, const double r)
+{
+  const nm::MapMetaData& geom = overlay->grid.info;
+  const int cell_radius = floor(r/geom.resolution);
+  const Cell c = pointCell(geom, p);
+  for (int x= c.x-cell_radius; x<=c.x+cell_radius; x++)
+  {
+    for (int y=c.y-cell_radius; y<=c.y+cell_radius; y++)
+    {
+      const Cell c2(x, y);
+      if (withinBounds(geom, c2))
+      {
+        const index_t ind = cellIndex(geom, c2);
+        overlay->hit_counts[ind] = 2;
+        overlay->pass_through_counts[ind] = 1;
+      }
+    }
+  }
+}
 void addCloud (OverlayClouds* overlay, LocalizedCloud::ConstPtr cloud, const int inc, bool hasEndpoint)
 {
   
