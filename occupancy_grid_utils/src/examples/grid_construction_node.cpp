@@ -201,7 +201,7 @@ void GridConstructionNode::buildGrid (const ros::WallTimerEvent& scan)
     gu::OverlayClouds overlay = gu::createCloudOverlay(fake_grid, fixed_frame_, 0.1, 10, 2);
     vector<CloudConstPtr> clouds(clouds_.begin(), clouds_.end());
     BOOST_FOREACH  (CloudConstPtr cloud, clouds_)
-      gu::addCloud(&overlay, cloud);
+      gu::addCloud(&overlay, cloud, true);
     nm::OccupancyGrid::ConstPtr grid = gu::getGrid(overlay);
 
     ROS_DEBUG_NAMED ("build_grid", "Done building grid");

@@ -127,8 +127,7 @@ void addKnownFreePoint (OverlayClouds* overlay, const gm::Point& p, const double
   }
 }
 
-
-void addCloud (OverlayClouds* overlay, LocalizedCloud::ConstPtr cloud, const int inc)
+void addCloud (OverlayClouds* overlay, LocalizedCloud::ConstPtr cloud, const int inc, bool hasEndpoint)
 {
   
   ROS_ASSERT_MSG(overlay->frame_id==cloud->header.frame_id,
@@ -171,7 +170,7 @@ void addCloud (OverlayClouds* overlay, LocalizedCloud::ConstPtr cloud, const int
                          overlay->pass_through_counts[*last_ind]);
       }
 
-      if (last_ind) {
+      if (last_ind && hasEndpoint) {
         // If the last cell equals the point (i.e., point is not off the grid), update hit counts
         const Cell last_cell = indexCell(overlay->grid.info, *last_ind);
         if (last_cell == pointCell(overlay->grid.info, p)) {
@@ -198,14 +197,14 @@ void addCloud (OverlayClouds* overlay, LocalizedCloud::ConstPtr cloud, const int
 }
 
 
-void addCloud (OverlayClouds* overlay, LocalizedCloud::ConstPtr cloud)
+void addCloud (OverlayClouds* overlay, LocalizedCloud::ConstPtr cloud, bool hasEndpoint)
 {
-  addCloud(overlay, cloud, 1);
+  addCloud(overlay, cloud, 1, hasEndpoint);
 }
 
 void removeCloud (OverlayClouds* overlay, LocalizedCloud::ConstPtr cloud)
 {
-  addCloud(overlay, cloud, -1);
+  addCloud(overlay, cloud, -1, true);
 }
 
 

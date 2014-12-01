@@ -87,7 +87,7 @@ OverlayClouds createCloudOverlay (const nav_msgs::OccupancyGrid& grid, const std
 
 
 /// \brief Raytrace a cloud onto grid in \a overlay
-void addCloud (OverlayClouds* overlay, LocalizedCloud::ConstPtr cloud);
+void addCloud (OverlayClouds* overlay, LocalizedCloud::ConstPtr cloud, bool hasEndpoint);
 
 /// \brief Effectively subtract a cloud (which was presumably previously added), by
 /// subtracting rather than adding counts, in \a overlay

@@ -4,3 +4,4 @@
 Header header
 geometry_msgs/Pose sensor_pose
 sensor_msgs/PointCloud cloud
+bool hasEndpoint
