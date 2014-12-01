@@ -1,4 +1,5 @@
 #include <ros/ros.h>
+#include <ros/timer.h>
 #include <geometry_msgs/Twist.h>
 #include <sensor_msgs/Joy.h>
 #include <std_msgs/String.h>
@@ -44,13 +45,16 @@ public:
         calc();
     }
 
-    void timer(const ros::TimerEvent& time)
+    void timer(const ros::TimerEvent&)
     {
         calc();
     }
 
     void calc()
     {
+        if (joy.axes.empty())
+            return;
+
         // publish twist
 
         static bool stopped = true;
