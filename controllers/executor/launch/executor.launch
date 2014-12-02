@@ -1,0 +1,7 @@
+<!---->
+
+<launch>
+    <node pkg="executor" type="executor_node"
+        name="executor" output="screen" clear_params="true">
+    </node>
+</launch>

@@ -143,8 +143,8 @@ public:
 
     pub_pwm = n.advertise<ras_arduino_msgs::PWM>("/arduino/pwm", 1000);
 
-    sub_encode = n.subscribe("/arduino/encoders", 1000, &MotorControllerNode::encoderCallback, this);
-    sub_twist = n.subscribe("twist", 1000, &MotorControllerNode::twistCallback, this);
+    sub_encode = n.subscribe("/arduino/encoders", 1, &MotorControllerNode::encoderCallback, this);
+    sub_twist = n.subscribe("twist", 1, &MotorControllerNode::twistCallback, this);
   }
 
   void encoderCallback(const ras_arduino_msgs::Encoders::ConstPtr &msg)
@@ -220,8 +220,9 @@ public:
         /*ROS_INFO(" desired: [%6.1f, %6.1f]", wDesiredL, wDesiredR);
         ROS_INFO("  actual: [%6.1f, %6.1f]", wMeasuredL, wMeasuredR);
         ROS_INFO("   error: [%6.1f, %6.1f]", errorL, errorR);
-        ROS_INFO("integral: [%6.1f, %6.1f]", motorL.I, motorR.I);
-        ROS_INFO("     PWM: [%6d, %6d]", pwm.PWM1, pwm.PWM2);*/
+        ROS_INFO("integral: [%6.1f, %6.1f]", motorL.I, motorR.I);*/
+        //ROS_INFO("     PWM: [%6d, %6d]", pwm.PWM1, pwm.PWM2);
+
     }
   }
 };
