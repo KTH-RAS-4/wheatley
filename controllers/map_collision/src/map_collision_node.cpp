@@ -39,10 +39,16 @@ private:
   sound_play::SoundRequest speaker_msg;
   nav_msgs::Odometry pose;
   ros::Rate loop_rate;
-  double theta,robot_x,robot_y;
 
-  //gu::OverlayClouds map;
-  nav_msgs::OccupancyGrid map;
+  double theta;
+  string fixed_frame;
+  gm::Pose robot_pose;
+  gm::Pose forward_pose;
+  double robot_outer_diameter;
+  double forward_distance;
+
+  gu::OverlayClouds map;
+  //nav_msgs::OccupancyGrid map;
 
 
 public:
@@ -56,8 +62,9 @@ public:
   ~map_collision()
   {
   }
-  gm::Pose robot_pose;
-  double robot_outer_diameter;
+
+
+
   void init()
   {
     double rate = 10;
@@ -65,19 +72,20 @@ public:
     sub_pose = n.subscribe("/sensors/pose", 1000, &map_collision::poseCallback, this);
     sub_map = nh.subscribe("map_in", 1, &map_collision::callback_map, this);
     robot_outer_diameter = 0.255;
+    fixed_frame = "map";
 
   }
 
   void callback_map(const nav_msgs::OccupancyGrid::ConstPtr& msg)
   {
-      map = *msg;
+      //map = *msg;
       /*
       inflated_map = *gu::inflateObstacles(map, robot_diameter/2);
       inflated_map.header.frame_id = msg->header.frame_id;
       inflated_map.header.stamp = msg->header.stamp;
       pub_map.publish(inflated_map);
       */
-      //map = occupancy_grid_utils::createCloudOverlay(msg, fixed_frame, 0.1, 10, 1);
+      map = gu::createCloudOverlay(*msg, fixed_frame, 0.1, 10, 1);
   }
 
   void poseCallback(const nav_msgs::Odometry::ConstPtr &msg)
@@ -99,10 +107,19 @@ public:
       n++;
       if (n==10)
      {
-       //if (IsWindowFree(z))
+
       ROS_INFO("x=[%f] y=[%f] theta=[%f]",robot_pose.position.x,robot_pose.position.y,theta);
 
-      //gu::addKnownFreePoint(&map, robot_pose.position, robot_outer_diameter/2);
+      forward_distance=robot_outer_diameter;
+      forward_pose.position.x = robot_pose.position.x+forward_distance*cos(theta);
+      forward_pose.position.y = robot_pose.position.y+forward_distance*sin(theta);
+
+       answer=gu::IsWindowFree(&map, forward_pose.position, robot_outer_diameter/2);
+        if (answer)
+             ROS_INFO("free");
+        else
+            ROS_INFO("******************occupied*********************");
+
 
       //void addKnownFreePoint (OverlayClouds* overlay, const gm::Point& p, const double r)
       //void addKnownOccupiedPoint (OverlayClouds* overlay, const gm::Point& p, const double r)
@@ -117,18 +134,7 @@ public:
     }
   }
 
-  bool IsWindowFree (int a)
-  {
-     for (int i=a-3; i<=a;i++)
-     {
-        if (!((i%10)<=3))
-        {
-              return false;
-          }
-    }
-    ROS_INFO("a=%d ",a);
-    return true;
-  }
+
 
 };
 
