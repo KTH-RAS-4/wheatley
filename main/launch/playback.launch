@@ -1,0 +1,9 @@
+<!-- only the static things that should be
+     available during playback of a ros bag -->
+
+<launch>
+	<rosparam command="load" file="$(find main)/config/measurements.yaml"/>
+	<param name="robot_description" textfile="$(find main)/urdf/wheatley_model.urdf" />
+	<param name="use_sim_time" value="true" />
+	<param name="use_gui" value="false"/>
+</launch>

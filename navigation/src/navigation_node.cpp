@@ -1,5 +1,5 @@
 #include <ros/ros.h>
-#include <ros/timer.h>
+#include <ros/wall_timer.h>
 #include <nav_msgs/OccupancyGrid.h>
 #include <nav_msgs/Path.h>
 #include <occupancy_grid_utils/ray_tracer.h>
@@ -27,7 +27,7 @@ private:
     ros::Publisher pub_path;
     ros::Publisher pub_map;
     tf::TransformListener tfl;
-    ros::Timer timer_pathfinding;
+    ros::WallTimer timer_pathfinding;
     string fixed_frame;
     string robot_frame;
     double robot_diameter;
@@ -53,7 +53,7 @@ public:
         pub_twist = nh.advertise<geometry_msgs::Twist>("twist_out", 10);
         pub_path = nh.advertise<nav_msgs::Path>("planned_path", 1);
         pub_map = nh.advertise<nav_msgs::OccupancyGrid>("map_out", 1);
-        timer_pathfinding = nh.createTimer(ros::Rate(rate), &Navigater::run_pathfinding, this);
+        timer_pathfinding = nh.createWallTimer(ros::WallDuration(1/rate), &Navigater::run_pathfinding, this);
     }
 
     void callback_map(const nav_msgs::OccupancyGrid::ConstPtr& msg)
@@ -72,12 +72,18 @@ public:
         active = true;
     }
 
-    void run_pathfinding(const ros::TimerEvent& time)
+    void run_pathfinding(const ros::WallTimerEvent&)
     {
         if (!active)
             return;
 
-        ros::Time now = time.current_real;
+        static gm::Point prev_goal;
+        if (prev_goal.x != goal.x && prev_goal.y != goal.y)
+        {
+            prev_goal = goal;
+            ROS_INFO("navigating to %-5.2f,%5.2f", goal.x, goal.y);
+        }
+
         gu::Cell robot_cell = getCell(ros::Time(0), robot_frame, inflated_map);
         gu::Cell goal_cell = gu::pointCell(inflated_map.info, goal);
         boost::optional<gu::AStarResult> astar = gu::shortestPathAStar(inflated_map, robot_cell, goal_cell);
@@ -85,37 +91,55 @@ public:
         //gu::shortestPathAStar(inflated_map, );
         //gu::singleSourceShortestPaths(inflated_map)
 
-        nav_msgs::Path msg_path;
-        msg_path.header.frame_id = inflated_map.header.frame_id;
-        msg_path.header.stamp = now;
-
         if (astar)
         {
-            gu::AStarResult astar2 = *astar;
-            gu::Path path = astar2.first;
+            gu::Path path = (*astar).first;
+            std::vector<gm::Point> points = getPoints(inflated_map, path);
+            publishPath(points);
+        }
+    }
 
-            for (int i=0; i<path.size(); i++)
-            {
-                geometry_msgs::Point curr = gu::cellCenter(inflated_map.info, path[i]);
-                geometry_msgs::Point next;
-                if (i==path.size()-1)
-                    next = gu::cellCenter(inflated_map.info, path[i]);
-                else
-                    next = gu::cellCenter(inflated_map.info, path[i+1]);
+    std::vector<gm::Point> getPoints(const nav_msgs::OccupancyGrid& grid, const gu::Path& path)
+    {
+        std::vector<gm::Point> points;
 
+        for (int i=0; i<path.size(); i++)
+        {
+            gm::PointStamped ps, fixed_frame_ps;
+            ps.header = grid.header;
+            ps.point = gu::cellCenter(inflated_map.info, path[i]);
+            tfl.transformPoint(fixed_frame, ps, fixed_frame_ps);
+            points.push_back(fixed_frame_ps.point);
+        }
 
-                geometry_msgs::PoseStamped pose;
-                pose.pose.position = curr;
-                tf::Point currTF, nextTF;
-                tf::pointMsgToTF(curr, currTF);
-                tf::pointMsgToTF(next, nextTF);
-                tf::Quaternion q = tf::shortestArcQuatNormalize2(currTF, nextTF);
-                tf::quaternionTFToMsg(q, pose.pose.orientation);
-                pose.header.frame_id = inflated_map.header.frame_id;
-                pose.header.stamp = now; //TODO: should maybe be the approximate time in the future
+        return points;
+    }
 
-                msg_path.poses.push_back(pose);
-            }
+    void publishPath(const std::vector<gm::Point>& path)
+    {
+        nav_msgs::Path msg_path;
+        msg_path.header.frame_id = inflated_map.header.frame_id;
+        msg_path.header.stamp = ros::Time::now();
+
+        for (int i=0; i<path.size(); i++)
+        {
+            gm::Point curr = path[i];
+            gm::Point next;
+            if (i==path.size()-1)
+                next = path[i];
+            else
+                next = path[i+1];
+
+            gm::PoseStamped pose;
+            pose.pose.position = curr;
+            tf::Point currTF, nextTF;
+            tf::pointMsgToTF(curr, currTF);
+            tf::pointMsgToTF(next, nextTF);
+            tf::Quaternion q = tf::shortestArcQuatNormalize2(currTF, nextTF);
+            tf::quaternionTFToMsg(q, pose.pose.orientation);
+            pose.header.frame_id = inflated_map.header.frame_id;
+            pose.header.stamp = ros::Time(0); //TODO: should maybe be the approximate time in the future
+            msg_path.poses.push_back(pose);
         }
 
         pub_path.publish(msg_path);
@@ -129,10 +153,11 @@ public:
         {
             ROS_FATAL_STREAM("couldn't find parameter "<<nh.resolveName(name));
             ros::shutdown();
-            exit(1);
+            exit(0);
         }
         T value;
         nh.getParam(name, value);
+        ROS_INFO_STREAM("loaded parameter "<<nh.resolveName(name)<<": "<<value);
         return value;
     }
 

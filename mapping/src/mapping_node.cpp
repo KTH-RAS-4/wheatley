@@ -79,7 +79,7 @@ private:
     ros::Publisher grid_pub_;
     ros::Publisher object_pub_;
     ros::WallTimer build_grid_timer_;
-    ros::Timer mark_pose_explored_timer_;
+    ros::WallTimer mark_pose_explored_timer_;
     boost::mutex mutex_;
 
     /****************************************
@@ -119,7 +119,7 @@ public:
         sub_cloud = handle.subscribe("/object_detection/preprocessed", 100, &MapNode::mapCloud, this);
         sub_objects = handle.subscribe("/object_recognition/objects", 100, &MapNode::insertObject, this);
 
-        mark_pose_explored_timer_ = handle.createTimer(ros::Rate(mark_pose_explored_rate), &MapNode::mapMarkPoseExplored, this);
+        mark_pose_explored_timer_ = handle.createWallTimer(ros::WallDuration(1/mark_pose_explored_rate), &MapNode::mapMarkPoseExplored, this);
         build_grid_timer_ = handle.createWallTimer(ros::WallDuration(grid_construction_interval_), &MapNode::echoGrid, this);
 
         init();
@@ -260,9 +260,9 @@ public:
         }
     }
 
-    void mapMarkPoseExplored(const ros::TimerEvent& time)
+    void mapMarkPoseExplored(const ros::WallTimerEvent& time)
     {
-        ros::Time now = time.current_real;
+        ros::Time now = ros::Time::now();
         if (tf_.waitForTransform(fixed_frame_, robot_frame, now, ros::Duration(0.1)))
             gu::addKnownFreePoint(&map, getPose(now, robot_frame).position, robot_outer_diameter/2);
     }
