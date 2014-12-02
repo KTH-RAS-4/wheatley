@@ -150,6 +150,12 @@ public:
         nm::OccupancyGrid fake_grid;
         fake_grid.info = info;
         map = gu::createCloudOverlay(fake_grid, fixed_frame_, 0.1, 10, 1);
+
+
+        //Fill init gap
+        robot_pose.position.x += 0.07;
+        gu::addKnownFreePoint(&map, robot_pose.position, robot_outer_diameter/2);
+
     }
 
     void echoGrid(const ros::WallTimerEvent& scan) {
@@ -242,7 +248,7 @@ public:
                 loc_cloud->header.frame_id = fixed_frame_;
 
                 Lock lock(mutex_);
-                gu::addCloud(&map, loc_cloud, hasEndpoint[pc]);
+                gu::addCloud(&map, loc_cloud, false);
 
                 //last_cloud_=loc_cloud;
                 //clouds_.push_back(last_cloud_);
