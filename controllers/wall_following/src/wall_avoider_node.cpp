@@ -42,9 +42,9 @@ public:
   
   void init()
   {
-    sub_distance = n.subscribe("/sensors/ir/distances", 1000, &WallFollowingControllerNode::distanceCallback, this);
-    sub_twist = n.subscribe("twist_in", 1000, &WallFollowingControllerNode::twistCallback, this);
-    pub_twist = n.advertise<geometry_msgs::Twist>("twist_out", 1000);
+    sub_distance = n.subscribe("/sensors/ir/distances", 1, &WallFollowingControllerNode::distanceCallback, this);
+    sub_twist = n.subscribe("twist_in", 1, &WallFollowingControllerNode::twistCallback, this);
+    pub_twist = n.advertise<geometry_msgs::Twist>("twist_out", 1);
   }
 
   void twistCallback(const geometry_msgs::Twist::ConstPtr &msg)
