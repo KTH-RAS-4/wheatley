@@ -1,7 +1,8 @@
 <!---->
 
 <launch>
-    <node pkg="executor" type="executor_node"
-        name="executor" output="screen" clear_params="true">
-    </node>
+	<node pkg="executor" type="executor_node"
+	        name="executor" output="screen" clear_params="true">
+		<remap from="~/pose_correction" to="/sensors/pose/pose_correction"/>
+	</node>
 </launch>

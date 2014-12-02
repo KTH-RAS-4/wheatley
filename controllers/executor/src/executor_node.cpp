@@ -91,11 +91,11 @@ public:
 
     sub_distance = n.subscribe("/sensors/ir/distances", 1000, &Executor::distanceCallback, this);
     sub_pose = n.subscribe("/sensors/pose", 1000, &Executor::poseCallback, this);
-    sub_action = n.subscribe("/nav/order", 1000, &Executor::orderCallback, this);
-    pub_task_done = n.advertise<std_msgs::String>("state",1000);
+    sub_action = n.subscribe("order", 1000, &Executor::orderCallback, this);
+    pub_task_done = n.advertise<std_msgs::String>("state",1000,true);
     motor_twist = n.advertise<geometry_msgs::Twist>("/motor_controller/twist", 1000);
     wall_twist = n.advertise<geometry_msgs::Twist>("/wall_avoider/twist", 1000);
-    pub_pose_correction = n.advertise<nav_msgs::Odometry> ("/wall_brain/pose_correction", 1);
+    pub_pose_correction = n.advertise<nav_msgs::Odometry> ("pose_correction", 1);
 
     ros::Time now(0);
 
@@ -115,7 +115,7 @@ public:
 
 
   void orderCallback(const std_msgs::String::ConstPtr &msg)
-    {    
+    {
     STATE = *msg;
     if (STATE.data == "LEFT")
       {
@@ -345,7 +345,8 @@ public:
   }
 };
 
-int main (int argc, char **argv){
+int main (int argc, char **argv)
+{
   ros::init(argc, argv, "executor");
   Executor my_node;
   my_node.run();

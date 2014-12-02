@@ -20,7 +20,7 @@ using std::string;
 namespace gm=geometry_msgs;
 namespace gu=occupancy_grid_utils;
 
-class Navigater
+class Navigator
 {
 private:
     ros::NodeHandle nh;
@@ -44,7 +44,7 @@ private:
     geometry_msgs::Point goal;
 
 public:
-    Navigater()
+    Navigator()
         : nh("~")
         , fixed_frame("map")
         , robot_frame("robot")
@@ -54,13 +54,13 @@ public:
     {
         double rate = requireParameter<double>("pathfinding_rate");
 
-        sub_map = nh.subscribe("map_in", 1, &Navigater::callback_map, this);
-        sub_clicked_point = nh.subscribe("/clicked_point", 1, &Navigater::callback_clicked_point, this);
-        sub_executor_state = nh.subscribe("executor_state", 1, &Navigater::callback_executor_state, this);
+        sub_map = nh.subscribe("map_in", 1, &Navigator::callback_map, this);
+        sub_clicked_point = nh.subscribe("/clicked_point", 1, &Navigator::callback_clicked_point, this);
+        sub_executor_state = nh.subscribe("executor_state", 1, &Navigator::callback_executor_state, this);
         pub_executor_order = nh.advertise<std_msgs::String>("executor_order", 1, true);
         pub_path = nh.advertise<nav_msgs::Path>("planned_path", 1);
         pub_map = nh.advertise<nav_msgs::OccupancyGrid>("map_out", 1);
-        timer_pathfinding = nh.createWallTimer(ros::WallDuration(1/rate), &Navigater::callback_timer, this);
+        timer_pathfinding = nh.createWallTimer(ros::WallDuration(1/rate), &Navigator::callback_timer, this);
     }
 
     void callback_map(const nav_msgs::OccupancyGrid::ConstPtr& msg)
@@ -303,7 +303,7 @@ public:
 
 int main (int argc, char **argv)
 {
-    ros::init(argc, argv, "navigater");
-    Navigater navigation_node;
+    ros::init(argc, argv, "navigator");
+    Navigator navigation_node;
     navigation_node.run();
 }

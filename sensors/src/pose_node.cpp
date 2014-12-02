@@ -34,7 +34,7 @@ public:
         , theta(0)
     {
         pub_pose = nh.advertise<nav_msgs::Odometry> ("", 1);
-        sub_pose_correction = nh.subscribe ("/wall_brain/pose_correction", 1, &PoseNode::correctionCallback, this);
+        sub_pose_correction = nh.subscribe ("pose_correction", 1, &PoseNode::correctionCallback, this);
         sub_encoders = nh.subscribe ("/arduino/encoders", 1, &PoseNode::encoderCallback, this);
 
         loadParameters();
