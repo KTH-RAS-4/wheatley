@@ -3,7 +3,9 @@
 
 <launch>
 	<rosparam command="load" file="$(find main)/config/measurements.yaml"/>
-	<param name="robot_description" textfile="$(find main)/urdf/wheatley_model.urdf" />
-	<param name="use_sim_time" value="true" />
+	<param name="robot_description" textfile="$(find main)/urdf/wheatley_model.urdf"/>
+	<param name="use_sim_time" value="true"/>
 	<param name="use_gui" value="false"/>
+
+	<node pkg="rqt_bag" type="rqt_bag" name="rqt_bag"/>
 </launch>
