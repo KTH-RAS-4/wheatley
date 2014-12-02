@@ -164,7 +164,7 @@ public:
             }
             avgLeftDiff = sumL / (double) 10;
         } else {
-            leftDiff[count++] = atan((distance.left_front-distance.left_rear)/lL);
+            leftDiff[count++] = atan(-(distance.left_front-distance.left_rear)/lL);
         }
     } else if (poseCorrR)
     {
@@ -177,7 +177,7 @@ public:
             }
             avgRightDiff = sumR / (double) 10;
         } else {
-            rightDiff[count++] = atan((distance.right_rear-distance.right_front)/lR);
+            rightDiff[count++] = atan((distance.right_front-distance.right_rear)/lR);
         }
     }
 
