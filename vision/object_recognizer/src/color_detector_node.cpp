@@ -57,13 +57,13 @@ float object_color_array[] = {
 
 // hue min max values
 float object_color_hue[] = {
-    -20, 360, // wall
-    10, 20, // orange
-    30, 50, // yellow
-    250, 320, // purple
-    100, 250, // blue
-    50, 100, // green
-    -15, 10 // red
+    -10, 180, // wall
+    5, 10, // orange
+    15, 25, // yellow
+    125, 160, // purple
+    50, 125, // blue
+    25, 50, // green
+    -8, 5 // red
 };
 
 // saturation min max values
@@ -71,8 +71,6 @@ float object_color_saturation[] = {
     0, 80, // wall
     80, 255 // not wall
 };
-
-
 
 map<int, string > object_color_map;
 
@@ -328,16 +326,14 @@ public:
         int type = -1;
 
         // extract hsv
-        Mat bgr = Mat(1, 1, CV_32FC3, Scalar(obj.b, obj.g, obj.r));
+        Mat bgr = Mat(1, 1, CV_8UC3, Scalar(obj.b, obj.g, obj.r));
         Mat hsv;
         cvtColor(bgr, hsv, CV_BGR2HSV);
-        Vec<float, 3> pix = hsv.at<Vec<float, 3> >(0,0);
-        float h = pix[0];
-        float s = pix[1] * 255;
-        float v = pix[2];
-
-        if(h > 340)
-            h -= 360;
+        Vec3b pix = hsv.at<Vec3b>(0,0);
+        int h = pix[0]; // [0, 180]
+        int s = pix[1]; // [0, 255]
+        int v = pix[2]; // [0, 255]
+        int _h;
 
         int object;
         int shape;
@@ -346,7 +342,8 @@ public:
         {
             // object / color detection
             object = objects_list[i];
-            if (h >= object_color_hue[object*2] && h <= object_color_hue[object*2+1])
+            _h = h > object_color_hue[object*2+1] ? h-180 : h; // wrap the value
+            if (_h >= object_color_hue[object*2] && _h <= object_color_hue[object*2+1])
             {
                 if (object == WALL)
                 { 
