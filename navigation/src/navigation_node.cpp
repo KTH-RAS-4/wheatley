@@ -40,6 +40,7 @@ namespace wheatley
         const double robot_diameter;
         bool active;
         bool executor_ready;
+        string prev_order;
 
         nav_msgs::OccupancyGrid map;
         nav_msgs::OccupancyGrid inflated_map;
@@ -82,12 +83,15 @@ namespace wheatley
         {
             goal = msg->point;
             active = true;
+            prev_order.clear();
             run_pathfinding();
         }
 
         void callback_executor_state(const std_msgs::String::ConstPtr& msg)
         {
             ROS_INFO_STREAM_ONCE("got first state from executor: " << msg->data);
+            if (msg->data == "STOP")
+                prev_order.clear();
             if (msg->data == "STOP" || msg->data == "FORWARD")
                 executor_ready = true;
             run_pathfinding();
@@ -163,8 +167,7 @@ namespace wheatley
 
         void publishOrder(string order)
         {
-            static string prev_order;
-            if (prev_order != order)
+            if (executor_ready && prev_order != order)
             {
                 prev_order = order;
 
