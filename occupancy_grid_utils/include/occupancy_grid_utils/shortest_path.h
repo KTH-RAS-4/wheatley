@@ -41,6 +41,7 @@
 #define OCCUPANCY_GRID_UTILS_SHORTEST_PATH_H
 
 #include <occupancy_grid_utils/coordinate_conversions.h>
+#include <wheatley_common/angles.h>
 #include <occupancy_grid_utils/NavigationFunction.h>
 #include <boost/shared_ptr.hpp>
 #include <boost/optional.hpp>
@@ -61,7 +62,7 @@ namespace occupancy_grid_utils
 /// replaced by the max of their values (-1 is considered to be the same as 1
 /// for this).
 /// Rounds up when converting from meters to cells
-nav_msgs::OccupancyGrid::Ptr inflateObstacles (const nav_msgs::OccupancyGrid& g,
+nav_msgs::OccupancyGrid inflateObstacles (const nav_msgs::OccupancyGrid& g,
                                                double r,
                                                bool allow_unknown=false);
 
@@ -99,7 +100,7 @@ struct TerminationCondition
 /// \brief Single source Dijkstra's algorithm
 /// \retval Structure from which paths can be extracted or distances computed
 /// \param manhattan If false, Euclidean
-/// 
+///
 /// Each cell is connected to its horizontal and vertical neighbors, with cost
 /// 1, and diagonal neighbors with cost sqrt(2).  Only cells with value UNOCCUPIED
 /// are considered.
@@ -109,10 +110,10 @@ ResultPtr singleSourceShortestPaths (const nav_msgs::OccupancyGrid& g, const Cel
 
 /// \brief Single source Dijkstra's algorithm
 /// \retval Structure from which paths can be extracted or distances computed
-/// \param term allows stopping early when a distance bound is reached or when a 
+/// \param term allows stopping early when a distance bound is reached or when a
 /// a set of goal cells have been found
 /// \param manhattan If false, Euclidean
-/// 
+///
 /// Each cell is connected to its horizontal and vertical neighbors, with cost
 /// 1, and diagonal neighbors with cost sqrt(2).  Only cells with value UNOCCUPIED
 /// are considered.
@@ -121,7 +122,7 @@ ResultPtr singleSourceShortestPaths (const nav_msgs::OccupancyGrid& g, const Cel
                                      bool manhattan=false);
 
 /// \brief Extract a path from the result of single-source shortest paths
-/// \retval path If path exists, vector of cells where the source is first and \a dest 
+/// \retval path If path exists, vector of cells where the source is first and \a dest
 /// is last; if not, uninitialized
 boost::optional<Path> extractPath (ResultPtr shortest_path_result, const Cell& dest);
 
@@ -158,7 +159,8 @@ boost::optional<AStarResult> shortestPath(const nav_msgs::OccupancyGrid& g,
 /// and the cost (meters).  Currently, though, the path is not returned, just
 /// the cost.
 boost::optional<AStarResult> shortestPathAStar(const nav_msgs::OccupancyGrid& g,
-                                               const Cell& src, const Cell& dest);
+                                               const Cell& src, const Cell& dest,
+                                               const angles::StraightAngle& srcDir = angles::StraightAngle::ANY);
 
 
 } // namespace

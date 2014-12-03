@@ -8,6 +8,7 @@ find_package(
     catkin REQUIRED COMPONENTS 
     nav_msgs geometry_msgs sensor_msgs laser_geometry
     roscpp rospy tf tf2_bullet message_generation
+    wheatley_common
 )
 
 ## Add find-modules and define external dependencies
@@ -37,7 +38,7 @@ generate_messages(
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES grid_utils grid_utils_boost_python_exports
-  CATKIN_DEPENDS nav_msgs geometry_msgs sensor_msgs laser_geometry roscpp rospy tf tf2_bullet message_runtime
+  CATKIN_DEPENDS nav_msgs geometry_msgs sensor_msgs laser_geometry roscpp rospy tf tf2_bullet message_runtime wheatley_common
   DEPENDS system_lib
 )
 

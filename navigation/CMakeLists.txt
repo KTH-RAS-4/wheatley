@@ -10,6 +10,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   std_msgs
   occupancy_grid_utils
+  wheatley_common
 )
 
 ## System dependencies are found with CMake's conventions
@@ -85,7 +86,7 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES navigation
-#  CATKIN_DEPENDS sensor_msgs geometry_msgs roscpp
+ CATKIN_DEPENDS sensor_msgs geometry_msgs roscpp wheatley_common
 #  DEPENDS system_lib
 )
 
