@@ -2,10 +2,12 @@
 
 <launch>
 	<node pkg="navigation" type="navigation_node"
-			name="navigater" output="screen" clear_params="true">
+			name="navigator" output="screen" clear_params="true">
 		<rosparam command="load" file="$(find navigation)/config/settings.yaml"/>
 		<remap from="~/map_in" to="/map"/>
 		<remap from="~/map_out" to="~/inflated_map"/>
 		<remap from="~/twist_out" to="/wall_avoider/twist"/>
+		<remap from="~/executor_state" to="/executor/state"/>
+		<remap from="~/executor_order" to="/executor/order"/>
 	</node>
 </launch>
