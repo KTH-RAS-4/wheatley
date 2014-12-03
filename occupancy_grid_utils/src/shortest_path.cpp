@@ -51,7 +51,7 @@ using std::vector;
 using boost::optional;
 using std::max;
 
-TerminationCondition::TerminationCondition () 
+TerminationCondition::TerminationCondition ()
 {}
 
 TerminationCondition::TerminationCondition (const double max_distance,
@@ -230,7 +230,7 @@ struct InflationQueueItem
   signed char cost;
 };
 
-GridPtr inflateObstacles (const nm::OccupancyGrid& g, const double r,
+nm::OccupancyGrid inflateObstacles (const nm::OccupancyGrid& g, const double r,
                           const bool allow_unknown)
 {
   // Set up optimized 'priority queue'
@@ -238,7 +238,7 @@ GridPtr inflateObstacles (const nm::OccupancyGrid& g, const double r,
   const int radius = 1+ceil(r/g.info.resolution);
   typedef vector<InflationQueueItem> QueueVec;
   vector<QueueVec> queues(radius);
-  GridPtr g2(new nm::OccupancyGrid(g));
+  nm::OccupancyGrid g2(g);
   const nm::MapMetaData& geom=g.info;
 
   // Add initial obstacles
@@ -267,9 +267,9 @@ GridPtr inflateObstacles (const nm::OccupancyGrid& g, const double r,
 
     const InflationQueueItem& q=queues[ind].back();
     const index_t index = cellIndex(geom, q.cell);
-    if (myGt(q.cost, g2->data[index]) || ind==0)
+    if (myGt(q.cost, g2.data[index]) || ind==0)
     {
-      g2->data[index] = q.cost;
+      g2.data[index] = q.cost;
       if (ind<radius-1)
       {
         for (int vert=0; vert<2; vert ++)
@@ -319,8 +319,12 @@ inline double manhattanHeuristic (const Cell& c1, const Cell& c2)
   return fabs(c1.x-c2.x) + fabs(c1.y-c2.y);
 }
 
+angles::StraightAngle getDirection(const Cell& from, const Cell& to)
+{
+    return angles::StraightAngle::getClosest(to.x-from.x, to.y-from.y);
+}
 
-optional<AStarResult> shortestPathAStar(const nm::OccupancyGrid& g, const Cell& src, const Cell& dest)
+optional<AStarResult> shortestPathAStar(const nm::OccupancyGrid& g, const Cell& src, const Cell& dest, const angles::StraightAngle& srcDir)
 {
   typedef std::map<index_t, index_t> ParentMap;
 
@@ -339,12 +343,12 @@ optional<AStarResult> shortestPathAStar(const nm::OccupancyGrid& g, const Cell& 
   while (!open_list.empty()) {
     const PQItem current = open_list.top();
     open_list.pop();
-    const Cell c = indexCell(g.info, current.ind);
+    const Cell curr = indexCell(g.info, current.ind);
     if (seen[current.ind])
       continue;
     parent[current.ind] = current.parent_ind;
     seen[current.ind] = true;
-    ROS_DEBUG_STREAM_NAMED ("shortest_path_internal", "  Considering " << c << " with cost " <<
+    ROS_DEBUG_STREAM_NAMED ("shortest_path_internal", "  Considering " << curr << " with cost " <<
                             current.g_cost << " + " << current.h_cost);
     if (current.ind == dest_ind) {
       res = AStarResult();
@@ -354,20 +358,24 @@ optional<AStarResult> shortestPathAStar(const nm::OccupancyGrid& g, const Cell& 
 
     for (int d=-1; d<=1; d+=2) {
       for (int vertical=0; vertical<2; vertical++) {
-        const int cx = c.x + d*(1-vertical);
-        const int cy = c.y + d*vertical;
+        const int cx = curr.x + d*(1-vertical);
+        const int cy = curr.y + d*vertical;
         if (cx>=0 && cy>=0) {
-          const Cell c2((coord_t) cx, (coord_t) cy);
-          if (withinBounds(g.info, c2)) {
-            const index_t ind = cellIndex(g.info, c2);
-            if (g.data[ind]==UNOCCUPIED && !seen[ind]) {
-              Cell c1 = indexCell(g.info, current.parent_ind);
-              Cell c2 = indexCell(g.info, current.ind);
-              Cell c3 = indexCell(g.info, ind);
-              bool needsToTurn = c2.x-c1.x != c3.x-c2.x || c2.y-c1.y != c3.y-c2.y;
+          const Cell next((coord_t) cx, (coord_t) cy);
+          if (withinBounds(g.info, next)) {
+            const index_t ind = cellIndex(g.info, next);
+            if (g.data[ind]==UNOCCUPIED && !seen[ind])
+            {
+              const Cell prev = indexCell(g.info, current.parent_ind);
 
-              open_list.push(PQItem(ind, current.g_cost + resolution + (needsToTurn?5:0),
-                                    resolution*manhattanHeuristic(c2, dest),
+              angles::StraightAngle oldDir = getDirection(prev, curr);
+              angles::StraightAngle newDir = getDirection(curr, next);
+
+              if (oldDir==angles::StraightAngle::ANY)
+                  oldDir = srcDir;
+
+              open_list.push(PQItem(ind, current.g_cost + resolution + (oldDir!=newDir?5:0),
+                                    resolution*manhattanHeuristic(next, dest),
                                     current.ind));
             }
             ROS_DEBUG_STREAM_COND_NAMED (g.data[ind]!=UNOCCUPIED, "shortest_path_internal",
