@@ -25,6 +25,7 @@ template <typename T> T CLAMP(const T& value, const T& low, const T& high)
 namespace gu=occupancy_grid_utils;
 using std::string;
 namespace gm=geometry_msgs;
+namespace nm=nav_msgs;
 
 class map_collision
 {
@@ -47,9 +48,8 @@ private:
   double robot_outer_diameter;
   double forward_distance;
 
-  gu::OverlayClouds map;
-  //nav_msgs::OccupancyGrid map;
-
+  gu::OverlayClouds map_oc;
+  nm::OccupancyGrid map_og;
 
 public:
   map_collision()
@@ -76,19 +76,22 @@ public:
 
   }
 
-  void callback_map(const nav_msgs::OccupancyGrid::ConstPtr& msg)
+  void callback_map(const nm::OccupancyGrid::ConstPtr& msg)
   {
-      //map = *msg;
       /*
       inflated_map = *gu::inflateObstacles(map, robot_diameter/2);
       inflated_map.header.frame_id = msg->header.frame_id;
       inflated_map.header.stamp = msg->header.stamp;
       pub_map.publish(inflated_map);
       */
-      map = gu::createCloudOverlay(*msg, fixed_frame, 0.1, 10, 1);
+      //map_og = *msg;
+      //map_oc = gu::createCloudOverlay(map_og, fixed_frame, 0.1, 10, 1);
+      map_oc = gu::createCloudOverlay(*msg, fixed_frame, 0.1, 10, 1);
+      //nm::OccupancyGrid::ConstPtr grid = gu::getGrid(map_oc);
+
   }
 
-  void poseCallback(const nav_msgs::Odometry::ConstPtr &msg)
+  void poseCallback(const nm::Odometry::ConstPtr &msg)
   {
       theta = tf::getYaw(msg->pose.pose.orientation);
       robot_pose.position.x = msg->pose.pose.position.x;
@@ -98,6 +101,7 @@ public:
   void run()
   {
       int n=1,z=5;
+      int a;
       bool answer;
     while (ros::ok())
     {
@@ -108,23 +112,27 @@ public:
       if (n==10)
      {
 
-      ROS_INFO("x=[%f] y=[%f] theta=[%f]",robot_pose.position.x,robot_pose.position.y,theta);
+      //ROS_INFO("x=[%f] y=[%f] theta=[%f]",robot_pose.position.x,robot_pose.position.y,theta);
 
       forward_distance=robot_outer_diameter;
       forward_pose.position.x = robot_pose.position.x+forward_distance*cos(theta);
       forward_pose.position.y = robot_pose.position.y+forward_distance*sin(theta);
 
-       answer=gu::IsWindowFree(&map, forward_pose.position, robot_outer_diameter/2);
-        if (answer)
-             ROS_INFO("free");
-        else
-            ROS_INFO("******************occupied*********************");
+       a=gu::IsWindowFree(&map_oc, forward_pose.position, robot_outer_diameter/2);
+       answer=true;
+       z++;
+       ROS_INFO("dermineOccupancy =%d",z);
+     ROS_INFO("dermineOccupancy =%d",a);
 
+      // gu::determineOccupancy (map_oc.hit_counts, map_oc.pass_through_counts,map_oc.occupancy_threshold,map_oc.min_pass_through);
+       // if (answer)
+         //    ROS_INFO("free");
+        //else
+          //  ROS_INFO("******************occupied*********************");
 
       //void addKnownFreePoint (OverlayClouds* overlay, const gm::Point& p, const double r)
       //void addKnownOccupiedPoint (OverlayClouds* overlay, const gm::Point& p, const double r)
       //bool IsWindowFree (OverlayClouds* overlay, const gm::Point& p, const double r)
-
       n=0;
     }
 

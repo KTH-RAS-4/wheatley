@@ -100,6 +100,8 @@ void addKnownFreePoint (OverlayClouds* overlay, const geometry_msgs::Point& p,
 /// \brief Assert that a square centered at this point with side 2*r contains obstacles
 void addKnownOccupiedPoint (OverlayClouds* overlay, const geometry_msgs::Point& p,
                         double r);
+/// return true if the square centered at this point with side 2*r contains no bostacles
+int IsWindowFree (OverlayClouds* overlay, const geometry_msgs::Point& p, double r);
 
 /// \brief Get the current grid.  It's fine to modify the returned object.
 nav_msgs::OccupancyGrid::Ptr getGrid (const OverlayClouds& overlay);
