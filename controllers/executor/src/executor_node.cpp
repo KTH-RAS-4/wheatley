@@ -47,7 +47,7 @@ private:
   nav_msgs::Odometry pose;
   sensors::Distance distance;
   std_msgs::String STATE;
-  std_msgs::String oldState;
+
 
   tf::StampedTransform tf_left_front;
   tf::StampedTransform tf_left_rear;
@@ -69,6 +69,8 @@ private:
   bool poseCorrL;
   bool poseCorrR;
   int count;
+  std::string str_stat;
+
 
 
 public:
@@ -111,6 +113,7 @@ public:
 
     poseCorrL = poseCorrR = false;
 
+
   }
 
 
@@ -119,7 +122,6 @@ public:
     STATE = *msg;
     if (STATE.data == "LEFT")
       {
-        pub_task_done.publish(oldState);
         stat = LEFT;
         ROS_INFO("LEFT");
         desiredTheta = fmod(desiredTheta + M_PI/2,(double) 2*M_PI);
@@ -128,7 +130,6 @@ public:
         ROS_INFO("Before state, DesiredTheta: %.1f, Theta: %.1f",desiredTheta*180/M_PI, theta*180/M_PI);
       } else if (STATE.data == "RIGHT")
       {
-        pub_task_done.publish(oldState);
         stat = RIGHT;
         ROS_INFO("RIGHT");
         desiredTheta = fmod (desiredTheta - M_PI/2, (double) 2*M_PI);
@@ -137,17 +138,14 @@ public:
         ROS_INFO("Before state, DesiredTheta: %.1f, Theta: %.1f",desiredTheta*180/M_PI, theta*180/M_PI);
       } else if (STATE.data == "FORWARD")
       {
-          pub_task_done.publish(oldState);
           stat = FORWARD;
           ROS_INFO("FORWARD");
           ROS_INFO("Before state, DesiredTheta: %.1f, Theta: %.1f",desiredTheta*180/M_PI, theta*180/M_PI);
       } else
       {
-          pub_task_done.publish(oldState);
           stat = STOP;
           ROS_INFO("STOP");
       }
-    oldState = *msg;
     }
 
   void distanceCallback(const sensors::Distance::ConstPtr &msg)
@@ -220,7 +218,6 @@ public:
           case FORWARD:
               if (!follow(0.16, 0.10))
               {
-                pub_task_done.publish(STATE);
                 ROS_INFO("After state, DesiredTheta: %.1f, Theta: %.1f",desiredTheta*180/M_PI, theta*180/M_PI);
                 stat = STOP;
               }
@@ -278,6 +275,29 @@ public:
             break;
           }
 
+      }
+      if (stat == STOP)
+      {
+          str_stat = "STOP";
+      } else if (stat == FORWARD)
+      {
+          str_stat = "FORWARD";
+      } else if (stat == LEFT)
+      {
+          str_stat = "LEFT";
+      } else if (stat == RIGHT)
+      {
+          str_stat = "RIGHT";
+      }
+
+      //static state prev_state = FORWARD;
+      static std::string prev_state;
+      if (prev_state != str_stat)
+      {
+          std_msgs::String curr_STATE;
+          prev_state = str_stat;
+          curr_STATE.data = str_stat;
+          pub_task_done.publish(curr_STATE);
       }
 
       ros::spinOnce();
