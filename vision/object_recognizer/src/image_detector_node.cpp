@@ -6,7 +6,7 @@
 #include <sensor_msgs/image_encodings.h>
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
-#include <opencv2/highgui/highgui.hpp>v
+#include <opencv2/highgui/highgui.hpp>
 
 using namespace std;
 using namespace cv;
@@ -15,13 +15,13 @@ static const string WINDOW_1 = "Image mask";
 static const string WINDOW_2 = "Image";
 
 // objects
-int WALL = 0x0;
-int RED = 0x1;
-int ORANGE = 0x2;
-int YELLOW = 0x3;
-int GREEN = 0x4;
-int BLUE = 0x5;
-int PURPLE = 0x6;
+static const int WALL = 0x0;
+static const int RED = 0x1;
+static const int ORANGE = 0x2;
+static const int YELLOW = 0x3;
+static const int GREEN = 0x4;
+static const int BLUE = 0x5;
+static const int PURPLE = 0x6;
 
 // hue min max values
 float object_color_hue[] = {
@@ -144,12 +144,12 @@ private:
 
             switch(color_list[color])
             {
-                case 0x1: bgr = Vec3b(0,0,255); break;
-                case 0x2: bgr = Vec3b(0,127,255); break;
-                case 0x3: bgr = Vec3b(0,255,255); break;
-                case 0x4: bgr = Vec3b(0,255,0); break;
-                case 0x5: bgr = Vec3b(255,0,0); break;
-                case 0x6: bgr = Vec3b(255,0,127); break;
+                case RED: bgr = Vec3b(0,0,255); break;
+                case ORANGE: bgr = Vec3b(0,127,255); break;
+                case YELLOW: bgr = Vec3b(0,255,255); break;
+                case GREEN: bgr = Vec3b(0,255,0); break;
+                case BLUE: bgr = Vec3b(255,0,0); break;
+                case PURPLE: bgr = Vec3b(255,0,127); break;
             }
 
             for (int i = 0; i < image.rows; i++)
