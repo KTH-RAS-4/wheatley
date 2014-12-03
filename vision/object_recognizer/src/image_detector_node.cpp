@@ -16,44 +16,52 @@ static const string WINDOW_2 = "Image";
 
 // objects
 static const int WALL = 0x0;
-static const int RED = 0x1;
-static const int ORANGE = 0x2;
-static const int YELLOW = 0x3;
-static const int GREEN = 0x4;
-static const int BLUE = 0x5;
-static const int PURPLE = 0x6;
+static const int FLOOR = 0x1;
+static const int RED = 0x2;
+static const int ORANGE = 0x3;
+static const int YELLOW = 0x4;
+static const int GREEN = 0x5;
+static const int BLUE = 0x6;
+static const int PURPLE = 0x7;
 
 // hue min max values
 float object_color_hue[] = {
     0, 180, // wall
-    -30, 6, // red
-    6, 20, // orange
-    20, 40, // yellow
-    40, 100, // green
-    100, 130, // blue
-    130, 150 // purple
+	0, 180, // floor
+    -20, 0, // red
+    0, 10, // orange
+    17, 30, // yellow
+    30, 80, // green
+    80, 110, // blue
+    110, 160 // purple
 };
 
 // saturation min max values
 float object_color_saturation[] = {
-    0, 80, // wall
+    0, 120, // wall
+	0, 255, // floor
     90, 255, // red
-    50, 255, // orange
-    40, 255, // yellow
+    120, 255, // orange
+    127, 255, // yellow
     127, 255, // green
-    140, 255, // blue
-    127, 255 // purple
+    120, 255, // blue
+    80, 255 // purple
 };
 
 // value min max values
 float object_color_value[] = {
-    0, 255, // wall
-    50, 255, // red
-    220, 252, // orange
-    220, 252, // yellow
-    127, 255, // green
+    50, 255, // wall
+	0, 255, // floor
+    70, 255, // red
+    180, 255, // orange
+    127, 255, // yellow
+    60, 255, // green
     50, 255, // blue
-    127, 255 // purple
+    80, 255 // purple
+};
+
+int mask_color_list[] = {
+	WALL
 };
 
 int color_list[] = {
@@ -117,11 +125,11 @@ private:
         }
 
         // normalize the colors
-        cvtColor(image, image, CV_BGR2YCrCb); //change the color image from BGR to YCrCb format
+        /*cvtColor(image, image, CV_BGR2YCrCb); //change the color image from BGR to YCrCb format
         split(image, channels); //split the image into channels
         equalizeHist(channels[0], channels[0]); //equalize histogram on the 1st channel (Y)
         merge(channels, image); //merge 3 channels including the modified 1st channel into one image
-        cvtColor(image, image, CV_YCrCb2BGR); //change the color image from YCrCb to BGR format (to display image properly)
+        cvtColor(image, image, CV_YCrCb2BGR);*/ //change the color image from YCrCb to BGR format (to display image properly)
         // apply gaussian filter
         GaussianBlur(image, image, Size(9, 9), 3, 0, BORDER_DEFAULT);
 
@@ -131,11 +139,40 @@ private:
         //dilate(image, image, dilation_element);
 
         Mat mask;
+		Mat masked;
         Mat marker;
+		Mat edges;
         Result = Mat(image.rows, image.cols, CV_8UC3, Scalar(0,0,0));
-        Vec3b bgr;
+        Vec3b bgr = Vec3b(0,0,0);
+		Vec3b line_color = Vec3b(255,255,255);
         Vec3b* _Result;
+		Vec3b* _image;
         float* _mask;
+        unsigned char* _edges;
+	
+		// remove floor and walls
+		image.copyTo(masked);
+		for (int color = 0; color < (sizeof(mask_color_list)/sizeof(*mask_color_list)); color++)
+        {
+            mask = maskColor(image, mask_color_list[color]);
+
+            for (int i = 0; i < image.rows; i++)
+            {
+                _image = masked.ptr<Vec3b>(i);
+                _mask = mask.ptr<float>(i);
+                for (int j = 0; j < image.cols; j++)
+                {
+                    if (_mask[j] > 0)
+                    {
+                        _image[j] = bgr;
+                    }
+                }
+            }
+        }
+
+		//erode(image, image, erosion_element);
+
+		// detect objects
         for (int color = 0; color < (sizeof(color_list)/sizeof(*color_list)); color++)
         {
             mask = maskColor(image, color_list[color]);
@@ -144,6 +181,8 @@ private:
 
             switch(color_list[color])
             {
+				case WALL: bgr = Vec3b(255,255,255); break;
+				case FLOOR: bgr = Vec3b(0,70,130); break;
                 case RED: bgr = Vec3b(0,0,255); break;
                 case ORANGE: bgr = Vec3b(0,127,255); break;
                 case YELLOW: bgr = Vec3b(0,255,255); break;
@@ -156,24 +195,55 @@ private:
             {
                 _Result = Result.ptr<Vec3b>(i);
                 _mask = mask.ptr<float>(i);
+                //_edges = edges.ptr<unsigned char>(i);
                 for (int j = 0; j < image.cols; j++)
                 {
-                    if (_mask[j] == 1.0)
+                    if (_mask[j] > 0)
                     {
                         _Result[j] = bgr;
                     }
+					/*if (_edges[j] > 0)
+					{
+						_Result[j] = line_color;
+					}*/
                 }
             }
         }
 
-        mask = maskColor(image, BLUE);
+        //mask = maskColor(image, BLUE);
         
-        double min, max;
-        minMaxLoc(mask, &min, &max);
-        mask.convertTo(mask, CV_8U, 255.0/(max - min), -min * 255.0/(max - min));
+        //double min, max;
+        //minMaxLoc(mask, &min, &max);
+        //mask.convertTo(mask, CV_8U, 255.0/(max - min), -min * 255.0/(max - min));
 
-        imshow(WINDOW_1, image);
-        imshow(WINDOW_2, Result);
+		// edge detection
+		Mat gray;
+		cvtColor(masked, gray, CV_BGR2GRAY);
+		Canny(gray, edges, 50, 100, 3, false);
+
+		/// Find contours
+		vector<vector<Point> > contours;
+		vector<Vec4i> hierarchy;
+		findContours(edges, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0,0));
+		/// Draw contours
+		Mat drawing = Mat::zeros(edges.size(), CV_8UC3);
+/*		for( int i = 0; i< contours.size(); i++ )
+		{
+			drawContours(drawing, contours, i, Scalar(255,255,255), 2, 8, hierarchy, 0, Point());
+		}*/
+		// find polygons
+		vector<vector<Point> > polygons;
+		vector<Point> polygon;
+		for (std::vector<vector<Point> >::iterator contour = contours.begin(); contour != contours.end(); contour++)
+		{
+			approxPolyDP(*contour, polygon, 2, true);
+			polygons.push_back(polygon);
+			cout << "vertices: " << polygon.size() << endl;
+		}
+		polylines(drawing, polygons, true, Scalar(255,255,255), 1, 8, 0);
+
+        imshow(WINDOW_1, drawing);
+        imshow(WINDOW_2, image);
 
         waitKey(10);
     }
