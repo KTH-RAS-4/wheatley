@@ -27,7 +27,7 @@ static const int PURPLE = 0x7;
 // hue min max values
 float object_color_hue[] = {
     0, 180, // wall
-	0, 180, // floor
+    0, 180, // floor
     160, 180, // red
     0, 10, // orange
     17, 30, // yellow
@@ -39,7 +39,7 @@ float object_color_hue[] = {
 // saturation min max values
 float object_color_saturation[] = {
     0, 120, // wall
-	0, 255, // floor
+    0, 255, // floor
     90, 255, // red
     120, 255, // orange
     127, 255, // yellow
@@ -51,7 +51,7 @@ float object_color_saturation[] = {
 // value min max values
 float object_color_value[] = {
     50, 255, // wall
-	0, 255, // floor
+    0, 255, // floor
     70, 255, // red
     127, 255, // orange
     127, 255, // yellow
@@ -61,7 +61,7 @@ float object_color_value[] = {
 };
 
 int mask_color_list[] = {
-	WALL
+    WALL
 };
 
 int color_list[] = {
@@ -124,15 +124,38 @@ private:
             ROS_ERROR("cv_bridge exception: %s", e.what());
         }
 
-		if (image.rows == 0 || image.cols == 0)
-			return;
+        if (image.rows == 0 || image.cols == 0)
+            return;
 
         // normalize the colors
-        cvtColor(image, image, CV_BGR2YCrCb); //change the color image from BGR to YCrCb format
-        split(image, channels); //split the image into channels
-        equalizeHist(channels[0], channels[0]); //equalize histogram on the 1st channel (Y)
-        merge(channels, image); //merge 3 channels including the modified 1st channel into one image
-        cvtColor(image, image, CV_YCrCb2BGR); //change the color image from YCrCb to BGR format (to display image properly)
+        //cvtColor(image, image, CV_BGR2YCrCb); //change the color image from BGR to YCrCb format
+        //split(image, channels); //split the image into channels
+        //equalizeHist(channels[0], channels[0]); //equalize histogram on the 1st channel (Y)
+        //merge(channels, image); //merge 3 channels including the modified 1st channel into one image
+        //cvtColor(image, image, CV_YCrCb2BGR); //change the color image from YCrCb to BGR format (to display image properly)
+
+        // extract wall sample color
+        cvtColor(image, image, CV_BGR2HSV);
+        vector<Mat> channels;
+        split(image, channels);
+        threshold(channels[1], bin_sat, 80, 255, 0);
+        bitwise_not(bin_sat, bin_sat);
+        threshold(channels[2], bin_val, 200, 255, 0);
+        cvtColor(image, image, CV_HSV2BGR);
+        bitwise_and(bin_sat, bin_val, bin, noArray());
+        Scalar average = mean(image, bin);
+
+        // color correction based on sample color
+        split(image, channels);
+        double min, max;
+        minMaxLoc(channels[0], &min, &max);
+        normalize(channels[0], channels[0], min, max + 255 - average[0], NORM_MINMAX, -1, noArray());
+        minMaxLoc(channels[1], &min, &max);
+        normalize(channels[1], channels[1], min, max + 255 - average[1], NORM_MINMAX, -1, noArray());
+        minMaxLoc(channels[2], &min, &max);
+        normalize(channels[2], channels[2], min, max + 255 - average[2], NORM_MINMAX, -1, noArray());
+        merge(channels, image);
+        
         // apply gaussian filter
         GaussianBlur(image, image, Size(9, 9), 3, 0, BORDER_DEFAULT);
 
@@ -142,20 +165,20 @@ private:
         //dilate(image, image, dilation_element);
 
         Mat mask;
-		Mat masked;
+        Mat masked;
         Mat marker;
-		Mat edges;
+        Mat edges;
         Result = Mat(image.rows, image.cols, CV_8UC3, Scalar(0,0,0));
         Vec3b bgr = Vec3b(0,0,0);
-		Vec3b line_color = Vec3b(255,255,255);
+        Vec3b line_color = Vec3b(255,255,255);
         Vec3b* _Result;
-		Vec3b* _image;
+        Vec3b* _image;
         float* _mask;
         unsigned char* _edges;
-	
-		// remove floor and walls
-		image.copyTo(masked);
-		for (int color = 0; color < (sizeof(mask_color_list)/sizeof(*mask_color_list)); color++)
+    
+        // remove floor and walls
+        image.copyTo(masked);
+        for (int color = 0; color < (sizeof(mask_color_list)/sizeof(*mask_color_list)); color++)
         {
             mask = maskColor(image, mask_color_list[color]);
 
@@ -173,9 +196,9 @@ private:
             }
         }
 
-		//erode(image, image, erosion_element);
+        //erode(image, image, erosion_element);
 
-		// detect objects
+        // detect objects
         for (int color = 0; color < (sizeof(color_list)/sizeof(*color_list)); color++)
         {
             mask = maskColor(image, color_list[color]);
@@ -184,8 +207,8 @@ private:
 
             switch(color_list[color])
             {
-				case WALL: bgr = Vec3b(255,255,255); break;
-				case FLOOR: bgr = Vec3b(0,70,130); break;
+                case WALL: bgr = Vec3b(255,255,255); break;
+                case FLOOR: bgr = Vec3b(0,70,130); break;
                 case RED: bgr = Vec3b(0,0,255); break;
                 case ORANGE: bgr = Vec3b(0,127,255); break;
                 case YELLOW: bgr = Vec3b(0,255,255); break;
@@ -205,10 +228,10 @@ private:
                     {
                         _Result[j] = bgr;
                     }
-					/*if (_edges[j] > 0)
-					{
-						_Result[j] = line_color;
-					}*/
+                    /*if (_edges[j] > 0)
+                    {
+                        _Result[j] = line_color;
+                    }*/
                 }
             }
         }
@@ -219,31 +242,31 @@ private:
         //minMaxLoc(mask, &min, &max);
         //mask.convertTo(mask, CV_8U, 255.0/(max - min), -min * 255.0/(max - min));
 
-		// edge detection
-		Mat gray;
-		cvtColor(Result, gray, CV_BGR2GRAY);
-		Canny(gray, edges, 20, 40, 3, false);
+        // edge detection
+        Mat gray;
+        cvtColor(Result, gray, CV_BGR2GRAY);
+        Canny(gray, edges, 20, 40, 3, false);
 
-		/// Find contours
-		vector<vector<Point> > contours;
-		vector<Vec4i> hierarchy;
-		findContours(edges, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0,0));
-		/// Draw contours
-		Mat drawing = Mat::zeros(edges.size(), CV_8UC3);
-/*		for( int i = 0; i< contours.size(); i++ )
-		{
-			drawContours(drawing, contours, i, Scalar(255,255,255), 2, 8, hierarchy, 0, Point());
-		}*/
-		// find polygons
-		vector<vector<Point> > polygons;
-		vector<Point> polygon;
+        /// Find contours
+        vector<vector<Point> > contours;
+        vector<Vec4i> hierarchy;
+        findContours(edges, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0,0));
+        /// Draw contours
+        Mat drawing = Mat::zeros(edges.size(), CV_8UC3);
+/*      for( int i = 0; i< contours.size(); i++ )
+        {
+            drawContours(drawing, contours, i, Scalar(255,255,255), 2, 8, hierarchy, 0, Point());
+        }*/
+        // find polygons
+        vector<vector<Point> > polygons;
+        vector<Point> polygon;
         vector<Rect> boundingBoxes;
         Rect bounds;
         cout << "----------" << endl;
         int boundingThreshold = 10;
-		for (int i = 0; i < contours.size(); i++)
-		{
-			approxPolyDP(contours[i], polygon, 5, true);
+        for (int i = 0; i < contours.size(); i++)
+        {
+            approxPolyDP(contours[i], polygon, 5, true);
             bounds = boundingRect(Mat(polygon));
             bool match = false;
             for (int j = 0; j < boundingBoxes.size() && j < polygons.size(); j++)
@@ -259,10 +282,10 @@ private:
                     bounds.height+boundingThreshold >= boundingBoxes[j].height)
                 {
                     //cout << "REMOVED EXISTING " << j << endl;
-		            rectangle(Result, boundingBoxes[j], Scalar(0,0,255), 1, 8, 0);
+                    rectangle(Result, boundingBoxes[j], Scalar(0,0,255), 1, 8, 0);
                     polygons.erase(polygons.begin()+j);
                     boundingBoxes.erase(boundingBoxes.begin()+j);
-					j--;
+                    j--;
                 }
                 // if the new bounds is enclosed
                 else if (bounds.x >= boundingBoxes[j].x &&
@@ -277,16 +300,16 @@ private:
             }
             if (!match)
             {
-    			polygons.push_back(polygon);
+                polygons.push_back(polygon);
                 boundingBoxes.push_back(bounds);
-    			//cout << "vertices: " << polygon.size() << endl;
+                //cout << "vertices: " << polygon.size() << endl;
             }
-		}
-		polylines(Result, polygons, true, Scalar(255,255,255), 1, 8, 0);
+        }
+        polylines(Result, polygons, true, Scalar(255,255,255), 1, 8, 0);
         for (int i = 0; i < boundingBoxes.size() && i < polygons.size(); i++)
         {
             rectangle(Result, boundingBoxes[i], Scalar(255,255,0), 1, 8, 0);
-			cout << "vertices: " << polygons[i].size() << endl;
+            cout << "vertices: " << polygons[i].size() << endl;
         }
 
         imshow(WINDOW_1, image);
