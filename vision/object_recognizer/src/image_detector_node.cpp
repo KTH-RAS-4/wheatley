@@ -28,12 +28,12 @@ static const int PURPLE = 0x7;
 float object_color_hue[] = {
     0, 180, // wall
 	0, 180, // floor
-    -20, 0, // red
+    160, 180, // red
     0, 10, // orange
     17, 30, // yellow
     30, 80, // green
-    80, 110, // blue
-    110, 160 // purple
+    80, 120, // blue
+    120, 160 // purple
 };
 
 // saturation min max values
@@ -44,7 +44,7 @@ float object_color_saturation[] = {
     120, 255, // orange
     127, 255, // yellow
     127, 255, // green
-    120, 255, // blue
+    60, 255, // blue
     80, 255 // purple
 };
 
@@ -53,7 +53,7 @@ float object_color_value[] = {
     50, 255, // wall
 	0, 255, // floor
     70, 255, // red
-    180, 255, // orange
+    127, 255, // orange
     127, 255, // yellow
     60, 255, // green
     50, 255, // blue
@@ -124,12 +124,15 @@ private:
             ROS_ERROR("cv_bridge exception: %s", e.what());
         }
 
+		if (image.rows == 0 || image.cols == 0)
+			return;
+
         // normalize the colors
-        /*cvtColor(image, image, CV_BGR2YCrCb); //change the color image from BGR to YCrCb format
+        cvtColor(image, image, CV_BGR2YCrCb); //change the color image from BGR to YCrCb format
         split(image, channels); //split the image into channels
         equalizeHist(channels[0], channels[0]); //equalize histogram on the 1st channel (Y)
         merge(channels, image); //merge 3 channels including the modified 1st channel into one image
-        cvtColor(image, image, CV_YCrCb2BGR);*/ //change the color image from YCrCb to BGR format (to display image properly)
+        cvtColor(image, image, CV_YCrCb2BGR); //change the color image from YCrCb to BGR format (to display image properly)
         // apply gaussian filter
         GaussianBlur(image, image, Size(9, 9), 3, 0, BORDER_DEFAULT);
 
@@ -219,7 +222,7 @@ private:
 		// edge detection
 		Mat gray;
 		cvtColor(Result, gray, CV_BGR2GRAY);
-		Canny(gray, edges, 50, 100, 3, false);
+		Canny(gray, edges, 20, 40, 3, false);
 
 		/// Find contours
 		vector<vector<Point> > contours;
@@ -237,27 +240,29 @@ private:
         vector<Rect> boundingBoxes;
         Rect bounds;
         cout << "----------" << endl;
-        int boundingThreshold = 20;
+        int boundingThreshold = 10;
 		for (int i = 0; i < contours.size(); i++)
 		{
-			approxPolyDP(contours[i], polygon, 2, true);
+			approxPolyDP(contours[i], polygon, 5, true);
             bounds = boundingRect(Mat(polygon));
             bool match = false;
-            for (int j = 0; j < boundingBoxes.size(); j++)
+            for (int j = 0; j < boundingBoxes.size() && j < polygons.size(); j++)
             {
                 /*if (abs(bounds.x-boundingBoxes[j].x) <= boundingThreshold &&
                     abs(bounds.y-boundingBoxes[j].y) <= boundingThreshold &&
                     abs(bounds.width-boundingBoxes[j].width) <= boundingThreshold &&
                     abs(bounds.height-boundingBoxes[j].height) <= boundingThreshold)*/
                 // if the new bounds are enclosing
-                if (bounds.x <= boundingBoxes[j].x &&
-                    bounds.y <= boundingBoxes[j].y &&
-                    bounds.width >= boundingBoxes[j].width &&
-                    bounds.height >= boundingBoxes[j].height)
+                if (bounds.x-boundingThreshold <= boundingBoxes[j].x &&
+                    bounds.y-boundingThreshold <= boundingBoxes[j].y &&
+                    bounds.width+boundingThreshold >= boundingBoxes[j].width &&
+                    bounds.height+boundingThreshold >= boundingBoxes[j].height)
                 {
                     //cout << "REMOVED EXISTING " << j << endl;
-                    polygons[j] = polygon;
-                    boundingBoxes[j] = bounds;
+		            rectangle(Result, boundingBoxes[j], Scalar(0,0,255), 1, 8, 0);
+                    polygons.erase(polygons.begin()+j);
+                    boundingBoxes.erase(boundingBoxes.begin()+j);
+					j--;
                 }
                 // if the new bounds is enclosed
                 else if (bounds.x >= boundingBoxes[j].x &&
@@ -274,13 +279,14 @@ private:
             {
     			polygons.push_back(polygon);
                 boundingBoxes.push_back(bounds);
-    			cout << "vertices: " << polygon.size() << endl;
+    			//cout << "vertices: " << polygon.size() << endl;
             }
 		}
 		polylines(Result, polygons, true, Scalar(255,255,255), 1, 8, 0);
-        for (int i = 0; i < boundingBoxes.size(); i++)
+        for (int i = 0; i < boundingBoxes.size() && i < polygons.size(); i++)
         {
-            rectangle(Result, boundingBoxes[i], Scalar(255,127,255), 1, 8, 0);
+            rectangle(Result, boundingBoxes[i], Scalar(255,255,0), 1, 8, 0);
+			cout << "vertices: " << polygons[i].size() << endl;
         }
 
         imshow(WINDOW_1, image);

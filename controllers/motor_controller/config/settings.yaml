@@ -8,7 +8,7 @@ motors:
 
     gains:
         P: 10
-        I: 0
+        I: 1
         D: 0.1
         I_memory: 0
     transform:
