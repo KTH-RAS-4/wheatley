@@ -61,7 +61,9 @@ public:
         n.getParam("transform/min", min);
         n.getParam("transform/max", max);
         n.getParam("gains/I_memory", I_memory);
-        errors = boost::circular_buffer<double>(I_memory, I_memory, 0); //pre-filled buffer
+        errors = boost::circular_buffer<double>(I_memory, 0); //pre-filled buffer
+
+
         //ROS_INFO("listening on %s", n.getNamespace().data());
     }
 
@@ -73,7 +75,9 @@ public:
         if (twi.linear.x != 0)
         {
             if (I_memory > 0)
+            {
                 I -= errors.front();
+            }
             I += error*elapsed;
             errors.push_back(error*elapsed);
 
@@ -81,7 +85,7 @@ public:
         } else
         {
             speed = kP*error + kD*D;
-            errors.clear();
+            errors = boost::circular_buffer<double>(I_memory, 0);
 
         }
         int sign = sgn(speed);

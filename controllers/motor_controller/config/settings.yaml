@@ -8,9 +8,9 @@ motors:
 
     gains:
         P: 10
-        I: 1
+        I: 8.5
         D: 0.1
-        I_memory: 0
+        I_memory: 200
     transform:
         constant: 0.088
         exponent: 2.439
