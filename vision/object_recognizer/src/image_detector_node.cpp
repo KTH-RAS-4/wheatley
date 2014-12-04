@@ -218,7 +218,7 @@ private:
 
 		// edge detection
 		Mat gray;
-		cvtColor(masked, gray, CV_BGR2GRAY);
+		cvtColor(Result, gray, CV_BGR2GRAY);
 		Canny(gray, edges, 50, 100, 3, false);
 
 		/// Find contours
@@ -234,16 +234,57 @@ private:
 		// find polygons
 		vector<vector<Point> > polygons;
 		vector<Point> polygon;
-		for (std::vector<vector<Point> >::iterator contour = contours.begin(); contour != contours.end(); contour++)
+        vector<Rect> boundingBoxes;
+        Rect bounds;
+        cout << "----------" << endl;
+        int boundingThreshold = 20;
+		for (int i = 0; i < contours.size(); i++)
 		{
-			approxPolyDP(*contour, polygon, 2, true);
-			polygons.push_back(polygon);
-			cout << "vertices: " << polygon.size() << endl;
+			approxPolyDP(contours[i], polygon, 2, true);
+            bounds = boundingRect(Mat(polygon));
+            bool match = false;
+            for (int j = 0; j < boundingBoxes.size(); j++)
+            {
+                /*if (abs(bounds.x-boundingBoxes[j].x) <= boundingThreshold &&
+                    abs(bounds.y-boundingBoxes[j].y) <= boundingThreshold &&
+                    abs(bounds.width-boundingBoxes[j].width) <= boundingThreshold &&
+                    abs(bounds.height-boundingBoxes[j].height) <= boundingThreshold)*/
+                // if the new bounds are enclosing
+                if (bounds.x <= boundingBoxes[j].x &&
+                    bounds.y <= boundingBoxes[j].y &&
+                    bounds.width >= boundingBoxes[j].width &&
+                    bounds.height >= boundingBoxes[j].height)
+                {
+                    //cout << "REMOVED EXISTING " << j << endl;
+                    polygons[j] = polygon;
+                    boundingBoxes[j] = bounds;
+                }
+                // if the new bounds is enclosed
+                else if (bounds.x >= boundingBoxes[j].x &&
+                    bounds.y >= boundingBoxes[j].y &&
+                    bounds.width <= boundingBoxes[j].width &&
+                    bounds.height <= boundingBoxes[j].height)
+                {
+                    //cout << "REMOVED NEW " << j << endl;
+                    match = true;
+                    break;
+                }
+            }
+            if (!match)
+            {
+    			polygons.push_back(polygon);
+                boundingBoxes.push_back(bounds);
+    			cout << "vertices: " << polygon.size() << endl;
+            }
 		}
-		polylines(drawing, polygons, true, Scalar(255,255,255), 1, 8, 0);
+		polylines(Result, polygons, true, Scalar(255,255,255), 1, 8, 0);
+        for (int i = 0; i < boundingBoxes.size(); i++)
+        {
+            rectangle(Result, boundingBoxes[i], Scalar(255,127,255), 1, 8, 0);
+        }
 
-        imshow(WINDOW_1, drawing);
-        imshow(WINDOW_2, image);
+        imshow(WINDOW_1, image);
+        imshow(WINDOW_2, Result);
 
         waitKey(10);
     }
