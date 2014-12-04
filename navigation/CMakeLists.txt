@@ -110,14 +110,19 @@ include_directories(
 
 ## Declare a cpp executable
 add_executable(navigation_node src/navigation_node.cpp)
+add_executable(navigation_queue_node src/navigation_queue_node.cpp)
 
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 add_dependencies(navigation_node navigation_generate_messages_cpp)
+add_dependencies(navigation_queue_node navigation_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(navigation_node
+  ${catkin_LIBRARIES}
+)
+target_link_libraries(navigation_queue_node
   ${catkin_LIBRARIES}
 )
 

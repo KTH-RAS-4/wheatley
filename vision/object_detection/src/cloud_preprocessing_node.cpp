@@ -13,17 +13,12 @@
 #include <pcl/ModelCoefficients.h>
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
-#include <pcl/filters/extract_indices.h>
 #include <pcl/filters/passthrough.h>
-#include <pcl/filters/crop_box.h>
-#include <pcl/filters/project_inliers.h>
 #include <pcl/filters/statistical_outlier_removal.h>
-#include <pcl/features/normal_3d.h>
-#include <pcl/sample_consensus/method_types.h>
-#include <pcl/sample_consensus/model_types.h>
-#include <pcl/segmentation/sac_segmentation.h>
+#include <pcl/filters/radius_outlier_removal.h>
+#include <pcl/filters/conditional_removal.h>
 
-#include <pcl/features/normal_3d.h>
+
 #include <pcl/kdtree/kdtree.h>
 
 typedef pcl::PointXYZRGB PointT;
@@ -75,17 +70,10 @@ public:
         if(!tf_.waitForTransform("camera_rgb_optical_frame", "map", cloud_msg->header.stamp, ros::Duration(0.1)))
             return;
 
-        sensor_msgs::PointCloud cloud_legacy;
-        sensor_msgs::convertPointCloud2ToPointCloud(*cloud_msg, cloud_legacy);
 
-        sensor_msgs::PointCloud cloud_msg_transformed;
-        tf_.transformPointCloud("map", cloud_legacy, cloud_msg_transformed);
-
-        sensor_msgs::PointCloud2 cloud2_transformed;
-        sensor_msgs::convertPointCloudToPointCloud2(cloud_msg_transformed, cloud2_transformed);
 
         // Convert to PCL data type
-        pcl::fromROSMsg(cloud2_transformed, *cloud);
+        pcl::fromROSMsg(*cloud_msg, *cloud);
 
         if(cloud->size() == 0)
             return;
@@ -95,21 +83,19 @@ public:
         pcl::PassThrough<PointT> pass;
         pcl::VoxelGrid<PointT> vgrid;
         pcl::StatisticalOutlierRemoval<PointT> sor;
-        pcl::NormalEstimation<PointT, pcl::Normal> ne;
-        pcl::SACSegmentationFromNormals<PointT, pcl::Normal> seg;
-        pcl::ExtractIndices<PointT> extract;
-        pcl::ExtractIndices<pcl::Normal> extract_normals;
         pcl::search::KdTree<PointT>::Ptr tree (new pcl::search::KdTree<PointT> ());
 
         // Datasets
         pcl::PointCloud<PointT>::Ptr cloud_downsampled (new pcl::PointCloud<PointT>);
-        pcl::PointCloud<PointT>::Ptr cloud_cleaned (new pcl::PointCloud<PointT>);
+        pcl::PointCloud<PointT>::Ptr cloud_pass_x (new pcl::PointCloud<PointT>);
+        pcl::PointCloud<PointT>::Ptr cloud_transformed (new pcl::PointCloud<PointT>);
         pcl::PointCloud<PointT>::Ptr cloud_filtered (new pcl::PointCloud<PointT>);
         pcl::PointCloud<pcl::Normal>::Ptr cloud_normals (new pcl::PointCloud<pcl::Normal>);
         pcl::PointCloud<PointT>::Ptr cloud_filtered2 (new pcl::PointCloud<PointT>);
         pcl::PointCloud<pcl::Normal>::Ptr cloud_normals2 (new pcl::PointCloud<pcl::Normal>);
 
         pcl::PointCloud<PointT>::Ptr cloud_plane (new pcl::PointCloud<PointT>);
+        pcl::PointCloud<PointT>::Ptr cloud_plane_filtered (new pcl::PointCloud<PointT>);
         pcl::ModelCoefficients::Ptr coefficients_plane (new pcl::ModelCoefficients);
         pcl::PointIndices::Ptr inliers_plane (new pcl::PointIndices);
 
@@ -121,31 +107,78 @@ public:
         if(cloud_downsampled->size() == 0)
             return;
 
+        pcl::PassThrough<PointT> passX;
+        passX.setInputCloud (cloud_downsampled);
+        passX.setFilterFieldName ("y");
+        passX.setFilterLimits (0, 1);
+        passX.filter (*cloud_pass_x);
+
+        if(cloud_pass_x->size() == 0) {
+            ROS_INFO("Empty after passX");
+            return;
+        }
+
+        sensor_msgs::PointCloud2 msg_pass_x;
+        pcl::toROSMsg(*cloud_pass_x, msg_pass_x);
+
+        sensor_msgs::PointCloud cloud_legacy;
+        sensor_msgs::convertPointCloud2ToPointCloud(msg_pass_x, cloud_legacy);
+
+        sensor_msgs::PointCloud cloud_msg_transformed;
+        tf_.transformPointCloud("map", cloud_legacy, cloud_msg_transformed);
+
+        sensor_msgs::PointCloud2 cloud2_transformed;
+        sensor_msgs::convertPointCloudToPointCloud2(cloud_msg_transformed, cloud2_transformed);
+
+        pcl::fromROSMsg(cloud2_transformed, *cloud_transformed);
+
         // Build a passthrough filter to remove spurious NaNs
-        pass.setInputCloud (cloud_downsampled);
+        pass.setInputCloud (cloud_transformed);
         pass.setFilterFieldName ("z");
         pass.setFilterLimits (0.01, 1.5);
         pass.filter (*cloud_filtered);
         pass.setNegative(true);
         pass.filter(*cloud_plane);
 
+        if(cloud_plane->size() == 0)
+            return;
+
+        /*pcl::RadiusOutlierRemoval<PointT> outrem;
+        // build the filter
+        outrem.setInputCloud(cloud_plane);
+        outrem.setRadiusSearch(0.03);
+        outrem.setMinNeighborsInRadius (20);
+        // apply filter
+        outrem.filter (*cloud_plane_filtered);*/
+        pcl::ConditionAnd<PointT>::Ptr range_cond (new pcl::ConditionAnd<PointT> ());
+        range_cond->addComparison (pcl::FieldComparison<PointT>::ConstPtr (new pcl::FieldComparison<PointT> ("z", pcl::ComparisonOps::LT, 0.01)));
+        range_cond->addComparison (pcl::FieldComparison<PointT>::ConstPtr (new pcl::FieldComparison<PointT> ("z", pcl::ComparisonOps::GT, -0.02)));
+        // build the filter
+        pcl::ConditionalRemoval<PointT> condrem (range_cond);
+        condrem.setInputCloud (cloud_plane);
+        condrem.setKeepOrganized(true);
+        // apply filter
+        condrem.filter (*cloud_plane_filtered);
+
+        sensor_msgs::PointCloud2 output_plane;
+        pcl::toROSMsg(*cloud_plane_filtered, output_plane);
+        output_plane.header.stamp = cloud_msg->header.stamp;
+        pub_plane.publish(output_plane);
+
+
         if(cloud_filtered->size() == 0)
             return;
 
-        /*sor.setInputCloud (cloud_filtered);
+        sor.setInputCloud (cloud_filtered);
         sor.setMeanK (50);
         sor.setStddevMulThresh (1.0);
-        sor.filter (*cloud_filtered2);*/
-
+        sor.filter (*cloud_filtered2);
 
         sensor_msgs::PointCloud2 output_others;
-        pcl::toROSMsg(*cloud_filtered, output_others);
+        pcl::toROSMsg(*cloud_filtered2, output_others);
         output_others.header.stamp = cloud_msg->header.stamp;
         pub_others.publish(output_others);
 
-        sensor_msgs::PointCloud2 output_plane;
-        pcl::toROSMsg(*cloud_plane, output_plane);
-        pub_plane.publish(output_plane);
 
         vision_msgs::PreprocessedClouds output_preprocessed;
         output_preprocessed.plane = output_plane;
@@ -153,6 +186,11 @@ public:
         pub_preprocessed.publish(output_preprocessed);
 
         /*
+
+        pcl::NormalEstimation<PointT, pcl::Normal> ne;
+        pcl::SACSegmentationFromNormals<PointT, pcl::Normal> seg;
+        pcl::ExtractIndices<PointT> extract;
+        pcl::ExtractIndices<pcl::Normal> extract_normals;
 
         if(cloud_filtered->empty())
             return;

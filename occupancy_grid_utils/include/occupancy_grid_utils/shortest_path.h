@@ -121,6 +121,9 @@ ResultPtr singleSourceShortestPaths (const nav_msgs::OccupancyGrid& g, const Cel
                                      const TerminationCondition& term,
                                      bool manhattan=false);
 
+ResultPtr singleSourceShortestPathsToUnknown (const nav_msgs::OccupancyGrid& g, const Cell& src,
+                                     const TerminationCondition& term,
+                                     bool manhattan=false);
 /// \brief Extract a path from the result of single-source shortest paths
 /// \retval path If path exists, vector of cells where the source is first and \a dest
 /// is last; if not, uninitialized

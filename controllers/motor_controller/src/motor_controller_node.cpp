@@ -16,6 +16,8 @@ template <typename T> int sgn(T val)
     return (T(0) < val) - (val < T(0));
 }
 
+geometry_msgs::Twist twi;
+
 class Motor
 {
 private:
@@ -67,13 +69,21 @@ public:
     {
         double D = (error - last_error) / elapsed;
         last_error = error;
+        double speed = 0;
+        if (twi.linear.x != 0)
+        {
+            if (I_memory > 0)
+                I -= errors.front();
+            I += error*elapsed;
+            errors.push_back(error*elapsed);
 
-        if (I_memory > 0)
-            I -= errors.front();
-        I += error*elapsed;
-        errors.push_back(error*elapsed);
+            speed = kP*error + kD*D + kI*I;
+        } else
+        {
+            speed = kP*error + kD*D;
+            errors.clear();
 
-        double speed = kP*error + kD*D + kI*I;
+        }
         int sign = sgn(speed);
 
         int pwm = (int) (pow(constant*fabs(speed), exponent)+min);
@@ -101,7 +111,7 @@ private:
   Motor motorR;
 
   ras_arduino_msgs::Encoders enc;
-  geometry_msgs::Twist twi;
+
   ros::Rate loop_rate;
   ros::Time last_input;
 

@@ -22,6 +22,7 @@
 #include <tf/transform_listener.h>
 
 #include <occupancy_grid_utils/ray_tracer.h>
+#include <occupancy_grid_utils/combine_grids.h>
 #include <ros/wall_timer.h>
 
 #include <boost/circular_buffer.hpp>
@@ -71,12 +72,16 @@ private:
     double grid_construction_interval_;
     double local_grid_size_;
 
+    nm::OccupancyGrid fake_grid;
+
+
     /****************************************
      * Associated objects
      ****************************************/
 
     tf::TransformListener tf_;
     ros::Publisher grid_pub_;
+    ros::Publisher merged_grid_pub_;
     ros::Publisher object_pub_;
     ros::WallTimer build_grid_timer_;
     ros::WallTimer mark_pose_explored_timer_;
@@ -95,7 +100,11 @@ private:
      ****************************************/
 
     gu::OverlayClouds map;
+    list<nm::OccupancyGrid::ConstPtr> map_collector;
     list<vision_msgs::Object> object_collector;
+
+
+    int current_iteration;
 
 
 public:
@@ -112,6 +121,8 @@ public:
         local_grid_size_ = 5.0;
 
         grid_pub_ = handle.advertise<nm::OccupancyGrid>("/map", 100);
+        //merged_grid_pub_ = handle.advertise<nm::OccupancyGrid>("/merged_map", 100);
+
         object_pub_ = handle.advertise<visualization_msgs::MarkerArray>("/map_objects/", 100);
 
         //sub_pointcloud = handle.subscribe("/object_detection/preprocessed", 1, &MapNode::mapPointCloud, this);
@@ -147,20 +158,44 @@ public:
         info.width = local_grid_size_/resolution_;
         info.height = local_grid_size_/resolution_;
 
-        nm::OccupancyGrid fake_grid;
         fake_grid.info = info;
         map = gu::createCloudOverlay(fake_grid, fixed_frame_, 0.1, 10, 1);
+        //merged_grid_pub_.publish(gu::getGrid(map));
 
 
         //Fill init gap
         robot_pose.position.x += 0.07;
         gu::addKnownFreePoint(&map, robot_pose.position, robot_outer_diameter/2);
 
+        current_iteration = 0;
     }
 
     void echoGrid(const ros::WallTimerEvent& scan) {
         nm::OccupancyGrid::ConstPtr grid = gu::getGrid(map);
+
+        //Every 2.5s
+        /*if(current_iteration >= 100) {
+            std::vector<nm::OccupancyGrid::ConstPtr> grid_vector;
+
+            list<nm::OccupancyGrid::ConstPtr>::iterator it;
+            for (it = map_collector.begin(); it != map_collector.end(); it++) {
+                grid_vector.push_back(*it);
+            }
+            grid_vector.push_back(grid);
+
+            nm::OccupancyGrid::ConstPtr merged_grid = gu::combineGrids(grid_vector);
+            merged_grid_pub_.publish(merged_grid);
+
+            map = gu::createCloudOverlay(fake_grid, fixed_frame_, 0.1, 10, 1);
+            map_collector.push_back(grid);
+
+            current_iteration = 0;
+        } else {
+            current_iteration++;
+        }*/
+
         grid_pub_.publish(grid);
+
 
         echoObjects();
     }
@@ -248,7 +283,7 @@ public:
                 loc_cloud->header.frame_id = fixed_frame_;
 
                 Lock lock(mutex_);
-                gu::addCloud(&map, loc_cloud, false);
+                gu::addCloud(&map, loc_cloud, hasEndpoint[pc]);
 
                 //last_cloud_=loc_cloud;
                 //clouds_.push_back(last_cloud_);

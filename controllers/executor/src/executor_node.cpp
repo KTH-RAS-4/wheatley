@@ -152,31 +152,25 @@ public:
   {
     distance = *msg;
     if (poseCorrL)
-    {
-        if (count >= 10)
+    {        
+        leftDiff[count++] = atan(-(distance.left_front-distance.left_rear)/lL);
+
+        double sumL;
+        for(int i = 0; i < count; i++)
         {
-            double sumL;
-            for(int i = 1; i < 10; i++)
-            {
-               sumL += leftDiff[i];
-            }
-            avgLeftDiff = sumL / (double) 10;
-        } else {
-            leftDiff[count++] = atan(-(distance.left_front-distance.left_rear)/lL);
+           sumL += leftDiff[i];
         }
+       avgLeftDiff = sumL / (double) count;
     } else if (poseCorrR)
     {
-        if (count >= 10)
+        rightDiff[count++] = atan((distance.right_front-distance.right_rear)/lR);
+
+        double sumR;
+        for(int i = 0; i < count; i++)
         {
-            double sumR;
-            for(int i = 1; i < count; i++)
-            {
-               sumR += rightDiff[i];
-            }
-            avgRightDiff = sumR / (double) 10;
-        } else {
-            rightDiff[count++] = atan((distance.right_front-distance.right_rear)/lR);
+           sumR += rightDiff[i];
         }
+        avgRightDiff = sumR / (double) count;
     }
 
   }
@@ -216,7 +210,7 @@ public:
       switch (stat)
       {
           case FORWARD:
-              if (!follow(0.16, 0.10))
+              if (!follow(0.2, 0.10))
               {
                 ROS_INFO("After state, DesiredTheta: %.1f, Theta: %.1f",desiredTheta*180/M_PI, theta*180/M_PI);
                 stat = STOP;
@@ -225,7 +219,7 @@ public:
           case STOP:
             twist.linear.x = 0;
             twist.angular.z = 0;
-            wall_twist.publish(twist);
+            motor_twist.publish(twist);
             break;
 
           case LEFT:

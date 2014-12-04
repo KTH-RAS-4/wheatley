@@ -214,6 +214,77 @@ ResultPtr singleSourceShortestPaths (const nm::OccupancyGrid& g, const Cell& src
   return result;
 }
 
+ResultPtr singleSourceShortestPathsToUnknown (const nm::OccupancyGrid& g, const Cell& src,
+                                     const TerminationCondition& t,
+                                     const bool manhattan)
+{
+  verifyDataSize(g);
+  ShortestPathResult* res = new ShortestPathResult();
+  ResultPtr result(res);
+  res->info = g.info;
+  res->src_ind = cellIndex(g.info, src);
+  res->back_pointers.resize(g.data.size());
+  res->potential.resize(g.data.size());
+
+  std::priority_queue<QueueItem> q;
+  q.push(QueueItem(res->src_ind, 0.0));
+  res->potential[res->src_ind] = 0.0;
+  ROS_DEBUG_NAMED ("shortest_path", "Computing single source shortest paths from %d, %d", src.x, src.y);
+
+  Cells remaining_goals;
+  if (t.goals_)
+    remaining_goals = *t.goals_;
+
+  while (!q.empty()) {
+    const QueueItem i=q.top();
+    q.pop();
+
+    const Cell cell = indexCell(g.info, i.ind);
+    const double dist = i.potential;
+    const double dist_in_meters = dist*g.info.resolution;
+    if (t.max_distance_ &&
+        (*t.max_distance_ < (t.use_cells_ ? dist : dist_in_meters)))
+        break;
+    if (t.goals_) {
+      remaining_goals.erase(cell);
+      if (remaining_goals.empty())
+        break;
+    }
+
+    for (int dx=-1; dx<=1; dx++) {
+      for (int dy=-1; dy<=1; dy++) {
+        if ((dx==0) && (dy==0))
+          continue;
+        if ((dx!=0) && (dy!=0) && manhattan)
+          continue;
+        const double d = ((dx==0) || (dy==0)) ? 1 : sqrt(2);
+        const Cell neighbor(cell.x+dx, cell.y+dy);
+        if (withinBounds(g.info, neighbor)) {
+          const index_t ind=cellIndex(g.info, neighbor);
+          const double new_dist = dist+d;
+          /*if (g.data[ind] == UNKNOWN)
+          {
+              return g.data[ind];
+          }*/
+          if (g.data[ind]==UNOCCUPIED &&
+              (!res->potential[ind] || *(res->potential[ind]) > new_dist) &&
+              (!t.max_distance_ ||
+               (t.use_cells_ && *t.max_distance_ >= new_dist) ||
+               (!t.use_cells_ && *t.max_distance_ >= new_dist*g.info.resolution)))
+          {
+            ROS_DEBUG_NAMED ("shortest_path_propagation", "Adding cell %d, %d, at distance %.2f",
+                             neighbor.x, neighbor.y, new_dist);
+            res->potential[ind] = new_dist;
+            res->back_pointers[ind] = i.ind;
+            q.push(QueueItem(ind, new_dist));
+          }
+        }
+      }
+    }
+  }
+  ROS_DEBUG_NAMED ("shortest_path", "Done computing single source shortest paths from %d, %d", src.x, src.y);
+  return result;
+}
 
 inline
 bool myGt (const signed char x, const signed char y)
