@@ -131,37 +131,50 @@ namespace wheatley
             angles::StraightAngle currDirection = angles::StraightAngle::getClosest(tf::getYaw(robot_transform.getRotation()));
 
             gu::Cell robot_cell = getCell(ros::Time(0), robot_frame, inflated_map);
+            boost::optional<gu::Cell> closestFree = gu::closestFree(inflated_map, robot_cell, 0.3);
+
+            if (!closestFree)
+            {
+                ROS_ERROR("unable to find any close by free point");
+                return;
+            }
+
+            robot_cell = *closestFree;
+
             gu::Cell goal_cell = gu::pointCell(inflated_map.info, goal);
 
             boost::optional<gu::AStarResult> astar = gu::shortestPathAStar(inflated_map, robot_cell, goal_cell, currDirection);
 
             //gu::singleSourceShortestPaths(inflated_map)
 
-            if (astar)
+            if (!astar)
             {
-                gu::Path path = (*astar).first;
-                std::vector<gm::Point> points = getPoints(inflated_map, path);
+                ROS_ERROR("unable to find any path to goal");
+                return;
+            }
 
-                if (points.size() < 2)
-                {
-                    publishPath(std::vector<gm::Point>());
-                    active = false;
-                    publishOrder("STOP");
-                }
+            gu::Path path = (*astar).first;
+            std::vector<gm::Point> points = getPoints(inflated_map, path);
+
+            if (points.size() < 2)
+            {
+                publishPath(std::vector<gm::Point>());
+                active = false;
+                publishOrder("STOP");
+            }
+            else
+            {
+                publishPath(points);
+
+                angles::StraightAngle nextDirection = angles::StraightAngle::getClosest(points[0], points[1]);
+                double diff = angles::shortest_angular_distance(currDirection.angle(), nextDirection.angle());
+
+                if (diff > 0)
+                    publishOrder("LEFT");
+                else if (diff < 0)
+                    publishOrder("RIGHT");
                 else
-                {
-                    publishPath(points);
-
-                    angles::StraightAngle nextDirection = angles::StraightAngle::getClosest(points[0], points[1]);
-                    double diff = angles::shortest_angular_distance(currDirection.angle(), nextDirection.angle());
-
-                    if (diff > 0)
-                        publishOrder("LEFT");
-                    else if (diff < 0)
-                        publishOrder("RIGHT");
-                    else
-                        publishOrder("FORWARD");
-                }
+                    publishOrder("FORWARD");
             }
         }
 

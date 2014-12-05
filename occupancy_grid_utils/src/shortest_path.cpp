@@ -83,12 +83,6 @@ TerminationCondition::TerminationCondition (const Cells& goals, const double max
 typedef vector<Cell> Path;
 typedef boost::shared_ptr<nm::OccupancyGrid> GridPtr;
 
-boost::optional<double> distance(ResultPtr res, const Cell& dest)
-{
-  ROS_WARN ("Using deprecated function distance.  Use distanceTo instead.");
-  return res->potential[cellIndex(res->info, dest)];
-}
-
 boost::optional<double> distanceTo(ResultPtr res, const Cell& dest)
 {
   boost::optional<double> d = res->potential[cellIndex(res->info, dest)];
@@ -393,6 +387,29 @@ inline double manhattanHeuristic (const Cell& c1, const Cell& c2)
 angles::StraightAngle getDirection(const Cell& from, const Cell& to)
 {
     return angles::StraightAngle::getClosest(to.x-from.x, to.y-from.y);
+}
+
+boost::optional<Cell> closestFree(const nm::OccupancyGrid& g, const Cell& from, double maxDistance)
+{
+    maxDistance /= g.info.resolution;
+    boost::optional<Cell> bestCell;
+    double bestDist = maxDistance*maxDistance+1;
+    for (int x=-maxDistance; x <= maxDistance; x++)
+    {
+        for (int y=-maxDistance; y <= maxDistance; y++)
+        {
+            double dist = x*x+y*y;
+            Cell cell(from.x+x,from.y+y);
+            if (bestDist > dist &&
+                withinBounds(g.info, cell) &&
+                g.data[cellIndex(g.info, cell)] != OCCUPIED)
+            {
+                bestDist = dist;
+                bestCell = cell;
+            }
+        }
+    }
+    return bestCell;
 }
 
 optional<AStarResult> shortestPathAStar(const nm::OccupancyGrid& g, const Cell& src, const Cell& dest, const angles::StraightAngle& srcDir)
