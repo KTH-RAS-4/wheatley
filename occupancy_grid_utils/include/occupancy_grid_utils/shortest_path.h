@@ -63,8 +63,9 @@ namespace occupancy_grid_utils
 /// for this).
 /// Rounds up when converting from meters to cells
 nav_msgs::OccupancyGrid inflateObstacles (const nav_msgs::OccupancyGrid& g,
-                                               double r,
-                                               bool allow_unknown=false);
+                                          float impassableRadius,
+                                          float passableRadius,
+                                          bool allow_unknown=false);
 
 
 /************************************************************
@@ -159,8 +160,8 @@ boost::optional<AStarResult> shortestPathAStar(const nav_msgs::OccupancyGrid& g,
                                                const angles::StraightAngle& srcDir = angles::StraightAngle::ANY);
 
 
-/// \return The closest cell within maxDistance that is unoccupied
-boost::optional<Cell> closestFree(const nav_msgs::OccupancyGrid& g, const Cell& from, double maxDistance);
+/// \return The closest cell within maxRadius that is unoccupied
+boost::optional<Cell> closestFree(const nav_msgs::OccupancyGrid& g, const Cell& from, float maxRadius);
 
 } // namespace
 

@@ -38,6 +38,8 @@
 
 #include "shortest_path_result.h"
 #include <occupancy_grid_utils/shortest_path.h>
+#include <vector>
+#include <functional>
 #include <ros/assert.h>
 #include <queue>
 
@@ -286,76 +288,107 @@ bool myGt (const signed char x, const signed char y)
   return (x==-1 && y==0) || x>y;
 }
 
+inline long distance2(int x, int y)
+{
+    return x*x+y*y;
+}
+
 struct InflationQueueItem
 {
-  InflationQueueItem (const Cell& cell, const signed char cost) :
-    cell(cell), cost(cost)
-  {}
-  Cell cell;
-  signed char cost;
+    Cell center;
+    Cell cell;
+    long dist2;
+
+    InflationQueueItem (const Cell center, const Cell cell)
+        : center(center)
+        , cell(cell)
+        , dist2(distance2(cell.x-center.x, cell.y-center.y))
+    {}
+
+    bool operator>(const InflationQueueItem& rhs) const
+    {
+        if (dist2 == rhs.dist2)
+        {
+            if (cell == rhs.cell)
+            {
+                if (center == rhs.center)
+                    return true;
+                else
+                    return center < rhs.center;
+            }
+            else
+                return cell < rhs.cell;
+        }
+        else
+            return dist2 > rhs.dist2;
+    }
 };
 
-nm::OccupancyGrid inflateObstacles (const nm::OccupancyGrid& g, const double r,
-                          const bool allow_unknown)
+nm::OccupancyGrid inflateObstacles (const nm::OccupancyGrid& g,
+                                    float impassableRadius,
+                                    float passableRadius,
+                                    const bool allow_unknown)
 {
-  // Set up optimized 'priority queue'
-  ROS_ASSERT (r>0);
-  const int radius = 1+ceil(r/g.info.resolution);
-  typedef vector<InflationQueueItem> QueueVec;
-  vector<QueueVec> queues(radius);
-  nm::OccupancyGrid g2(g);
-  const nm::MapMetaData& geom=g.info;
+    ROS_ASSERT (impassableRadius>0);
+    ROS_ASSERT (passableRadius>impassableRadius);
 
-  // Add initial obstacles
-  for (coord_t x=0; x<(int)geom.width; x++) {
-    for (coord_t y=0; y<(int)geom.height; y++) {
-      const Cell cell(x, y);
-      const signed char val=g.data[cellIndex(geom, cell)];
-      if ((allow_unknown && val>=1) || (!allow_unknown && val!=0))
-        queues[0].push_back(InflationQueueItem(cell, val));
-    }
-  }
+    impassableRadius = ceil(impassableRadius/g.info.resolution);
+      passableRadius = ceil(  passableRadius/g.info.resolution);
+    long impassableRadius2 = (int)impassableRadius*(int)impassableRadius + 1;
+    long   passableRadius2 = (int)  passableRadius*(int)  passableRadius + 1;
 
-  while (true)
-  {
-    int ind=-1;
-    for (int i=0; i<radius; i++)
+    std::vector<bool> seen(g.info.height*g.info.width);
+    std::priority_queue<InflationQueueItem,
+                        std::vector<InflationQueueItem>,
+                        std::greater<InflationQueueItem> > queue;
+    nm::OccupancyGrid g2(g);
+
+    // Add initial obstacles
+    for (coord_t x=0; x<(int)g.info.width; x++)
     {
-      if (queues[i].size()>0)
-      {
-        ind=i;
-        break;
-      }
-    }
-    if (ind<0)
-      break;
-
-    const InflationQueueItem& q=queues[ind].back();
-    const index_t index = cellIndex(geom, q.cell);
-    if (myGt(q.cost, g2.data[index]) || ind==0)
-    {
-      g2.data[index] = q.cost;
-      if (ind<radius-1)
-      {
-        for (int vert=0; vert<2; vert ++)
+        for (coord_t y=0; y<(int)g.info.height; y++)
         {
-          for (int d=-1; d<=1; d += 2)
-          {
-            const int dx = vert ? 0 : d;
-            const int dy = vert ? d : 0;
-            const Cell c2(q.cell.x+dx, q.cell.y+dy);
-            if (withinBounds(geom, c2))
-            {
-              queues[ind+1].push_back(InflationQueueItem(c2, q.cost));
-            }
-          }
+            const Cell cell(x,y);
+            const index_t ind = cellIndex(g.info, cell);
+            const signed char val=g.data[ind];
+            if ((allow_unknown && val>=1) || (!allow_unknown && val!=0))
+                queue.push(InflationQueueItem(cell, cell));
         }
-      }
     }
 
-    queues[ind].pop_back();
-  }
-  return g2;
+    while (!queue.empty())
+    {
+        const InflationQueueItem& q = queue.top();
+        queue.pop();
+        const index_t ind = cellIndex(g.info, q.cell);
+        if (seen[ind])
+            continue;
+        seen[ind] = true;
+
+        if (q.dist2 <= passableRadius2)
+        {
+            const float passableMax = OCCUPIED/2;
+            if (q.dist2 <= impassableRadius2)
+                g2.data[ind] = OCCUPIED;
+            else
+                g2.data[ind] = passableMax*(1.0 - (float)(q.dist2-impassableRadius2)/(float)(passableRadius2-impassableRadius2));
+
+            for (int i=0; i<4; i++)
+            {
+                const angles::StraightAngle& offset = angles::StraightAngle::rotations[i];
+                const Cell c2(q.cell.x+offset.x(), q.cell.y+offset.y());
+                //ROS_INFO("lol %d %d %ld", q.center.x, q.cell.y, InflationQueueItem(q.center, c2).dist2);
+
+                if (withinBounds(g.info, c2))
+                {
+                    const index_t ind2 = cellIndex(g.info, c2);
+                    if (!seen[ind2])
+                        queue.push(InflationQueueItem(q.center, c2));
+                }
+            }
+        }
+    }
+    return g2;
 }
 
 /************************************************************
@@ -389,14 +422,14 @@ angles::StraightAngle getDirection(const Cell& from, const Cell& to)
     return angles::StraightAngle::getClosest(to.x-from.x, to.y-from.y);
 }
 
-boost::optional<Cell> closestFree(const nm::OccupancyGrid& g, const Cell& from, double maxDistance)
+boost::optional<Cell> closestFree(const nm::OccupancyGrid& g, const Cell& from, float maxRadius)
 {
-    maxDistance /= g.info.resolution;
+    maxRadius = ceil(maxRadius/g.info.resolution);
     boost::optional<Cell> bestCell;
-    double bestDist = maxDistance*maxDistance+1;
-    for (int x=-maxDistance; x <= maxDistance; x++)
+    double bestDist = maxRadius*maxRadius+1;
+    for (int x=-maxRadius; x <= maxRadius; x++)
     {
-        for (int y=-maxDistance; y <= maxDistance; y++)
+        for (int y=-maxRadius; y <= maxRadius; y++)
         {
             double dist = x*x+y*y;
             Cell cell(from.x+x,from.y+y);
@@ -426,7 +459,7 @@ optional<AStarResult> shortestPathAStar(const nm::OccupancyGrid& g, const Cell& 
   ParentMap parent;
 
   optional<AStarResult> res;
-  ROS_DEBUG_STREAM_NAMED ("shortest_path", "Computing shortest path from " << src << " to " << dest);
+  //ROS_DEBUG_STREAM_NAMED ("shortest_path", "Computing shortest path from " << src << " to " << dest);
 
   while (!open_list.empty()) {
     const PQItem current = open_list.top();
@@ -436,8 +469,8 @@ optional<AStarResult> shortestPathAStar(const nm::OccupancyGrid& g, const Cell& 
       continue;
     parent[current.ind] = current.parent_ind;
     seen[current.ind] = true;
-    ROS_DEBUG_STREAM_NAMED ("shortest_path_internal", "  Considering " << curr << " with cost " <<
-                            current.g_cost << " + " << current.h_cost);
+    //ROS_DEBUG_STREAM_NAMED ("shortest_path_internal", "  Considering " << curr << " with cost " <<
+    //                        current.g_cost << " + " << current.h_cost);
     if (current.ind == dest_ind) {
       res = AStarResult();
       res->second = current.g_cost;
@@ -452,7 +485,7 @@ optional<AStarResult> shortestPathAStar(const nm::OccupancyGrid& g, const Cell& 
           const Cell next((coord_t) cx, (coord_t) cy);
           if (withinBounds(g.info, next)) {
             const index_t ind = cellIndex(g.info, next);
-            if (g.data[ind]==UNOCCUPIED && !seen[ind])
+            if (g.data[ind]!=OCCUPIED && !seen[ind])
             {
               const Cell prev = indexCell(g.info, current.parent_ind);
 
@@ -466,9 +499,9 @@ optional<AStarResult> shortestPathAStar(const nm::OccupancyGrid& g, const Cell& 
                                     resolution*manhattanHeuristic(next, dest),
                                     current.ind));
             }
-            ROS_DEBUG_STREAM_COND_NAMED (g.data[ind]!=UNOCCUPIED, "shortest_path_internal",
-                                         "  Skipping cell " << indexCell(g.info, ind) <<
-                                         " with cost " << (unsigned) g.data[ind]);
+            //ROS_DEBUG_STREAM_COND_NAMED (g.data[ind]!=UNOCCUPIED, "shortest_path_internal",
+            //                             "  Skipping cell " << indexCell(g.info, ind) <<
+            //                             " with cost " << (unsigned) g.data[ind]);
           }
         }
       }
