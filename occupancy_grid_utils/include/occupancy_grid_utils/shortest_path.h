@@ -129,17 +129,10 @@ ResultPtr singleSourceShortestPathsToUnknown (const nav_msgs::OccupancyGrid& g, 
 /// is last; if not, uninitialized
 boost::optional<Path> extractPath (ResultPtr shortest_path_result, const Cell& dest);
 
-/// \brief From result of single-source shortest paths, extract distance to some destination
-/// \retval Distance if path exists, uninitialized otherwise
-boost::optional<double> distance(ResultPtr shortest_path_result, const Cell& dest);
-
 /// \brief From result of single-source shortest paths, extract distance to some destination.
 /// \retval Distance if path exists, uninitialized otherwise.  In meters, not cells.
 boost::optional<double> distanceTo(ResultPtr shortest_path_result, const Cell& dest);
 
-
-/// \brief deprecated
-boost::optional<double> distance(ResultPtr shortest_path_result, const Cell& dest);
 
 /// \brief Convert a shortest path result from a ros message
 ResultPtr shortestPathResultFromMessage (const NavigationFunction& msg);
@@ -165,6 +158,9 @@ boost::optional<AStarResult> shortestPathAStar(const nav_msgs::OccupancyGrid& g,
                                                const Cell& src, const Cell& dest,
                                                const angles::StraightAngle& srcDir = angles::StraightAngle::ANY);
 
+
+/// \return The closest cell within maxDistance that is unoccupied
+boost::optional<Cell> closestFree(const nav_msgs::OccupancyGrid& g, const Cell& from, double maxDistance);
 
 } // namespace
 
