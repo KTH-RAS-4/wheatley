@@ -42,7 +42,7 @@ float object_color_saturation[] = {
     0, 255, // floor
     90, 255, // red
     120, 255, // orange
-    127, 255, // yellow
+    90, 255, // yellow
     127, 255, // green
     60, 255, // blue
     80, 255 // purple
@@ -135,6 +135,7 @@ private:
         //cvtColor(image, image, CV_YCrCb2BGR); //change the color image from YCrCb to BGR format (to display image properly)
 
         // extract wall sample color
+		Mat bin, bin_sat, bin_val;
         cvtColor(image, image, CV_BGR2HSV);
         vector<Mat> channels;
         split(image, channels);
@@ -311,6 +312,8 @@ private:
             rectangle(Result, boundingBoxes[i], Scalar(255,255,0), 1, 8, 0);
             cout << "vertices: " << polygons[i].size() << endl;
         }
+
+//		cuda::gammaCorrection(image, image, true, Stream::Null());
 
         imshow(WINDOW_1, image);
         imshow(WINDOW_2, Result);
