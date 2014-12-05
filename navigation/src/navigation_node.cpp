@@ -142,7 +142,7 @@ namespace wheatley
                 gu::Path path = (*astar).first;
                 std::vector<gm::Point> points = getPoints(inflated_map, path);
 
-                if (points.size() < 2)
+                if (points.size() < 5)
                 {
                     publishPath(std::vector<gm::Point>());
                     active = false;
