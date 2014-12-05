@@ -70,10 +70,17 @@ public:
         if(!tf_.waitForTransform("camera_rgb_optical_frame", "map", cloud_msg->header.stamp, ros::Duration(0.1)))
             return;
 
+        sensor_msgs::PointCloud cloud_legacy;
+        sensor_msgs::convertPointCloud2ToPointCloud(*cloud_msg, cloud_legacy);
 
+        sensor_msgs::PointCloud cloud_msg_transformed;
+        tf_.transformPointCloud("map", cloud_msg->header.stamp, cloud_legacy, "camera_rgb_optical_frame", cloud_msg_transformed);
+
+        sensor_msgs::PointCloud2 cloud2_transformed;
+        sensor_msgs::convertPointCloudToPointCloud2(cloud_msg_transformed, cloud2_transformed);
 
         // Convert to PCL data type
-        pcl::fromROSMsg(*cloud_msg, *cloud);
+        pcl::fromROSMsg(cloud2_transformed, *cloud);
 
         if(cloud->size() == 0)
             return;
@@ -107,35 +114,11 @@ public:
         if(cloud_downsampled->size() == 0)
             return;
 
-        pcl::PassThrough<PointT> passX;
-        passX.setInputCloud (cloud_downsampled);
-        passX.setFilterFieldName ("y");
-        passX.setFilterLimits (0, 1);
-        passX.filter (*cloud_pass_x);
-
-        if(cloud_pass_x->size() == 0) {
-            ROS_INFO("Empty after passX");
-            return;
-        }
-
-        sensor_msgs::PointCloud2 msg_pass_x;
-        pcl::toROSMsg(*cloud_pass_x, msg_pass_x);
-
-        sensor_msgs::PointCloud cloud_legacy;
-        sensor_msgs::convertPointCloud2ToPointCloud(msg_pass_x, cloud_legacy);
-
-        sensor_msgs::PointCloud cloud_msg_transformed;
-        tf_.transformPointCloud("map", cloud_legacy, cloud_msg_transformed);
-
-        sensor_msgs::PointCloud2 cloud2_transformed;
-        sensor_msgs::convertPointCloudToPointCloud2(cloud_msg_transformed, cloud2_transformed);
-
-        pcl::fromROSMsg(cloud2_transformed, *cloud_transformed);
 
         // Build a passthrough filter to remove spurious NaNs
-        pass.setInputCloud (cloud_transformed);
+        pass.setInputCloud (cloud_downsampled);
         pass.setFilterFieldName ("z");
-        pass.setFilterLimits (0.01, 1.5);
+        pass.setFilterLimits (0.015, 1.5);
         pass.filter (*cloud_filtered);
         pass.setNegative(true);
         pass.filter(*cloud_plane);
