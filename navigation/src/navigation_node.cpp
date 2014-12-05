@@ -37,7 +37,7 @@ namespace wheatley
         ros::WallTimer timer_pathfinding;
         const string fixed_frame;
         const string robot_frame;
-        const double robot_diameter;
+        const double robot_outer_diameter;
         bool active;
         bool executor_ready;
         string prev_order;
@@ -54,7 +54,7 @@ namespace wheatley
             , robot_frame("robot")
             , active(false)
             , executor_ready(false)
-            , robot_diameter(requireParameter<double>("/base/diameter"))
+            , robot_outer_diameter(requireParameter<double>("/base/outer_diameter"))
         {
             double rate = requireParameter<double>("pathfinding_rate");
 
@@ -71,11 +71,13 @@ namespace wheatley
         {
             ROS_INFO_ONCE("got first map");
             map = *msg;
-            inflated_map = gu::inflateObstacles(map, robot_diameter/2+0.04, true);
+            inflated_map = gu::inflateObstacles(map,
+                                                robot_outer_diameter/2,
+                                                robot_outer_diameter/2 + 0.1,
+                                                true);
             inflated_map.header.frame_id = msg->header.frame_id;
             inflated_map.header.stamp = msg->header.stamp;
             pub_map.publish(inflated_map);
-            //map = occupancy_grid_utils::createCloudOverlay(msg, fixed_frame, 0.1, 10, 1);
             run_pathfinding();
         }
 
