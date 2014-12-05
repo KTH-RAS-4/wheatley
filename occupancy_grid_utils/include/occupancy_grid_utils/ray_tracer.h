@@ -94,13 +94,22 @@ void addCloud (OverlayClouds* overlay, LocalizedCloud::ConstPtr cloud, bool hasE
 void removeCloud (OverlayClouds* overlay, LocalizedCloud::ConstPtr cloud);
 
 /// \brief Assert that a square centered at this point with side 2*r contains no obstacles
-void addKnownFreePoint (OverlayClouds* overlay, const geometry_msgs::Point& p,
-                        double r);
+void addFreePoint (OverlayClouds* overlay, const geometry_msgs::Point& p, double r);
 
 /// \brief Assert that a square centered at this point with side 2*r contains obstacles
-void addKnownOccupiedPoint (OverlayClouds* overlay, const geometry_msgs::Point& p,
-                        double r);
-/// return true if the square centered at this point with side 2*r contains no bostacles
+void addOccupiedPoint (OverlayClouds* overlay, const geometry_msgs::Point& p, double r);
+
+/// \brief Assert that a square centered at this point with side 2*r contains no obstacles
+void addKnownFreePoint (OverlayClouds* overlay, const geometry_msgs::Point& p, double r, const int extra);
+
+/// \brief Assert that a square centered at this point with side 2*r contains obstacles
+void addKnownOccupiedPoint (OverlayClouds* overlay, const geometry_msgs::Point& p, double r);
+
+
+/// return UNOCCUPIED if all the cells in the square centered at this point with side 2*r contains no obstacles
+/// return OCCUPIED if at least one cell is occupied.
+/// retrun unkown other wise.
+/// ///UNOCCUPIED=0; OCCUPIED=100; UNKNOWN=255;
 int IsWindowFree (OverlayClouds* overlay, const geometry_msgs::Point& p, double r);
 
 /// \brief Get the current grid.  It's fine to modify the returned object.

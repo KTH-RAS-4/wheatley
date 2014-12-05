@@ -23,6 +23,7 @@
 
 #include <occupancy_grid_utils/ray_tracer.h>
 #include <occupancy_grid_utils/combine_grids.h>
+#include <occupancy_grid_utils/file.h>
 #include <ros/wall_timer.h>
 
 #include <boost/circular_buffer.hpp>
@@ -159,13 +160,13 @@ public:
         info.height = local_grid_size_/resolution_;
 
         fake_grid.info = info;
-        map = gu::createCloudOverlay(fake_grid, fixed_frame_, 0.1, 10, 1);
+        map = gu::createCloudOverlay(fake_grid, fixed_frame_, 0.33, 5, 1);
         //merged_grid_pub_.publish(gu::getGrid(map));
 
 
         //Fill init gap
-        robot_pose.position.x += 0.07;
-        gu::addKnownFreePoint(&map, robot_pose.position, robot_outer_diameter/2);
+        robot_pose.position.x += 0.012;
+        gu::addKnownFreePoint(&map, robot_pose.position, robot_outer_diameter/2, 30);
 
         current_iteration = 0;
     }
@@ -299,7 +300,7 @@ public:
     {
         ros::Time now = ros::Time::now();
         if (tf_.waitForTransform(fixed_frame_, robot_frame, now, ros::Duration(0.1)))
-            gu::addKnownFreePoint(&map, getPose(now, robot_frame).position, robot_outer_diameter/2);
+            gu::addKnownFreePoint(&map, getPose(now, robot_frame).position, robot_outer_diameter/2, 30);
     }
 
     void mapPointCloud(const vision_msgs::PreprocessedClouds &msg)
@@ -381,7 +382,7 @@ public:
             pf.y = pf_t.y;
             pf.z = pf_t.z;
 
-            gu::addKnownFreePoint(&map, pf, 0.01);
+            gu::addFreePoint(&map, pf, 0.01);
         }
 
         sm::PointCloud cloudWall_legacy;
@@ -398,7 +399,7 @@ public:
             pw.y = pw_t.y;
             pw.z = pw_t.z;
 
-            gu::addKnownOccupiedPoint(&map, pw, 0.01);
+            gu::addOccupiedPoint(&map, pw, 0.01);
         }
     }
 
