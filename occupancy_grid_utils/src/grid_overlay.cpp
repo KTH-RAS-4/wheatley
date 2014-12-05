@@ -29,7 +29,7 @@
 
 /**
  * \file
- * 
+ *
  * Implements overlayClouds
  *
  * \author Bhaskara Marthi
@@ -76,7 +76,7 @@ inline double euclideanDistance (const gm::Point& p1, const gm::Point& p2)
 
 
 // This is our policy for computing the occupancy of a cell based on hit and pass through counts
-inline int8_t determineOccupancy (const unsigned hit_count, const unsigned pass_through_count, 
+inline int8_t determineOccupancy (const unsigned hit_count, const unsigned pass_through_count,
                                   const double occupancy_threshold, const double min_pass_through)
 {
   int8_t ret;
@@ -84,7 +84,7 @@ inline int8_t determineOccupancy (const unsigned hit_count, const unsigned pass_
     ret=UNKNOWN;
   else if (hit_count > pass_through_count*occupancy_threshold)
     ret=OCCUPIED;
-  else 
+  else
     ret=UNOCCUPIED;
   ROS_DEBUG_NAMED ("overlay_get_grid", " Hit count is %u, pass through count is %u, occupancy is %d",
                    hit_count, pass_through_count, ret);
@@ -117,7 +117,7 @@ void addKnownFreePoint (OverlayClouds* overlay, const gm::Point& p, const double
     for (int y=c.y-cell_radius; y<=c.y+cell_radius; y++)
     {
       const Cell c2(x, y);
-      if (withinBounds(geom, c2))
+      if (withinBounds(geom, c2) && x*x+y*y <= cell_radius*cell_radius+1)
       {
         const index_t ind = cellIndex(geom, c2);
         overlay->hit_counts[ind] = 0;
@@ -137,7 +137,7 @@ void addKnownOccupiedPoint (OverlayClouds* overlay, const gm::Point& p, const do
     for (int y=c.y-cell_radius; y<=c.y+cell_radius; y++)
     {
       const Cell c2(x, y);
-      if (withinBounds(geom, c2))
+      if (withinBounds(geom, c2) && x*x+y*y <= cell_radius*cell_radius+1)
       {
         const index_t ind = cellIndex(geom, c2);
         overlay->hit_counts[ind] = 2;
@@ -172,7 +172,7 @@ int IsWindowFree (OverlayClouds* overlay, const gm::Point& p, const double r)
 
 void addCloud (OverlayClouds* overlay, LocalizedCloud::ConstPtr cloud, const int inc, bool hasEndpoint)
 {
-  
+
   ROS_ASSERT_MSG(overlay->frame_id==cloud->header.frame_id,
                  "Frame id %s of overlayed cloud didn't match existing one %s",
                  cloud->header.frame_id.c_str(), overlay->frame_id.c_str());
@@ -186,21 +186,21 @@ void addCloud (OverlayClouds* overlay, LocalizedCloud::ConstPtr cloud, const int
   tf::Pose sensor_to_world;
   tf::poseMsgToTF(cloud->sensor_pose, sensor_to_world);
   vector<gm::Point> transformed_points(cloud->cloud.points.size());
-  transform(cloud->cloud.points.begin(), 
-            cloud->cloud.points.end(), 
+  transform(cloud->cloud.points.begin(),
+            cloud->cloud.points.end(),
             transformed_points.begin(),
             bind(transformPt, ref(sensor_to_world), _1));
 
   // Iterate over points in this cloud
   BOOST_FOREACH (const gm::Point& p, transformed_points) {
-  
+
     // Skip point unless it's within the distance threshold
     if (euclideanDistance(sensor_pos, p) < overlay->max_distance) {
       ROS_DEBUG_NAMED ("overlay_counts", " Ray tracing to point %.2f, %.2f", p.x, p.y);
       boost::optional<index_t> last_ind;
 
       const bool have_existing_grid = !overlay->grid.data.empty();
-      
+
       // Inner loop: raytrace along the line and update counts
       // We allow both the sensor pose and the target to be off the grid
       BOOST_FOREACH (const Cell& c, rayTrace(overlay->grid.info, sensor_pos, p, true, true)) {
@@ -209,7 +209,7 @@ void addCloud (OverlayClouds* overlay, LocalizedCloud::ConstPtr cloud, const int
         if (have_existing_grid && overlay->grid.data[*last_ind] == OCCUPIED)
             break;
         ROS_ASSERT(overlay->pass_through_counts[*last_ind]>=0);
-        ROS_DEBUG_NAMED ("overlay_counts", "  Pass-through counts for %d, %d are now %u", c.x, c.y, 
+        ROS_DEBUG_NAMED ("overlay_counts", "  Pass-through counts for %d, %d are now %u", c.x, c.y,
                          overlay->pass_through_counts[*last_ind]);
       }
 
@@ -217,20 +217,20 @@ void addCloud (OverlayClouds* overlay, LocalizedCloud::ConstPtr cloud, const int
         // If the last cell equals the point (i.e., point is not off the grid), update hit counts
         const Cell last_cell = indexCell(overlay->grid.info, *last_ind);
         if (last_cell == pointCell(overlay->grid.info, p)) {
-          
+
 #ifdef GRID_UTILS_GCC_46
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wuninitialized"
 #endif
-          
+
           overlay->hit_counts[*last_ind] += inc;
-          
+
 #ifdef GRID_UTILS_GCC_46
 #pragma GCC diagnostic pop
 #endif
-          
+
           ROS_ASSERT(overlay->hit_counts[*last_ind]>=0);
-          ROS_DEBUG_NAMED ("overlay_counts", "  Hit counts for %d, %d are now %u", last_cell.x, last_cell.y, 
+          ROS_DEBUG_NAMED ("overlay_counts", "  Hit counts for %d, %d are now %u", last_cell.x, last_cell.y,
                            overlay->hit_counts[*last_ind]);
         }
       }
@@ -252,14 +252,14 @@ void removeCloud (OverlayClouds* overlay, LocalizedCloud::ConstPtr cloud)
 
 
 
-GridPtr getGrid (const OverlayClouds& overlay) 
+GridPtr getGrid (const OverlayClouds& overlay)
 {
   GridPtr grid(new nm::OccupancyGrid());
   grid->info = overlay.grid.info;
   grid->header.frame_id = overlay.frame_id;
   ROS_DEBUG_STREAM_NAMED ("overlay_get_grid", "Getting overlaid grid with geometry " << overlay.grid.info);
   grid->data.resize(overlay.grid.info.width*overlay.grid.info.height);
-  transform(overlay.hit_counts.begin(), overlay.hit_counts.end(), overlay.pass_through_counts.begin(), 
+  transform(overlay.hit_counts.begin(), overlay.hit_counts.end(), overlay.pass_through_counts.begin(),
             grid->data.begin(), bind(determineOccupancy, _1, _2, overlay.occupancy_threshold,
                                      overlay.min_pass_through));
   return grid;
@@ -271,7 +271,7 @@ void resetCounts (OverlayClouds* overlay)
   fill(overlay->pass_through_counts.begin(), overlay->pass_through_counts.end(), 0);
 }
 
-nm::MapMetaData gridInfo (const OverlayClouds& overlay) 
+nm::MapMetaData gridInfo (const OverlayClouds& overlay)
 {
   return overlay.grid.info;
 }
