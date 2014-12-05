@@ -80,7 +80,6 @@ class ImageCorrectionNode
     image_transport::Subscriber image_sub;
 
     Mat image;
-    Mat Tmp;
     Mat Result;
     vector<Mat> channels;
 
@@ -148,13 +147,18 @@ private:
 
         // color correction based on sample color
         split(image, channels);
-        double min, max;
+        double min, max, wmax;
+		wmax = 230;
+		cout << "-----" << endl;
         minMaxLoc(channels[0], &min, &max);
-        normalize(channels[0], channels[0], min, max + 255 - average[0], NORM_MINMAX, -1, noArray());
+        normalize(channels[0], channels[0], min, max + wmax - average[0], NORM_MINMAX, -1, noArray());
+		cout << max + wmax - average[2] << " (" << wmax - average[0] << ")" << endl;
         minMaxLoc(channels[1], &min, &max);
-        normalize(channels[1], channels[1], min, max + 255 - average[1], NORM_MINMAX, -1, noArray());
+        normalize(channels[1], channels[1], min, max + wmax - average[1], NORM_MINMAX, -1, noArray());
+		cout << max + wmax - average[1] << " (" << wmax - average[1] << ")" << endl;
         minMaxLoc(channels[2], &min, &max);
-        normalize(channels[2], channels[2], min, max + 255 - average[2], NORM_MINMAX, -1, noArray());
+        normalize(channels[2], channels[2], min, max + wmax - average[2], NORM_MINMAX, -1, noArray());
+		cout << max + wmax - average[2] << " (" << wmax - average[2] << ")" << endl;
         merge(channels, image);
         
         // apply gaussian filter
@@ -206,6 +210,8 @@ private:
             erode(mask, marker, erosion_element);
             mask = maskReconstruction(marker, mask);
 
+			cout << color << endl;
+	
             switch(color_list[color])
             {
                 case WALL: bgr = Vec3b(255,255,255); break;
@@ -217,6 +223,8 @@ private:
                 case BLUE: bgr = Vec3b(255,0,0); break;
                 case PURPLE: bgr = Vec3b(255,0,127); break;
             }
+
+			cout << mask.cols << " " << Result.cols << endl;
 
             for (int i = 0; i < image.rows; i++)
             {
@@ -237,6 +245,8 @@ private:
             }
         }
 
+		cout << "masking" << endl;
+
         //mask = maskColor(image, BLUE);
         
         //double min, max;
@@ -247,6 +257,8 @@ private:
         Mat gray;
         cvtColor(Result, gray, CV_BGR2GRAY);
         Canny(gray, edges, 20, 40, 3, false);
+
+		cout << "edge detection" << endl;
 
         /// Find contours
         vector<vector<Point> > contours;
@@ -263,7 +275,7 @@ private:
         vector<Point> polygon;
         vector<Rect> boundingBoxes;
         Rect bounds;
-        cout << "----------" << endl;
+        //cout << "----------" << endl;
         int boundingThreshold = 10;
         for (int i = 0; i < contours.size(); i++)
         {
@@ -310,10 +322,16 @@ private:
         for (int i = 0; i < boundingBoxes.size() && i < polygons.size(); i++)
         {
             rectangle(Result, boundingBoxes[i], Scalar(255,255,0), 1, 8, 0);
-            cout << "vertices: " << polygons[i].size() << endl;
+            //cout << "vertices: " << polygons[i].size() << endl;
         }
 
+		cout << "contours" << endl;
+
 //		cuda::gammaCorrection(image, image, true, Stream::Null());
+
+		
+		Mat solid = Mat(image.size(), CV_8UC3, Scalar(255,0,255));
+		bitwise_and(image, solid, image, bin);
 
         imshow(WINDOW_1, image);
         imshow(WINDOW_2, Result);
@@ -323,6 +341,10 @@ private:
 
     Mat maskColor(const Mat src, int color)
     {
+		cout << "masking " << color << endl;
+
+		Mat Tmp;
+
         cvtColor(src, Tmp, CV_BGR2HSV);
 
         Mat mask = Mat::zeros(src.rows, src.cols, CV_32FC1);
@@ -362,6 +384,8 @@ private:
 
     Mat maskReconstruction(Mat marker, Mat mask)
     {
+		cout << "mask reconstruction" << endl;
+
         int rows = mask.rows;
         int cols = mask.cols;
         Mat mat = Mat::zeros(rows, cols, CV_32FC1);
@@ -376,10 +400,12 @@ private:
                 if (_marker[i*cols+j] == 1 && _mask[i*cols+j] == 1 && _mat[i*cols+j] == 0)
                 {
                     _mat[i*cols+j] = 1;
-                    maskReconstructionHelper(_mask, _mat, rows, cols, i, j);
+                    //maskReconstructionHelper(_mask, _mat, rows, cols, i, j);
                 }
             }
         }
+
+		cout << "reconstruction end" << endl;
 
         return mat;
     }
