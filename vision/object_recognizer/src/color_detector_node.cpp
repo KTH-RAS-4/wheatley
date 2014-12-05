@@ -61,8 +61,8 @@ float object_color_hue[] = {
     5, 10, // orange
     15, 25, // yellow
     125, 160, // purple
-    50, 125, // blue
-    25, 50, // green
+    70, 125, // blue
+    25, 70, // green
     -8, 5 // red
 };
 
@@ -127,7 +127,7 @@ public:
         object_color_map[WALL] = "Wall";
         object_color_map[ORANGE] = "Patrick";
         object_color_map[YELLOW] = "Yellow";
-        object_color_map[GREEN] = "Green";
+        object_color_map[GREEN] = "Green Cube";
         object_color_map[BLUE] = "Blue";
         object_color_map[PURPLE] = "Purple";
         object_color_map[RED] = "Red";

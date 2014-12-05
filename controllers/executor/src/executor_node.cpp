@@ -210,7 +210,7 @@ public:
       switch (stat)
       {
           case FORWARD:
-              if (!follow(0.2, 0.10))
+              if (!follow(0.17, 0.12))
               {
                 ROS_INFO("After state, DesiredTheta: %.1f, Theta: %.1f",desiredTheta*180/M_PI, theta*180/M_PI);
                 stat = STOP;
@@ -226,16 +226,23 @@ public:
           {
             //TODO: check that the distance to the wall, on the last measurement from both sensors is reasonable
             static bool align_done = false;
-            if (!align_done && align(0.2))
+            if (!align_done && align(0.25))
             {
                 count = 0;
                 poseCorrR = true;
                 align_done = true;
             }
-
+            if (align_done && distance.right_front > 0.1 && distance.right_rear > 0.1)
+            {
+                count = 0;
+                poseCorrR = false;
+                align_done = false;
+                ROS_INFO("After state, DesiredTheta: %.1f, Theta: %.1f",desiredTheta*180/M_PI, theta*180/M_PI);
+                stat = STOP;
+            }
             if (align_done && count >= 10)
             {
-                if (std::abs(avgRightDiff) < (10*M_PI)/180 && distance.right_front < 0.15 && distance.right_rear < 0.15)
+                if (std::abs(avgRightDiff) < (10*M_PI)/180)
                     publishOdometry(ros::Time(), avgRightDiff);
                 ROS_INFO("AvgRightDiff: %f",avgRightDiff);
                 ROS_INFO("After state, DesiredTheta: %.1f, Theta: %.1f",desiredTheta*180/M_PI, theta*180/M_PI);
@@ -249,13 +256,20 @@ public:
           {
             //TODO: check that the distance to the wall, on the last measurement from both sensors is reasonable
             static bool align_done = false;
-            if (!align_done && align(0.2))
+            if (!align_done && align(0.25))
             {
                 count = 0;
                 poseCorrL = true;
                 align_done = true;
             }
-
+            if (align_done && distance.left_front > 0.1 && distance.left_rear > 0.1)
+            {
+                count = 0;
+                poseCorrL = false;
+                align_done = false;
+                ROS_INFO("After state, DesiredTheta: %.1f, Theta: %.1f",desiredTheta*180/M_PI, theta*180/M_PI);
+                stat = STOP;
+            }
             if (align_done && count >= 10)
             {
                 if (std::abs(avgLeftDiff) < (10*M_PI)/180 && distance.left_front < 0.15 && distance.left_rear < 0.15)

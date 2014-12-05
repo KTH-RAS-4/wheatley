@@ -54,11 +54,12 @@ int main(int argc, char **argv)
   queue.push_back("FORWARD");
   queue.push_back("RIGHT");
   queue.push_back("RIGHT");
-  queue.push_back("FORWARD");
+  /*queue.push_back("FORWARD");
 
   queue.push_back("LEFT");
   queue.push_back("FORWARD");
   queue.push_back("RIGHT");
+
   queue.push_back("FORWARD");
   queue.push_back("RIGHT");
   queue.push_back("LEFT");
@@ -66,7 +67,7 @@ int main(int argc, char **argv)
   queue.push_back("FORWARD");
   queue.push_back("LEFT");
   queue.push_back("FORWARD");
-  queue.push_back("LEFT");
+  queue.push_back("LEFT");*/
 
   ros::spin();
 

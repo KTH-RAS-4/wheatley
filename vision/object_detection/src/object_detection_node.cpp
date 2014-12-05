@@ -95,6 +95,7 @@ public:
         if(cloud_plane->size() == 0 || cloud_others->size() == 0)
             return;
 
+        ROS_INFO("Clouds are not empty");
         //Generate clusters
         std::vector<pcl::PointIndices> cluster_indices;
         /*pcl::EuclideanClusterExtraction<PointT> ec;
@@ -116,6 +117,9 @@ public:
 
         reg.extract (cluster_indices);
 
+        ROS_INFO("Extract done");
+        if(cloud_plane->empty())
+            return;
         tree->setInputCloud(cloud_plane);
         std::vector<int> pointIdxNKNSearch(1);
         std::vector<float> pointNKNSquaredDistance(1);
@@ -130,10 +134,13 @@ public:
             return;
         }*/
 
+        ROS_INFO("Starting clustering");
         for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
         {
             pcl::PointCloud<PointT>::Ptr cloud_cluster (new pcl::PointCloud<PointT>(*cloud_others, it->indices));
 
+            if(cloud_cluster->size() == 0)
+                continue;
             Eigen::Vector4f centroid;
             pcl::compute3DCentroid(*cloud_others, it->indices, centroid);
 
@@ -205,6 +212,7 @@ public:
             //std::cout << "Color:" << color << std::endl;
             j++;
         }
+        ROS_INFO("Clustering done");
 
         pub_objects.publish(objects);
         std::cout << "Published " << objects.objects.size() << " objects" << std::endl;

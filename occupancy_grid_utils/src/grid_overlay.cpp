@@ -188,13 +188,15 @@ void addKnownOccupiedPoint (OverlayClouds* overlay, const gm::Point& p, const do
 /// return UNOCCUPIED if all the cells in the square centered at this point with side 2*r contains no obstacles
 /// return OCCUPIED if at least one cell is occupied.
 /// retrun unkown other wise.
-/// ///UNOCCUPIED=0; OCCUPIED=100; UNKNOWN=255;
+/// ///UNOCCUPIED=0; OCCUPIED=100; UNKNOWN=255;ERROR=33;
 int IsWindowFree (OverlayClouds* overlay, const gm::Point& p, const double r)
 {
     const nm::MapMetaData& geom = overlay->grid.info;
     const int cell_radius = floor(r/geom.resolution);
     const Cell c = pointCell(geom, p);
     bool isUnknown = false;
+    int a;
+    int isUnoccupied=1;
     for (int x= c.x-cell_radius; x<=c.x+cell_radius; x++)
     {
         for (int y=c.y-cell_radius; y<=c.y+cell_radius; y++)
@@ -203,19 +205,25 @@ int IsWindowFree (OverlayClouds* overlay, const gm::Point& p, const double r)
             if (withinBounds(geom, c2))
             {
                 const index_t ind = cellIndex(geom, c2);
-                int a=determineOccupancy (overlay->hit_counts[ind], overlay->pass_through_counts[ind] ,overlay->occupancy_threshold,overlay->min_pass_through);
-                if (a==OCCUPIED)
+               a=determineOccupancy (overlay->hit_counts[ind], overlay->pass_through_counts[ind] ,overlay->occupancy_threshold,overlay->min_pass_through);
+               if (a==0)
+                   isUnoccupied=isUnoccupied*1;
+               else
+                   isUnoccupied=0;
+               if (a==100)
                     return a;
-                else if(a==UNKNOWN)
+                else if(a==255)
                     isUnknown = true;
             }
         }
     }
     if(isUnknown)
-        return UNKNOWN;
+        return 255;
+    else if(isUnoccupied)
+        return 0;
     else
-        return UNOCCUPIED; 
-    //UNOCCUPIED=0; OCCUPIED=100; UNKNOWN=255;
+        return 33;
+    //UNOCCUPIED=0; OCCUPIED=100; UNKNOWN=255; ERROR=33;
 }
 
 

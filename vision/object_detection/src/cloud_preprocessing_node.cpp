@@ -70,17 +70,7 @@ public:
         if(!tf_.waitForTransform("camera_rgb_optical_frame", "map", cloud_msg->header.stamp, ros::Duration(0.1)))
             return;
 
-        sensor_msgs::PointCloud cloud_legacy;
-        sensor_msgs::convertPointCloud2ToPointCloud(*cloud_msg, cloud_legacy);
-
-        sensor_msgs::PointCloud cloud_msg_transformed;
-        tf_.transformPointCloud("map", cloud_msg->header.stamp, cloud_legacy, "camera_rgb_optical_frame", cloud_msg_transformed);
-
-        sensor_msgs::PointCloud2 cloud2_transformed;
-        sensor_msgs::convertPointCloudToPointCloud2(cloud_msg_transformed, cloud2_transformed);
-
-        // Convert to PCL data type
-        pcl::fromROSMsg(cloud2_transformed, *cloud);
+        pcl::fromROSMsg(*cloud_msg, *cloud);
 
         if(cloud->size() == 0)
             return;
@@ -94,7 +84,7 @@ public:
 
         // Datasets
         pcl::PointCloud<PointT>::Ptr cloud_downsampled (new pcl::PointCloud<PointT>);
-        pcl::PointCloud<PointT>::Ptr cloud_pass_x (new pcl::PointCloud<PointT>);
+        pcl::PointCloud<PointT>::Ptr cloud_pass_y (new pcl::PointCloud<PointT>);
         pcl::PointCloud<PointT>::Ptr cloud_transformed (new pcl::PointCloud<PointT>);
         pcl::PointCloud<PointT>::Ptr cloud_filtered (new pcl::PointCloud<PointT>);
         pcl::PointCloud<pcl::Normal>::Ptr cloud_normals (new pcl::PointCloud<pcl::Normal>);
@@ -114,9 +104,32 @@ public:
         if(cloud_downsampled->size() == 0)
             return;
 
+        pcl::PassThrough<PointT> passY;
+        passY.setInputCloud (cloud_downsampled);
+        passY.setFilterFieldName ("y");
+        passY.setFilterLimits (0, 2);
+        passY.filter (*cloud_pass_y);
+
+        if(cloud_pass_y->size() == 0)
+            return;
+
+        sensor_msgs::PointCloud2 cloud_msg_pass_y;
+        pcl::toROSMsg(*cloud_pass_y, cloud_msg_pass_y);
+
+        sensor_msgs::PointCloud cloud_legacy;
+        sensor_msgs::convertPointCloud2ToPointCloud(cloud_msg_pass_y, cloud_legacy);
+
+        sensor_msgs::PointCloud cloud_msg_transformed;
+        tf_.transformPointCloud("map", cloud_msg->header.stamp, cloud_legacy, "camera_rgb_optical_frame", cloud_msg_transformed);
+
+        sensor_msgs::PointCloud2 cloud2_transformed;
+        sensor_msgs::convertPointCloudToPointCloud2(cloud_msg_transformed, cloud2_transformed);
+
+        // Convert to PCL data type
+        pcl::fromROSMsg(cloud2_transformed, *cloud_transformed);
 
         // Build a passthrough filter to remove spurious NaNs
-        pass.setInputCloud (cloud_downsampled);
+        pass.setInputCloud (cloud_transformed);
         pass.setFilterFieldName ("z");
         pass.setFilterLimits (0.015, 1.5);
         pass.filter (*cloud_filtered);
@@ -126,13 +139,7 @@ public:
         if(cloud_plane->size() == 0)
             return;
 
-        /*pcl::RadiusOutlierRemoval<PointT> outrem;
-        // build the filter
-        outrem.setInputCloud(cloud_plane);
-        outrem.setRadiusSearch(0.03);
-        outrem.setMinNeighborsInRadius (20);
-        // apply filter
-        outrem.filter (*cloud_plane_filtered);*/
+
         pcl::ConditionAnd<PointT>::Ptr range_cond (new pcl::ConditionAnd<PointT> ());
         range_cond->addComparison (pcl::FieldComparison<PointT>::ConstPtr (new pcl::FieldComparison<PointT> ("z", pcl::ComparisonOps::LT, 0.01)));
         range_cond->addComparison (pcl::FieldComparison<PointT>::ConstPtr (new pcl::FieldComparison<PointT> ("z", pcl::ComparisonOps::GT, -0.02)));
@@ -142,6 +149,9 @@ public:
         condrem.setKeepOrganized(true);
         // apply filter
         condrem.filter (*cloud_plane_filtered);
+
+        if(cloud_plane_filtered->size() == 0)
+            return;
 
         sensor_msgs::PointCloud2 output_plane;
         pcl::toROSMsg(*cloud_plane_filtered, output_plane);
@@ -156,6 +166,9 @@ public:
         sor.setMeanK (50);
         sor.setStddevMulThresh (1.0);
         sor.filter (*cloud_filtered2);
+
+        if(cloud_filtered2->size() == 0)
+            return;
 
         sensor_msgs::PointCloud2 output_others;
         pcl::toROSMsg(*cloud_filtered2, output_others);

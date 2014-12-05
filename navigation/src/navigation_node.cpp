@@ -71,7 +71,7 @@ namespace wheatley
         {
             ROS_INFO_ONCE("got first map");
             map = *msg;
-            inflated_map = gu::inflateObstacles(map, robot_diameter/2, true);
+            inflated_map = gu::inflateObstacles(map, robot_diameter/2+0.04, true);
             inflated_map.header.frame_id = msg->header.frame_id;
             inflated_map.header.stamp = msg->header.stamp;
             pub_map.publish(inflated_map);
@@ -156,7 +156,7 @@ namespace wheatley
             gu::Path path = (*astar).first;
             std::vector<gm::Point> points = getPoints(inflated_map, path);
 
-            if (points.size() < 2)
+            if (points.size() < 4)
             {
                 publishPath(std::vector<gm::Point>());
                 active = false;
