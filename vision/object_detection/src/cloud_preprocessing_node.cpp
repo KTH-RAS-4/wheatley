@@ -107,7 +107,7 @@ public:
         pcl::PassThrough<PointT> passY;
         passY.setInputCloud (cloud_downsampled);
         passY.setFilterFieldName ("y");
-        passY.setFilterLimits (0, 2);
+        passY.setFilterLimits (-0.2, 1);
         passY.filter (*cloud_pass_y);
 
         if(cloud_pass_y->size() == 0)
@@ -115,12 +115,14 @@ public:
 
         sensor_msgs::PointCloud2 cloud_msg_pass_y;
         pcl::toROSMsg(*cloud_pass_y, cloud_msg_pass_y);
+        cloud_msg_pass_y.header  = cloud_msg->header;
+
 
         sensor_msgs::PointCloud cloud_legacy;
         sensor_msgs::convertPointCloud2ToPointCloud(cloud_msg_pass_y, cloud_legacy);
 
         sensor_msgs::PointCloud cloud_msg_transformed;
-        tf_.transformPointCloud("map", cloud_msg->header.stamp, cloud_legacy, "camera_rgb_optical_frame", cloud_msg_transformed);
+        tf_.transformPointCloud("map", cloud_legacy, cloud_msg_transformed);
 
         sensor_msgs::PointCloud2 cloud2_transformed;
         sensor_msgs::convertPointCloudToPointCloud2(cloud_msg_transformed, cloud2_transformed);

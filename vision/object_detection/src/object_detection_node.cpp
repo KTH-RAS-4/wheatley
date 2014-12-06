@@ -118,9 +118,14 @@ public:
         reg.extract (cluster_indices);
 
         ROS_INFO("Extract done");
-        if(cloud_plane->empty())
+        if(cloud_plane->empty() || cluster_indices.empty())
             return;
-        tree->setInputCloud(cloud_plane);
+        try {
+            tree->setInputCloud(cloud_plane);
+        } catch ( ... ) {
+            return;
+        }
+
         std::vector<int> pointIdxNKNSearch(1);
         std::vector<float> pointNKNSquaredDistance(1);
 
@@ -137,6 +142,7 @@ public:
         ROS_INFO("Starting clustering");
         for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
         {
+            ROS_INFO("Loop");
             pcl::PointCloud<PointT>::Ptr cloud_cluster (new pcl::PointCloud<PointT>(*cloud_others, it->indices));
 
             if(cloud_cluster->size() == 0)

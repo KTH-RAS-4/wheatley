@@ -165,7 +165,7 @@ public:
     void publish() {
         if(!identified) {
             identified = true;
-            cout << "Found " << type << //" (" << object.x << ", " << object.y << ", " << object.z << ")" <<
+            cout << "Found " << object.type << //" (" << object.x << ", " << object.y << ", " << object.z << ")" <<
                     " - Color (" << object.r << ", " << object.g << ", " << object.b << "), GrayColor: " << (.11*object.r + .59*object.g + 0.3*object.b) << endl;
 
             ras_msgs::RAS_Evidence evidence;
@@ -361,7 +361,7 @@ public:
             // TODO: shape detection
             // type = type | shape;
         }
-        ROS_INFO_STREAM("Found object " << type << ", (" << h << ", " << s << ", " << v << ")");
+        ROS_INFO_STREAM("Found object " << object_color_map[type] << ", (" << h << ", " << s << ", " << v << ")");
 
         return type;
     }

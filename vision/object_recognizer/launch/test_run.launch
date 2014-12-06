@@ -1,11 +1,8 @@
 <!-- wall avoider launch file -->
 
 <launch>
-    <node pkg="object_detection" type="cloud_preprocessing_node"
-        name="cloud_preprocessing" output="screen" clear_params="true">
-    </node>
     <node pkg="object_detection" type="object_detection_node"
-        name="object_detection" output="screen" clear_params="true"> 
+        name="object_detection" output="screen" clear_params="true" respawn="true"> 
     </node>
     <node pkg="object_recognizer" type="color_detector_node"
         name="object_recognizer" output="screen" clear_params="true"> 
