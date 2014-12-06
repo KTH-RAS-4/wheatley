@@ -116,6 +116,29 @@ add_executable(mapping_node src/mapping_node.cpp)
    ${catkin_LIBRARIES}
  )
 
+## Declare a cpp executable
+add_executable(object_mapping_node src/object_mapping_node.cpp)
+
+## Add cmake target dependencies of the executable/library
+## as an example, message headers may need to be generated before nodes
+ add_dependencies(object_mapping_node mapping_generate_messages_cpp)
+
+## Specify libraries to link a library or executable target against
+ target_link_libraries(object_mapping_node
+   ${catkin_LIBRARIES}
+ )
+
+## Declare a cpp executable
+add_executable(grid_merge_node src/grid_merge_node.cpp)
+
+## Add cmake target dependencies of the executable/library
+## as an example, message headers may need to be generated before nodes
+ add_dependencies(grid_merge_node mapping_generate_messages_cpp)
+
+## Specify libraries to link a library or executable target against
+ target_link_libraries(grid_merge_node
+   ${catkin_LIBRARIES}
+ )
 #############
 ## Install ##
 #############

@@ -82,7 +82,7 @@ private:
 
     tf::TransformListener tf_;
     ros::Publisher grid_pub_;
-    ros::Publisher merged_grid_pub_;
+    ros::Publisher temp_grid_pub_;
     ros::Publisher object_pub_;
     ros::WallTimer build_grid_timer_;
     ros::WallTimer mark_pose_explored_timer_;
@@ -101,6 +101,7 @@ private:
      ****************************************/
 
     gu::OverlayClouds map;
+    gu::OverlayClouds temp_map;
     list<nm::OccupancyGrid::ConstPtr> map_collector;
     list<vision_msgs::Object> object_collector;
 
@@ -122,14 +123,13 @@ public:
         local_grid_size_ = 5.0;
 
         grid_pub_ = handle.advertise<nm::OccupancyGrid>("/map", 100);
-        //merged_grid_pub_ = handle.advertise<nm::OccupancyGrid>("/merged_map", 100);
+        temp_grid_pub_ = handle.advertise<nm::OccupancyGrid>("/temp_map", 100);
 
-        object_pub_ = handle.advertise<visualization_msgs::MarkerArray>("/map_objects/", 100);
 
         //sub_pointcloud = handle.subscribe("/object_detection/preprocessed", 1, &MapNode::mapPointCloud, this);
         sub_ir = handle.subscribe("/sensors/ir/point_clouds", 100, &MapNode::mapIr, this);
         sub_cloud = handle.subscribe("/object_detection/preprocessed", 100, &MapNode::mapCloud, this);
-        sub_objects = handle.subscribe("/object_recognition/objects", 100, &MapNode::insertObject, this);
+
 
         mark_pose_explored_timer_ = handle.createWallTimer(ros::WallDuration(1/mark_pose_explored_rate), &MapNode::mapMarkPoseExplored, this);
         build_grid_timer_ = handle.createWallTimer(ros::WallDuration(grid_construction_interval_), &MapNode::echoGrid, this);
@@ -160,101 +160,23 @@ public:
         info.height = local_grid_size_/resolution_;
 
         fake_grid.info = info;
-        map = gu::createCloudOverlay(fake_grid, fixed_frame_, 0.33, 5, 1);
-        //merged_grid_pub_.publish(gu::getGrid(map));
+        map = gu::createCloudOverlay(fake_grid, fixed_frame_, 0.33, 10, 1);
+
 
 
         //Fill init gap
-        robot_pose.position.x += 0.012;
-        gu::addKnownFreePoint(&map, robot_pose.position, robot_outer_diameter/2, 30);
+        robot_pose.position.x += 0.12;
+        gu::addKnownFreePoint(&map, robot_pose.position, robot_outer_diameter/2, 80);
 
         current_iteration = 0;
     }
 
     void echoGrid(const ros::WallTimerEvent& scan) {
         nm::OccupancyGrid::ConstPtr grid = gu::getGrid(map);
-
-        //Every 2.5s
-        /*if(current_iteration >= 100) {
-            std::vector<nm::OccupancyGrid::ConstPtr> grid_vector;
-
-            list<nm::OccupancyGrid::ConstPtr>::iterator it;
-            for (it = map_collector.begin(); it != map_collector.end(); it++) {
-                grid_vector.push_back(*it);
-            }
-            grid_vector.push_back(grid);
-
-            nm::OccupancyGrid::ConstPtr merged_grid = gu::combineGrids(grid_vector);
-            merged_grid_pub_.publish(merged_grid);
-
-            map = gu::createCloudOverlay(fake_grid, fixed_frame_, 0.1, 10, 1);
-            map_collector.push_back(grid);
-
-            current_iteration = 0;
-        } else {
-            current_iteration++;
-        }*/
-
         grid_pub_.publish(grid);
 
-
-        echoObjects();
     }
 
-    void echoObjects() {
-        visualization_msgs::MarkerArray object_marker;
-
-        int counter = 0;
-        for (list<vision_msgs::Object>::iterator it = object_collector.begin() ; it != object_collector.end(); ++it) {
-            visualization_msgs::Marker marker;
-            visualization_msgs::Marker text;
-            marker.header.frame_id = text.header.frame_id = "/map";
-            marker.ns = text.ns = "objects";
-            marker.action = text.action = visualization_msgs::Marker::ADD;
-            marker.pose.orientation.w = text.pose.orientation.w = 1.0;
-
-            marker.id = counter++;
-            text.id = counter++;
-
-            marker.type = visualization_msgs::Marker::POINTS;
-            text.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
-
-            marker.scale.x = 0.05;
-            marker.scale.y = 0.05;
-
-            text.scale.z = 0.5;
-
-            marker.color.r = it->r / 255;
-            marker.color.g = it->g / 255;
-            marker.color.b = it->b / 255;
-            marker.color.a = 1.0;
-
-            geometry_msgs::Point p;
-            p.x = text.pose.position.x = it->x;
-            p.y = text.pose.position.y = it->y;
-            p.z = text.pose.position.z = it->z;
-            marker.points.push_back(p);
-            text.text = it->type;
-            object_marker.markers.push_back(marker);
-            object_marker.markers.push_back(text);
-        }
-        object_pub_.publish(object_marker);
-    }
-
-    void insertObject(const vision_msgs::Object &new_object) {
-        ROS_INFO("Inserting object");
-        for (list<vision_msgs::Object>::iterator it = object_collector.begin() ; it != object_collector.end(); ++it) {
-
-            //If already inserted
-            if(abs(new_object.x - it->x) < 0.03 && abs(new_object.y - it->y) < 0.03 && abs(new_object.z - it->z) < 0.03) {
-                ROS_INFO("Already there, differences: %f, %f, %f", abs(new_object.x - it->x), abs(new_object.y - it->y), abs(new_object.z - it->z));
-                return;
-            }
-        }
-        ROS_INFO("Inserted new object");
-        object_collector.push_back(new_object);
-
-    }
 
     void mapIr(const sensors::SensorClouds &msg)
     {
@@ -284,7 +206,7 @@ public:
                 loc_cloud->header.frame_id = fixed_frame_;
 
                 Lock lock(mutex_);
-                gu::addCloud(&map, loc_cloud, hasEndpoint[pc]);
+                gu::addCloud(&map, loc_cloud, 15, hasEndpoint[pc]);
 
                 //last_cloud_=loc_cloud;
                 //clouds_.push_back(last_cloud_);
@@ -299,8 +221,10 @@ public:
     void mapMarkPoseExplored(const ros::WallTimerEvent& time)
     {
         ros::Time now = ros::Time::now();
-        if (tf_.waitForTransform(fixed_frame_, robot_frame, now, ros::Duration(0.1)))
-            gu::addKnownFreePoint(&map, getPose(now, robot_frame).position, robot_outer_diameter/2, 30);
+        if (tf_.waitForTransform(fixed_frame_, robot_frame, now, ros::Duration(0.1))) {
+
+            gu::addKnownFreePoint(&map, getPose(now, robot_frame).position, robot_outer_diameter/2, 80);
+        }
     }
 
     void mapPointCloud(const vision_msgs::PreprocessedClouds &msg)
@@ -371,12 +295,12 @@ public:
         sm::PointCloud cloudFloor_legacy;
         sm::convertPointCloud2ToPointCloud(cloudFloor, cloudFloor_legacy);
 
-        sm::PointCloud cloudFloor_legacy_transformed;
-        tf_.transformPointCloud(fixed_frame_, cloudFloor_legacy, cloudFloor_legacy_transformed);
+        //sm::PointCloud cloudFloor_legacy_transformed;
+        //tf_.transformPointCloud(fixed_frame_, cloudFloor_legacy, cloudFloor_legacy_transformed);
 
-        for (int n=0; n < cloudFloor_legacy_transformed.points.size(); n++)
+        for (int n=0; n < cloudFloor_legacy.points.size(); n++)
         {
-            gm::Point32 pf_t = cloudFloor_legacy_transformed.points[n];
+            gm::Point32 pf_t = cloudFloor_legacy.points[n];
             gm::Point pf;
             pf.x = pf_t.x;
             pf.y = pf_t.y;
@@ -388,12 +312,12 @@ public:
         sm::PointCloud cloudWall_legacy;
         sm::convertPointCloud2ToPointCloud(cloudWall, cloudWall_legacy);
 
-        sm::PointCloud cloudWall_legacy_transformed;
-        tf_.transformPointCloud(fixed_frame_, cloudWall_legacy, cloudWall_legacy_transformed);
+        //sm::PointCloud cloudWall_legacy_transformed;
+        //tf_.transformPointCloud(fixed_frame_, cloudWall_legacy, cloudWall_legacy_transformed);
 
-        for (int n=0; n < cloudWall_legacy_transformed.points.size(); n++)
+        for (int n=0; n < cloudWall_legacy.points.size(); n++)
         {
-            gm::Point32 pw_t = cloudWall_legacy_transformed.points[n];
+            gm::Point32 pw_t = cloudWall_legacy.points[n];
             gm::Point pw;
             pw.x = pw_t.x;
             pw.y = pw_t.y;
