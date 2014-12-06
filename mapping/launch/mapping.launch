@@ -1,0 +1,9 @@
+<!-- motor controller launch file -->
+
+<launch>
+	<node pkg="mapping" type="mapping_node" name="mapping" output="screen" clear_params="true">
+	</node>
+	<node pkg="mapping" type="object_mapping_node" name="object_mapping" output="screen" clear_params="true">
+	</node>
+</launch>
+
