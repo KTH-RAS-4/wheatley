@@ -210,7 +210,7 @@ public:
       switch (stat)
       {
           case FORWARD:
-              if (!follow(0.17, 0.12))
+              if (!follow(0.17, 0.10))
               {
                 ROS_INFO("After state, DesiredTheta: %.1f, Theta: %.1f",desiredTheta*180/M_PI, theta*180/M_PI);
                 stat = STOP;
@@ -365,7 +365,7 @@ public:
     {
         //geometry_msgs::Twist twist;
         twist.linear.x = 0;
-        geometry_msgs::Twist twist;
+        //geometry_msgs::Twist twist;
         wall_twist.publish(twist);
         ros::Duration(0.5).sleep();
         return false;
