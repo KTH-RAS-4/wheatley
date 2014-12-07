@@ -1,1 +1,4 @@
 rate: 20
+max_wall_align_distance: 0.16
+max_wall_align_angle: 25
+

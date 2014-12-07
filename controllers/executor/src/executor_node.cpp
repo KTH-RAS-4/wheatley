@@ -58,11 +58,16 @@ namespace wheatley
         bool poseCorrR;
         int count;
 
+        double maxWallAlignDistance;
+        double maxWallAlignAngle;
+
 
 
     public:
         Executor()
             : loop_rate(requireParameter<double>("rate"))
+            , maxWallAlignDistance(requireParameter<double>("max_wall_align_distance"))
+            , maxWallAlignAngle(requireParameter<double>("max_wall_align_angle")*M_PI/180)
             , poseCorrL(false)
             , poseCorrR(false)
             , desiredTheta(0)
@@ -186,16 +191,23 @@ namespace wheatley
                         align_done = true;
                         poseCorrR = true;
                     }
-                    if (align_done && count == 1 && (distance.right_front > 0.1 || distance.right_rear > 0.1))
+                    if (align_done && count == 1 &&
+                            (distance.right_front >= maxWallAlignDistance ||
+                             distance.right_rear >= maxWallAlignDistance))
                     {
+                        ROS_INFO("skipping theta correction, distances: %.2f, %.2f > %.2f",
+                                 distance.right_front, distance.right_rear, maxWallAlignDistance);
                         state = "STOP";
                         align_done = false;
                         poseCorrR = false;
                     }
                     if (align_done && count >= 10)
                     {
-                        if (std::abs(avgRightDiff) < (10*M_PI)/180)
+                        if (std::abs(avgRightDiff) <= maxWallAlignAngle)
                             publishOdometry(ros::Time(), avgRightDiff);
+                        else
+                            ROS_INFO("skipping theta correction, angles: |%.2f| > %.2f",
+                                     avgRightDiff, maxWallAlignAngle);
                         state = "STOP";
                         align_done = false;
                         poseCorrR = false;
@@ -204,22 +216,29 @@ namespace wheatley
                 else if (state == "RIGHT")
                 {
                     static bool align_done = false;
-                    if (!align_done && align(0.2))
+                    if (!align_done && align(0.2)) //align just finished
                     {
                         count = 0;
                         align_done = true;
                         poseCorrL = true;
                     }
-                    if (align_done && count == 1 && (distance.left_front > 0.1 || distance.left_rear > 0.1))
+                    if (align_done && count == 1 &&
+                            (distance.left_front >= maxWallAlignDistance ||
+                             distance.left_rear >= maxWallAlignDistance))
                     {
+                        ROS_INFO("skipping theta correction, distances: %.2f, %.2f > %.2f",
+                                 distance.left_front, distance.left_rear, maxWallAlignDistance);
                         state = "STOP";
                         align_done = false;
                         poseCorrL = false;
                     }
                     if (align_done && count >= 10)
                     {
-                        if (std::abs(avgLeftDiff) < (10*M_PI)/180)
+                        if (std::abs(avgLeftDiff) <= maxWallAlignAngle)
                             publishOdometry(ros::Time(), avgLeftDiff);
+                        else
+                            ROS_INFO("skipping theta correction, angles: |%.2f| > %.2f",
+                                     avgLeftDiff, maxWallAlignAngle);
                         state = "STOP";
                         align_done = false;
                         poseCorrL = false;
