@@ -10,7 +10,7 @@ motors:
         P: 10
         I: 8.5
         D: 0.1
-        I_memory: 200
+        I_memory: 40
     transform:
         constant: 0.088
         exponent: 2.439

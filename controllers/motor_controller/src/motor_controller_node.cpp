@@ -195,7 +195,7 @@ public:
         if (!timedOut)
         {
             timedOut = true;
-            ROS_INFO("timeout");
+            ROS_DEBUG("timeout");
             motorL.I = 0;
             motorR.I = 0;
         }

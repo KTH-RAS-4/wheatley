@@ -155,7 +155,7 @@ void addKnownFreePoint (OverlayClouds* overlay, const gm::Point& p, const double
         for (int y=c.y-cell_radius; y<=c.y+cell_radius; y++)
         {
             const Cell c2(x, y);
-      if (withinBounds(geom, c2) && x*x+y*y <= cell_radius*cell_radius+1)
+      if (withinBounds(geom, c2)/* && x*x+y*y <= cell_radius*cell_radius+1*/)
             {
                 const index_t ind = cellIndex(geom, c2);
                 overlay->hit_counts[ind] = 0;
@@ -175,7 +175,7 @@ void addKnownOccupiedPoint (OverlayClouds* overlay, const gm::Point& p, const do
         for (int y=c.y-cell_radius; y<=c.y+cell_radius; y++)
         {
             const Cell c2(x, y);
-      if (withinBounds(geom, c2) && x*x+y*y <= cell_radius*cell_radius+1)
+      if (withinBounds(geom, c2)/* && x*x+y*y <= cell_radius*cell_radius+1*/)
             {
                 const index_t ind = cellIndex(geom, c2);
                 overlay->hit_counts[ind] = 2;
