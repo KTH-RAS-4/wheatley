@@ -231,7 +231,7 @@ public:
         iteration = 0;
         pub_evidence = handle.advertise<ras_msgs::RAS_Evidence> ("/evidence", 1);
         //pub_speaker = handle.advertise<std_msgs::String> ("/espeak/string", 1);
-        pub_speaker = handle.advertise<sound_play::SoundRequest>("robotsound", 1);
+        pub_speaker = handle.advertise<sound_play::SoundRequest>("robotsound", 100);
         pub_object = handle.advertise<vision_msgs::Object>("/object_recognition/objects", 100);
         sub_image = handle.subscribe("camera/rgb/image_raw", 1, &ColorDetectorNode::storeImage, this);
         sub_object = handle.subscribe("object_detection/objects", 1, &ColorDetectorNode::objectHandle, this);
