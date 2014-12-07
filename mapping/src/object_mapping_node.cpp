@@ -30,11 +30,14 @@
 #include <boost/circular_buffer.hpp>
 #include <boost/optional.hpp>
 #include <boost/foreach.hpp>
+#include <wheatley_common/common.h>
 
 namespace gm=geometry_msgs;
 namespace sm=sensor_msgs;
 namespace nm=nav_msgs;
-namespace gu=occupancy_grid_utils;
+namespace wheatley {
+
+
 
 using std::vector;
 using std::string;
@@ -44,39 +47,17 @@ using std::abs;
 
 
 
-class MapNode {
+class MapNode : NiceBaseClass{
 private:
-
-    ros::NodeHandle handle;
     ros::Subscriber sub_objects;
-
-
-
-
-
-    /****************************************
-     * Params
-     ****************************************/
-
-    ros::NodeHandle nh_;
-
-
-
-
+    ros::NodeHandle nh;
     /****************************************
      * Associated objects
      ****************************************/
     ros::Publisher rviz_object_pub_;
     ros::Publisher object_pub_;
     boost::mutex mutex_;
-
-    /****************************************
-     * State
-     ****************************************/
-
-
-
-
+    std::string state;
     /****************************************
      * Stores
      ****************************************/
@@ -88,27 +69,14 @@ private:
 
 
 public:
-    MapNode()
+    MapNode(const ros::NodeHandle& nh_)
+        : nh(nh_)
+        , state(requireParameter<std::string>("run_state"))
     {
+        rviz_object_pub_ = nh.advertise<visualization_msgs::MarkerArray>("map_objects", 100);
+        object_pub_ = nh.advertise<vision_msgs::Object>("/object/placement", 100);
 
-
-
-
-        rviz_object_pub_ = handle.advertise<visualization_msgs::MarkerArray>("map_objects/", 100);
-        object_pub_ = handle.advertise<vision_msgs::Object>("/object/placement/", 100);
-
-        sub_objects = handle.subscribe("/object_recognition/objects", 100, &MapNode::insertSubObject, this);
-
-        init();
-    }
-
-    ~MapNode()
-    {
-    }
-
-    void init()
-    {
-        readFromFile();
+        sub_objects = nh.subscribe("/object_recognition/objects", 100, &MapNode::insertSubObject, this);
 
 
     }
@@ -221,10 +189,11 @@ public:
                 {
                     l = line.length();
                     obj.type = line.substr(6,l-6);
+                    ros::Duration(1).sleep();
                     object_pub_.publish(obj);
                     insertFileObject(obj);
                     count = -1;
-                    ROS_INFO_STREAM(obj);
+                    ROS_INFO_STREAM("lol"<<obj);
                 }
                 count ++;
             }
@@ -248,10 +217,10 @@ public:
         }
         ROS_INFO("Inserted new object");
         object_collector.push_back(new_object);
-
         echoObjects();
         object_pub_.publish(new_object);
-        write2File(new_object);
+        if(state == "WRITE")
+            write2File(new_object);
 
     }
 
@@ -261,14 +230,18 @@ public:
 
     void run()
     {
+        if(state == "READ")
+            readFromFile();
         ros::spin();
+
 
     }
 };
-
+}
 int main(int argc, char** argv)
 {
     ros::init(argc, argv, "object_mapping_node");
-    MapNode map_node;
+    ros::NodeHandle nh;
+    wheatley::MapNode map_node(nh);
     map_node.run();
 }

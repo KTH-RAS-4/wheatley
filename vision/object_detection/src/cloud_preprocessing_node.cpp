@@ -98,7 +98,7 @@ public:
 
         // Create the filtering object
         vgrid.setInputCloud (cloud);
-        vgrid.setLeafSize (0.01f, 0.01f, 0.01f);
+        vgrid.setLeafSize (0.005f, 0.005f, 0.005f);
         vgrid.filter (*cloud_downsampled);
 
         if(cloud_downsampled->size() == 0)
@@ -133,7 +133,7 @@ public:
         // Build a passthrough filter to remove spurious NaNs
         pass.setInputCloud (cloud_transformed);
         pass.setFilterFieldName ("z");
-        pass.setFilterLimits (0.015, 1.5);
+        pass.setFilterLimits (0, 1.5);
         pass.filter (*cloud_filtered);
         pass.setNegative(true);
         pass.filter(*cloud_plane);
@@ -143,7 +143,7 @@ public:
 
 
         pcl::ConditionAnd<PointT>::Ptr range_cond (new pcl::ConditionAnd<PointT> ());
-        range_cond->addComparison (pcl::FieldComparison<PointT>::ConstPtr (new pcl::FieldComparison<PointT> ("z", pcl::ComparisonOps::LT, 0.01)));
+        range_cond->addComparison (pcl::FieldComparison<PointT>::ConstPtr (new pcl::FieldComparison<PointT> ("z", pcl::ComparisonOps::LT, 0.02)));
         range_cond->addComparison (pcl::FieldComparison<PointT>::ConstPtr (new pcl::FieldComparison<PointT> ("z", pcl::ComparisonOps::GT, -0.02)));
         // build the filter
         pcl::ConditionalRemoval<PointT> condrem (range_cond);

@@ -10,6 +10,8 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   vision_msgs
   occupancy_grid_utils
+  std_msgs
+  wheatley_common
 )
 
 ## System dependencies are found with CMake's conventions

@@ -1,0 +1,6 @@
+<launch>
+<include file="$(find mapping)/launch/serve.launch">
+  <!-- all vars that included.launch requires must be set -->
+  <arg name="run_state" value="READ" />
+</include>
+</launch>
