@@ -7,8 +7,8 @@
 #include <vision_msgs/Objects.h>
 #include <map>
 #include <ras_msgs/RAS_Evidence.h>
-//#include <std_msgs/String.h>
-#include <sound_play/SoundRequest.h>
+#include <std_msgs/String.h>
+//#include <sound_play/SoundRequest.h>
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -58,12 +58,12 @@ float object_color_array[] = {
 // hue min max values
 float object_color_hue[] = {
     -10, 180, // wall
-    5, 10, // orange
+    1, 10, // orange
     15, 25, // yellow
     125, 160, // purple
     70, 125, // blue
     25, 70, // green
-    -8, 5 // red
+    -8, 0 // red
 };
 
 // saturation min max values
@@ -125,9 +125,9 @@ public:
         object_color_map[9] = "Blue Cube";*/
 
         object_color_map[WALL] = "Wall";
-        object_color_map[ORANGE] = "Patrick";
+        object_color_map[ORANGE] = "Orange";
         object_color_map[YELLOW] = "Yellow";
-        object_color_map[GREEN] = "Green Cube";
+        object_color_map[GREEN] = "Green";
         object_color_map[BLUE] = "Blue";
         object_color_map[PURPLE] = "Purple";
         object_color_map[RED] = "Red";
@@ -137,7 +137,7 @@ public:
     }
 
     bool compare(vision_msgs::Object other) {
-        if(abs(other.x - object.x) < 0.03 && abs(other.y - object.y) < 0.03 && abs(other.z - object.z) < 0.03) {
+        if(abs(other.x - object.x) < 0.05 && abs(other.y - object.y) < 0.05 && abs(other.z - object.z) < 0.05) {
             return true;
         } else {
             return false;
@@ -175,10 +175,8 @@ public:
             evidence.object_id = this->type;
             pub_evidence.publish(evidence);
 
-            sound_play::SoundRequest message;
-            message.sound = -3;
-            message.command = 1;
-            message.arg = "I see a " + type;
+            std_msgs::String message;
+            message.data = "I see " + type;
             pub_speaker.publish(message);
 
             pub_object.publish(this->object);
@@ -230,8 +228,8 @@ public:
     {
         iteration = 0;
         pub_evidence = handle.advertise<ras_msgs::RAS_Evidence> ("/evidence", 1);
-        //pub_speaker = handle.advertise<std_msgs::String> ("/espeak/string", 1);
-        pub_speaker = handle.advertise<sound_play::SoundRequest>("robotsound", 100);
+        pub_speaker = handle.advertise<std_msgs::String> ("/espeak/string", 100);
+        //pub_speaker = handle.advertise<sound_play::SoundRequest>("robotsound", 100);
         pub_object = handle.advertise<vision_msgs::Object>("/object_recognition/objects", 100);
         sub_image = handle.subscribe("camera/rgb/image_raw", 1, &ColorDetectorNode::storeImage, this);
         sub_object = handle.subscribe("object_detection/objects", 1, &ColorDetectorNode::objectHandle, this);
