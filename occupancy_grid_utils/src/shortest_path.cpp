@@ -325,23 +325,19 @@ struct InflationQueueItem
 };
 
 nm::OccupancyGrid inflateObstacles (const nm::OccupancyGrid& g,
-                                    float impassableRadius,
-                                    float passableRadius,
+                                    boost::function<signed char (float)> distanceToOccupancyFn,
                                     const bool allow_unknown)
 {
-    ROS_ASSERT (impassableRadius>0);
-    ROS_ASSERT (passableRadius>impassableRadius);
-
-    impassableRadius = ceil(impassableRadius/g.info.resolution);
-      passableRadius = ceil(  passableRadius/g.info.resolution);
-    long impassableRadius2 = (int)impassableRadius*(int)impassableRadius + 1;
-    long   passableRadius2 = (int)  passableRadius*(int)  passableRadius + 1;
-
     std::vector<bool> seen(g.info.height*g.info.width);
     std::priority_queue<InflationQueueItem,
                         std::vector<InflationQueueItem>,
                         std::greater<InflationQueueItem> > queue;
     nm::OccupancyGrid g2(g);
+    for (int i=0; i<seen.size(); i++)
+    {
+        if (g2.data[i] == OCCUPIED)
+            g2.data[i] = 101;
+    }
 
     // Add initial obstacles
     for (coord_t x=0; x<(int)g.info.width; x++)
@@ -365,13 +361,10 @@ nm::OccupancyGrid inflateObstacles (const nm::OccupancyGrid& g,
             continue;
         seen[ind] = true;
 
-        if (q.dist2 <= passableRadius2)
+        signed char occupancy = distanceToOccupancyFn(sqrt(q.dist2)*g.info.resolution);
+        if (occupancy != UNKNOWN)
         {
-            const float passableMax = OCCUPIED/2;
-            if (q.dist2 <= impassableRadius2)
-                g2.data[ind] = OCCUPIED;
-            else
-                g2.data[ind] = passableMax*(1.0 - (float)(q.dist2-impassableRadius2)/(float)(passableRadius2-impassableRadius2));
+            g2.data[ind] = std::max(g2.data[ind], occupancy);
 
             for (int i=0; i<4; i++)
             {
@@ -395,26 +388,9 @@ nm::OccupancyGrid inflateObstacles (const nm::OccupancyGrid& g,
  * A*
  ***********************************************************/
 
-typedef std::pair<Path, double> AStarResult;
-struct PQItem
+inline float manhattanHeuristic (const Cell& c1, const Cell& c2)
 {
-  index_t ind;
-  double g_cost;
-  double h_cost;
-  index_t parent_ind;
-  PQItem (index_t ind, double g_cost, double h_cost, index_t parent_ind) :
-    ind(ind), g_cost(g_cost), h_cost(h_cost), parent_ind(parent_ind) {}
-
-  bool operator< (const PQItem& i2) const
-  {
-    return ((g_cost + h_cost) > (i2.g_cost + i2.h_cost));
-  }
-};
-
-
-inline double manhattanHeuristic (const Cell& c1, const Cell& c2)
-{
-  return fabs(c1.x-c2.x) + fabs(c1.y-c2.y);
+    return std::abs(c1.x-c2.x) + std::abs(c1.y-c2.y);
 }
 
 angles::StraightAngle getDirection(const Cell& from, const Cell& to)
@@ -426,16 +402,16 @@ boost::optional<Cell> closestFree(const nm::OccupancyGrid& g, const Cell& from, 
 {
     maxRadius = ceil(maxRadius/g.info.resolution);
     boost::optional<Cell> bestCell;
-    double bestDist = maxRadius*maxRadius+1;
+    float bestDist = maxRadius*maxRadius+1;
     for (int x=-maxRadius; x <= maxRadius; x++)
     {
         for (int y=-maxRadius; y <= maxRadius; y++)
         {
-            double dist = x*x+y*y;
+            float dist = x*x+y*y;
             Cell cell(from.x+x,from.y+y);
             if (bestDist > dist &&
                 withinBounds(g.info, cell) &&
-                g.data[cellIndex(g.info, cell)] != OCCUPIED)
+                g.data[cellIndex(g.info, cell)] < OCCUPIED)
             {
                 bestDist = dist;
                 bestCell = cell;
@@ -445,152 +421,161 @@ boost::optional<Cell> closestFree(const nm::OccupancyGrid& g, const Cell& from, 
     return bestCell;
 }
 
-optional<AStarResult> shortestPathAStar(const nm::OccupancyGrid& g, const Cell& src, const Cell& dest, const angles::StraightAngle& srcDir)
+bool containsWall(const nm::OccupancyGrid& g, const Cell& center, float radius)
 {
-  typedef std::map<index_t, index_t> ParentMap;
-
-  const double resolution = g.info.resolution;
-  std::priority_queue<PQItem> open_list;
-  const unsigned num_cells = g.info.height*g.info.width;
-  std::vector<bool> seen(num_cells); // Default initialized to all false
-  const index_t dest_ind = cellIndex(g.info, dest);
-  const index_t src_ind = cellIndex(g.info, src);
-  open_list.push(PQItem(src_ind, 0, resolution*manhattanHeuristic(src, dest), src_ind));
-  ParentMap parent;
-
-  optional<AStarResult> res;
-  //ROS_DEBUG_STREAM_NAMED ("shortest_path", "Computing shortest path from " << src << " to " << dest);
-
-  while (!open_list.empty()) {
-    const PQItem current = open_list.top();
-    open_list.pop();
-    const Cell curr = indexCell(g.info, current.ind);
-    if (seen[current.ind])
-      continue;
-    parent[current.ind] = current.parent_ind;
-    seen[current.ind] = true;
-    //ROS_DEBUG_STREAM_NAMED ("shortest_path_internal", "  Considering " << curr << " with cost " <<
-    //                        current.g_cost << " + " << current.h_cost);
-    if (current.ind == dest_ind) {
-      res = AStarResult();
-      res->second = current.g_cost;
-      break;
-    }
-
-    for (int d=-1; d<=1; d+=2) {
-      for (int vertical=0; vertical<2; vertical++) {
-        const int cx = curr.x + d*(1-vertical);
-        const int cy = curr.y + d*vertical;
-        if (cx>=0 && cy>=0) {
-          const Cell next((coord_t) cx, (coord_t) cy);
-          if (withinBounds(g.info, next)) {
-            const index_t ind = cellIndex(g.info, next);
-            if (g.data[ind]!=OCCUPIED && !seen[ind])
-            {
-              const Cell prev = indexCell(g.info, current.parent_ind);
-
-              angles::StraightAngle oldDir = getDirection(prev, curr);
-              angles::StraightAngle newDir = getDirection(curr, next);
-
-              if (oldDir==angles::StraightAngle::ANY)
-                  oldDir = srcDir;
-
-              open_list.push(PQItem(ind, current.g_cost + resolution + (oldDir!=newDir?5:0),
-                                    resolution*manhattanHeuristic(next, dest),
-                                    current.ind));
-            }
-            //ROS_DEBUG_STREAM_COND_NAMED (g.data[ind]!=UNOCCUPIED, "shortest_path_internal",
-            //                             "  Skipping cell " << indexCell(g.info, ind) <<
-            //                             " with cost " << (unsigned) g.data[ind]);
-          }
-        }
-      }
-    }
-  }
-
-  // Extract path if found
-  if (res)
-  {
-    vector<index_t> path;
-    path.push_back(dest_ind);
-    const index_t src_ind = cellIndex(g.info, src);
-    while (true)
+    radius = ceil(radius/g.info.resolution);
+    for (int x=-radius; x <= radius; x++)
     {
-      index_t last = *(--path.end());
-      if (last == src_ind)
-        break;
-      ParentMap::const_iterator it = parent.find(last);
-      ROS_ASSERT (it!=parent.end());
-      index_t parent = it->second;
-      ROS_ASSERT (parent!=last);
-      path.push_back(parent);
-    }
-    for (int i=path.size()-1; i>=0; i--)
-      res->first.push_back(indexCell(g.info, path[i]));
-  }
-
-  ROS_DEBUG_STREAM_NAMED ("shortest_path", "Computed shortest path.  Found = " << (bool) res.is_initialized());
-  return res;
-}
-
-
-optional<AStarResult> shortestPath(const nm::OccupancyGrid& g, const Cell& src, const Cell& dest)
-{
-  ROS_WARN ("Using deprecated function shortestPath (use shortestPathAStar)");
-  std::priority_queue<PQItem> open_list;
-  const unsigned num_cells = g.info.height*g.info.width;
-  std::vector<bool> seen(num_cells); // Default initialized to all false
-  index_t src_ind = cellIndex(g.info, src);
-  open_list.push(PQItem(src_ind, 0, manhattanHeuristic(src, dest), src_ind));
-  std::vector<index_t> parent(num_cells);
-  const index_t dest_ind = cellIndex(g.info, dest);
-
-  optional<AStarResult> res;
-  ROS_DEBUG_STREAM_NAMED ("shortest_path", "Computing shortest path from " << src << " to " << dest);
-
-  while (!open_list.empty()) {
-    const PQItem current = open_list.top();
-    open_list.pop();
-    const Cell c = indexCell(g.info, current.ind);
-    if (seen[current.ind])
-      continue;
-    seen[current.ind] = true;
-    ROS_DEBUG_STREAM_NAMED ("shortest_path_internal", "  Considering " << c << " with cost " <<
-                            current.g_cost << " + " << current.h_cost);
-    if (current.ind == dest_ind) {
-      res = AStarResult();
-      res->second = current.g_cost;
-      // Todo fill in path
-      break;
-    }
-
-    for (int d=-1; d<=1; d+=2) {
-      for (int vertical=0; vertical<2; vertical++) {
-        const int cx = c.x + d*(1-vertical);
-        const int cy = c.y + d*vertical;
-        if (cx>=0 && cy>=0) {
-          const Cell c2((coord_t) cx, (coord_t) cy);
-          if (withinBounds(g.info, c2)) {
-            const index_t ind = cellIndex(g.info, c2);
-            if (g.data[ind]==UNOCCUPIED && !seen[ind]) {
-              open_list.push(PQItem(ind, current.g_cost + 1, manhattanHeuristic(c2, dest),
-                                    current.ind));
-              parent[ind] = current.ind;
+        for (int y=-radius; y <= radius; y++)
+        {
+            float dist = x*x+y*y;
+            Cell cell(center.x+x,center.y+y);
+            if (radius*radius+1 > dist &&
+                withinBounds(g.info, cell) &&
+                g.data[cellIndex(g.info, cell)] == 101)
+            {
+                return true;
             }
-            ROS_DEBUG_STREAM_COND_NAMED (g.data[ind]!=UNOCCUPIED, "shortest_path_internal",
-                                         "  Skipping cell " << indexCell(g.info, ind) <<
-                                         " with cost " << (unsigned) g.data[ind]);
-          }
         }
-      }
     }
-  }
-
-  ROS_DEBUG_STREAM_NAMED ("shortest_path", "Computed shortest path.  Found = " << (bool) res.is_initialized());
-  return res;
+    return false;
 }
 
+typedef std::pair<Path, double> AStarResult;
+struct PQItem
+{
+    index_t parent_ind;
+    index_t ind;
+    angles::StraightAngle dir;
 
+    float g_cost;
+    float h_cost;
+    float wall_cost;
+
+    PQItem (index_t parent_ind, index_t ind, angles::StraightAngle dir)
+        : parent_ind(parent_ind)
+        , ind(ind)
+        , dir(dir)
+        , g_cost(0)
+        , h_cost(0)
+        , wall_cost(0)
+    {}
+
+    PQItem (index_t parent_ind, index_t ind, angles::StraightAngle dir, float g_cost, float h_cost, float wall_cost)
+        : parent_ind(parent_ind)
+        , ind(ind)
+        , dir(dir)
+        , g_cost(g_cost)
+        , h_cost(h_cost)
+        , wall_cost(wall_cost)
+    {}
+
+    float cost() const
+    {
+        return g_cost + h_cost + wall_cost;
+    }
+
+    bool operator>(const PQItem& o) const
+    {
+        return cost() > o.cost();
+    }
+};
+
+optional<AStarResult> shortestPathAStar(const nm::OccupancyGrid& g, const Cell& src, const Cell& dest, const angles::StraightAngle& srcDir)//, const float drivingCloseToWallPenalty)
+{
+    std::priority_queue<PQItem,
+            std::vector<PQItem>,
+            std::greater<PQItem> > queue;
+    std::vector<bool> seen(g.info.height*g.info.width); // Default initialized to all false
+    const index_t dest_ind = cellIndex(g.info, dest);
+    const index_t src_ind = cellIndex(g.info, src);
+    queue.push(PQItem(src_ind, src_ind, srcDir, 0, g.info.resolution*manhattanHeuristic(src, dest), 0));
+    std::map<index_t, index_t> parent;
+
+    optional<AStarResult> res;
+
+    while (!queue.empty())
+    {
+        const PQItem currItem = queue.top();
+        queue.pop();
+        const Cell curr = indexCell(g.info, currItem.ind);
+
+        if (seen[currItem.ind])
+            continue;
+        seen[currItem.ind] = true;
+        parent[currItem.ind] = currItem.parent_ind;
+
+        if (currItem.ind == dest_ind)
+        {
+            res = AStarResult();
+            res->second = currItem.g_cost;
+            break;
+        }
+
+        for (int i=0; i<4; i++)
+        {
+            const angles::StraightAngle& offset = angles::StraightAngle::rotations[i];
+            const Cell next(curr.x+offset.x(), curr.y+offset.y());
+
+            if (withinBounds(g.info, next))
+            {
+                const index_t ind = cellIndex(g.info, next);
+                if (g.data[ind] < OCCUPIED && !seen[ind])
+                {
+                    PQItem nextItem(currItem.ind, ind, getDirection(curr, next));
+
+                    nextItem.g_cost = currItem.g_cost + 1;
+                    nextItem.h_cost = manhattanHeuristic(next, dest);
+
+
+                    //nextItem.wall_cost = (float)g.data[ind]*100;
+
+                    if (currItem.dir != nextItem.dir)
+                    {
+                        nextItem.g_cost += 20;
+                        //if (containsWall(g, Cell(curr.x+offset.x()*0.15/g.info.resolution,
+                        //                         curr.y+offset.y()*0.15/g.info.resolution), 0.1))
+                        //    nextItem.g_cost += 1;
+                        //else
+                        //    nextItem.g_cost += 20;
+                        //nextItem.g_cost += currItem.wall_cost;
+                    }
+                    else
+                        ;//nextItem.wall_cost = std::max(nextItem.wall_cost, currItem.wall_cost);
+
+                    queue.push(nextItem);
+                }
+                //ROS_DEBUG_STREAM_COND_NAMED (g.data[ind]!=UNOCCUPIED, "shortest_path_internal",
+                //                             "  Skipping cell " << indexCell(g.info, ind) <<
+                //                             " with cost " << (unsigned) g.data[ind]);
+            }
+        }
+    }
+
+    // Extract path if found
+    if (res)
+    {
+        vector<index_t> path;
+        path.push_back(dest_ind);
+        const index_t src_ind = cellIndex(g.info, src);
+        while (true)
+        {
+            index_t last = *(--path.end());
+            if (last == src_ind)
+                break;
+            std::map<index_t, index_t>::const_iterator it = parent.find(last);
+            ROS_ASSERT (it!=parent.end());
+            index_t parent = it->second;
+            ROS_ASSERT (parent!=last);
+            path.push_back(parent);
+        }
+        for (int i=path.size()-1; i>=0; i--)
+            res->first.push_back(indexCell(g.info, path[i]));
+    }
+
+    ROS_DEBUG_STREAM_NAMED ("shortest_path", "Computed shortest path.  Found = " << (bool) res.is_initialized());
+    return res;
+}
 
 
 

@@ -5,12 +5,14 @@
 #include <std_msgs/String.h>
 #include <occupancy_grid_utils/ray_tracer.h>
 #include <occupancy_grid_utils/shortest_path.h>
+#include <occupancy_grid_utils/coordinate_conversions.h>
 #include <geometry_msgs/Twist.h>
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/PointStamped.h>
 #include <tf/transform_listener.h>
 #include <tf/transform_datatypes.h>
 #include <angles/angles.h>
+#include <boost/function.hpp>
 #include <wheatley_common/common.h>
 #include <wheatley_common/angles.h>
 #define _USE_MATH_DEFINES
@@ -65,13 +67,29 @@ namespace wheatley
             timer_pathfinding = nh.createWallTimer(ros::WallDuration(1/rate), &Navigator::callback_timer, this);
         }
 
+        signed char occupancyFunction(float distance)
+        {
+            const float min = robot_outer_diameter/2;
+            const float max = robot_outer_diameter/2 + 0.3;
+
+            if (distance <= min)
+                return gu::OCCUPIED;
+            else if (distance <= max)
+            {
+                //ROS_INFO("%f %d", distance, (int)(std::exp(-(distance-min)/(max-min)) * (gu::OCCUPIED-1)));
+                //return std::exp(-(distance-min)/(max-min)) * (gu::OCCUPIED-1);
+                return (1-(distance-min)/(max-min))*(gu::OCCUPIED-1);
+            }
+            else
+                return gu::UNKNOWN;
+        }
+
         void callback_map(const nav_msgs::OccupancyGrid::ConstPtr& msg)
         {
             ROS_INFO_ONCE("got first map");
             map = *msg;
             inflated_map = gu::inflateObstacles(map,
-                                                robot_outer_diameter/2,
-                                                robot_outer_diameter/2 + 0.1,
+                                                boost::bind(&Navigator::occupancyFunction, this, _1),
                                                 true);
             inflated_map.header.frame_id = msg->header.frame_id;
             inflated_map.header.stamp = msg->header.stamp;
@@ -131,25 +149,21 @@ namespace wheatley
             angles::StraightAngle currDirection = angles::StraightAngle::getClosest(tf::getYaw(robot_transform.getRotation()));
 
             gu::Cell robot_cell = getCell(ros::Time(0), robot_frame, inflated_map);
-            boost::optional<gu::Cell> closestFree = gu::closestFree(inflated_map, robot_cell, 0.3);
+            boost::optional<gu::Cell> free_robot_cell = gu::closestFree(inflated_map, robot_cell, 0.3);
+            gu::Cell goal_cell = gu::pointCell(inflated_map.info, goal);
+            boost::optional<gu::Cell> free_goal_cell = gu::closestFree(inflated_map, goal_cell, 0.3);
 
-            if (!closestFree)
+            if (!free_robot_cell || !free_goal_cell)
             {
                 ROS_ERROR("unable to find any close by free point");
                 return;
             }
 
-            robot_cell = *closestFree;
-
-            gu::Cell goal_cell = gu::pointCell(inflated_map.info, goal);
-
-            boost::optional<gu::AStarResult> astar = gu::shortestPathAStar(inflated_map, robot_cell, goal_cell, currDirection);
-
-            //gu::singleSourceShortestPaths(inflated_map)
+            boost::optional<gu::AStarResult> astar = gu::shortestPathAStar(inflated_map, *free_robot_cell, *free_goal_cell, currDirection);
 
             if (!astar)
             {
-                ROS_ERROR("unable to find any path to goal");
+                ROS_ERROR("no path to goal");
                 return;
             }
 
