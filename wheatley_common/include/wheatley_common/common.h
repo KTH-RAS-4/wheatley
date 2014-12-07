@@ -42,6 +42,11 @@ namespace wheatley
         tf::poseTFToMsg(pose, pose_msg);
         return pose_msg;
     }
+
+    template <typename T> T clamp(const T& value, const T& low, const T& high)
+    {
+      return value < low ? low : (value > high ? high : value);
+    }
 }
 
 #endif

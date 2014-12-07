@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   message_generation
   tf
+  wheatley_common
 )
 
 ## System dependencies are found with CMake's conventions
@@ -67,12 +68,12 @@ add_message_files(
 # )
 
 ## Generate added messages and services with any dependencies listed here
- generate_messages(
-   DEPENDENCIES
-   geometry_msgs
-   sensor_msgs
-   std_msgs
- )
+generate_messages(
+  DEPENDENCIES
+  geometry_msgs
+  sensor_msgs
+  std_msgs
+)
 
 ###################################
 ## catkin specific configuration ##
@@ -86,7 +87,7 @@ add_message_files(
 catkin_package(
 #  INCLUDE_DIRS
 #  LIBRARIES
-  CATKIN_DEPENDS geometry_msgs roscpp sensor_msgs std_msgs message_runtime tf
+  CATKIN_DEPENDS geometry_msgs roscpp sensor_msgs std_msgs message_runtime tf wheatley_common
 #  DEPENDS system_lib
 )
 
