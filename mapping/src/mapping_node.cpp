@@ -18,6 +18,7 @@
 #include <map>
 
 #include <sensors/SensorClouds.h>
+#include <std_msgs/String.h>
 
 #include <tf/transform_listener.h>
 
@@ -55,6 +56,7 @@ private:
     ros::Subscriber sub_objects;
     ros::Subscriber sub_ir;
     ros::Subscriber sub_cloud;
+    ros::Subscriber sub_executor_state;
 
 
 
@@ -107,6 +109,7 @@ private:
 
 
     int current_iteration;
+    bool isMapping;
 
 
 public:
@@ -129,12 +132,14 @@ public:
         //sub_pointcloud = handle.subscribe("/object_detection/preprocessed", 1, &MapNode::mapPointCloud, this);
         sub_ir = handle.subscribe("/sensors/ir/point_clouds", 100, &MapNode::mapIr, this);
         sub_cloud = handle.subscribe("/object_detection/preprocessed", 100, &MapNode::mapCloud, this);
+        sub_executor_state = handle.subscribe("/executor/state", 1, &MapNode::executorState, this);
 
 
         mark_pose_explored_timer_ = handle.createWallTimer(ros::WallDuration(1/mark_pose_explored_rate), &MapNode::mapMarkPoseExplored, this);
         build_grid_timer_ = handle.createWallTimer(ros::WallDuration(grid_construction_interval_), &MapNode::echoGrid, this);
 
         init();
+        isMapping = true;
     }
 
     ~MapNode()
@@ -175,6 +180,14 @@ public:
         nm::OccupancyGrid::ConstPtr grid = gu::getGrid(map);
         grid_pub_.publish(grid);
 
+    }
+
+    void executorState(const std_msgs::String &state) {
+        if(state.data == "FORWARD" || state.data == "STOP") {
+            isMapping = true;
+        } else {
+            isMapping = false;
+        }
     }
 
 
@@ -227,8 +240,10 @@ public:
         }
     }
 
-    void mapPointCloud(const vision_msgs::PreprocessedClouds &msg)
+    /*void mapPointCloud(const vision_msgs::PreprocessedClouds &msg)
     {
+
+
         sm::PointCloud2 cloud = msg.others;
         string camera_frame = cloud.header.frame_id;
         ros::Time stamp = cloud.header.stamp;
@@ -266,10 +281,13 @@ public:
         gu::addCloud(&map, loc_cloud, true);
 
         //last_cloud_=loc_cloud;
-    }
+    }*/
 
     void mapCloud(const vision_msgs::PreprocessedClouds &msg)
     {
+        if(!isMapping)
+            return;
+
         sm::PointCloud2 cloudFloor = msg.plane;
         string camera_frame = cloudFloor.header.frame_id;
         ros::Time stamp = cloudFloor.header.stamp;
