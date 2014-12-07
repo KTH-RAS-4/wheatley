@@ -26,7 +26,6 @@ namespace wheatley
     class Navigator : NiceBaseClass
     {
     private:
-        ros::NodeHandle nh;
         ros::Subscriber sub_map;
         ros::Subscriber sub_clicked_point;
         ros::Subscriber sub_executor_state;
@@ -49,8 +48,7 @@ namespace wheatley
 
     public:
         Navigator()
-            : nh("~")
-            , fixed_frame("map")
+            : fixed_frame("map")
             , robot_frame("robot")
             , active(false)
             , executor_ready(false)

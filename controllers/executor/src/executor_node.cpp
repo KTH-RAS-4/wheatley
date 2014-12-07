@@ -46,7 +46,6 @@ namespace wheatley
 
         tf::TransformListener tfl;
         ros::Rate loop_rate;
-        double alignment;
         double theta;
         double desiredTheta;
         double leftDiff [10];
@@ -67,6 +66,7 @@ namespace wheatley
             , poseCorrL(false)
             , poseCorrR(false)
             , desiredTheta(0)
+            , state("STOP")
         {
             sub_ir_distances = nh.subscribe("/sensors/ir/distances", 1, &Executor::distanceCallback, this);
             sub_pose = nh.subscribe("/sensors/pose", 1, &Executor::poseCallback, this);
@@ -92,24 +92,17 @@ namespace wheatley
 
         void orderCallback(const std_msgs::String::ConstPtr &msg)
         {
+            if (state == "LEFT" || state == "RIGHT")
+            {
+                ROS_ERROR("ordered state transition %7s->%7s not allowed, ignoring...", state.data(), msg->data.data());
+                return;
+            }
             state = msg->data;
+
             if (state == "LEFT")
-            {
-                desiredTheta = fmod(desiredTheta + M_PI/2,(double) 2*M_PI);
-                if (desiredTheta>M_PI/2) desiredTheta-=2*M_PI;
-                    alignment = desiredTheta;
-            }
+                desiredTheta = angles::normalize_angle(desiredTheta + M_PI/2);
             else if (state == "RIGHT")
-            {
-                desiredTheta = fmod (desiredTheta - M_PI/2, (double) 2*M_PI);
-                if (desiredTheta>M_PI/2) desiredTheta-=2*M_PI;
-                    alignment = desiredTheta;
-            }
-            else if (state == "FORWARD")
-                ;
-            else
-                state = "STOP";
-            ROS_INFO("Before state, DesiredTheta: %.1f, Theta: %.1f",desiredTheta*180/M_PI, theta*180/M_PI);
+                desiredTheta = angles::normalize_angle(desiredTheta - M_PI/2);
         }
 
         void distanceCallback(const sensors::Distance::ConstPtr &msg)
@@ -254,7 +247,7 @@ namespace wheatley
 
         bool align(double speed)
         {
-            double error = angles::shortest_angular_distance(theta, alignment);
+            double error = angles::shortest_angular_distance(theta, desiredTheta);
 
             if (std::abs(error) < 1*M_PI/180)
             {

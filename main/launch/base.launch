@@ -11,6 +11,6 @@
 	<include file="$(find sensors)/launch/pose.launch"/>
 	<include file="$(find motor_controller)/launch/motor_controller.launch"/>
 	<include file="$(find wall_following)/launch/wall_avoider.launch"/>
-	<!--<include file="$(find executor)/launch/executor.launch"/>-->
+	<include file="$(find executor)/launch/executor.launch"/>
 	<include file="$(find sound_play)/soundplay_node.launch"/>
 </launch>

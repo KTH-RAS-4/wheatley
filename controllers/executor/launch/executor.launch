@@ -3,6 +3,7 @@
 <launch>
 	<node pkg="executor" type="executor_node"
 	        name="executor" output="screen" clear_params="true">
+		<rosparam command="load" file="$(find executor)/config/settings.yaml"/>
 		<remap from="~/pose_correction" to="/sensors/pose/pose_correction"/>
 	</node>
 </launch>

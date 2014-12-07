@@ -6,7 +6,7 @@
 	<node pkg="xbox" type="xbox_node" name="xbox" output="screen">
 		<rosparam command="load" file="$(find xbox)/config/settings.yaml"/>
 		<remap from="~/twist" to="/motor_controller/twist"/>
-		<remap from="~/direction" to="/nav/order"/>
+		<remap from="~/direction" to="/executor/order"/>
 	</node>
 </launch>
 
