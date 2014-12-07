@@ -199,7 +199,6 @@ public:
             }
 
             ifs.close();
-            remove("/home/ras/catkin_ws/src/wheatley/objects.txt");
          }
 
 
@@ -230,6 +229,8 @@ public:
 
     void run()
     {
+        if(state == "WRITE")
+            remove("/home/ras/catkin_ws/src/wheatley/objects.txt");
         if(state == "READ")
             readFromFile();
         ros::spin();
