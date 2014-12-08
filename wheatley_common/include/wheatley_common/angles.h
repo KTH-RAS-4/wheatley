@@ -33,13 +33,15 @@ namespace angles
         std::string text_;
         int x_;
         int y_;
+        int index_;
 
     private:
-        StraightAngle(double angle, std::string text, int x, int y)
+        StraightAngle(double angle, std::string text, int x, int y, int index)
             : angle_(angle)
             , text_(text)
             , x_(x)
             , y_(y)
+            , index_(index)
         {}
     public:
         double angle() const
@@ -57,6 +59,10 @@ namespace angles
         int y() const
         {
             return y_;
+        }
+        int index() const
+        {
+            return index_;
         }
 
     public:
@@ -105,11 +111,11 @@ namespace angles
         }
     };
 
-    const StraightAngle StraightAngle::RIGHT( 0     , "right",  1, 0);
-    const StraightAngle StraightAngle::UP   ( M_PI/2, "up"   ,  0, 1);
-    const StraightAngle StraightAngle::LEFT ( M_PI  , "left" , -1, 0);
-    const StraightAngle StraightAngle::DOWN (-M_PI/2, "down" ,  0,-1);
-    const StraightAngle StraightAngle::ANY  (-10    , "any"  ,  0, 0);
+    const StraightAngle StraightAngle::RIGHT( 0     , "right",  1, 0, 0);
+    const StraightAngle StraightAngle::UP   ( M_PI/2, "up"   ,  0, 1, 1);
+    const StraightAngle StraightAngle::LEFT ( M_PI  , "left" , -1, 0, 2);
+    const StraightAngle StraightAngle::DOWN (-M_PI/2, "down" ,  0,-1, 3);
+    const StraightAngle StraightAngle::ANY  (-10    , "any"  ,  0, 0, 4);
     const StraightAngle StraightAngle::rotations[] = {StraightAngle::RIGHT, StraightAngle::UP, StraightAngle::LEFT, StraightAngle::DOWN};
 }
 

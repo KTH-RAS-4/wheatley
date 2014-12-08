@@ -157,6 +157,7 @@ boost::optional<AStarResult> shortestPath(const nav_msgs::OccupancyGrid& g,
 /// the cost.
 boost::optional<AStarResult> shortestPathAStar(const nav_msgs::OccupancyGrid& g,
                                                const Cell& src, const Cell& dest,
+                                               const bool searchForClosestUnknown = false,
                                                const angles::StraightAngle& srcDir = angles::StraightAngle::ANY);
 
 

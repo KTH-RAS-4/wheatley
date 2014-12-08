@@ -1,6 +1,8 @@
 <!---->
 
 <launch>
+	<arg name="phase" value="1"/>
+	<param name="/phase" value="$(arg phase)"/>
 	<node pkg="navigation" type="navigation_node"
 			name="navigator" output="screen" clear_params="true">
 		<rosparam command="load" file="$(find navigation)/config/settings.yaml"/>

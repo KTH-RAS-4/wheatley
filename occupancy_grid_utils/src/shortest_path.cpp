@@ -451,6 +451,8 @@ struct PQItem
     float g_cost;
     float h_cost;
     float wall_cost;
+    float acc_wall_cost;
+    int segments;
 
     PQItem (index_t parent_ind, index_t ind, angles::StraightAngle dir)
         : parent_ind(parent_ind)
@@ -459,6 +461,8 @@ struct PQItem
         , g_cost(0)
         , h_cost(0)
         , wall_cost(0)
+        , acc_wall_cost(0)
+        , segments(0)
     {}
 
     PQItem (index_t parent_ind, index_t ind, angles::StraightAngle dir, float g_cost, float h_cost, float wall_cost)
@@ -468,11 +472,13 @@ struct PQItem
         , g_cost(g_cost)
         , h_cost(h_cost)
         , wall_cost(wall_cost)
+        , acc_wall_cost(0)
+        , segments(0)
     {}
 
     float cost() const
     {
-        return g_cost + h_cost + wall_cost;
+        return g_cost + h_cost;// + (wall_cost + acc_wall_cost)/(segments+1);
     }
 
     bool operator>(const PQItem& o) const
@@ -481,13 +487,17 @@ struct PQItem
     }
 };
 
-optional<AStarResult> shortestPathAStar(const nm::OccupancyGrid& g, const Cell& src, const Cell& dest, const angles::StraightAngle& srcDir)//, const float drivingCloseToWallPenalty)
+optional<AStarResult> shortestPathAStar(const nm::OccupancyGrid& g,
+                                        const Cell& src,
+                                        const Cell& dest,
+                                        const bool searchForClosestUnknown,
+                                        const angles::StraightAngle& srcDir)
 {
     std::priority_queue<PQItem,
             std::vector<PQItem>,
             std::greater<PQItem> > queue;
     std::vector<bool> seen(g.info.height*g.info.width); // Default initialized to all false
-    const index_t dest_ind = cellIndex(g.info, dest);
+    index_t dest_ind = cellIndex(g.info, dest);
     const index_t src_ind = cellIndex(g.info, src);
     queue.push(PQItem(src_ind, src_ind, srcDir, 0, g.info.resolution*manhattanHeuristic(src, dest), 0));
     std::map<index_t, index_t> parent;
@@ -505,8 +515,10 @@ optional<AStarResult> shortestPathAStar(const nm::OccupancyGrid& g, const Cell& 
         seen[currItem.ind] = true;
         parent[currItem.ind] = currItem.parent_ind;
 
-        if (currItem.ind == dest_ind)
+        if ((searchForClosestUnknown && g.data[currItem.ind] == UNKNOWN) ||
+           (!searchForClosestUnknown && currItem.ind == dest_ind))
         {
+            dest_ind = currItem.ind;
             res = AStarResult();
             res->second = currItem.g_cost;
             break;
@@ -520,28 +532,32 @@ optional<AStarResult> shortestPathAStar(const nm::OccupancyGrid& g, const Cell& 
             if (withinBounds(g.info, next))
             {
                 const index_t ind = cellIndex(g.info, next);
-                if (g.data[ind] < OCCUPIED && !seen[ind])
+                PQItem nextItem(currItem.ind, ind, getDirection(curr, next));
+                if (g.data[ind] < OCCUPIED)// && !seen[ind])
                 {
-                    PQItem nextItem(currItem.ind, ind, getDirection(curr, next));
-
                     nextItem.g_cost = currItem.g_cost + 1;
-                    nextItem.h_cost = manhattanHeuristic(next, dest);
+                    if (!searchForClosestUnknown)
+                        nextItem.h_cost = manhattanHeuristic(next, dest);
+                    nextItem.acc_wall_cost = currItem.acc_wall_cost;
+                    nextItem.segments = currItem.segments;
+                    float occupancy = g.data[ind];
 
-
-                    //nextItem.wall_cost = (float)g.data[ind]*100;
-
-                    if (currItem.dir != nextItem.dir)
+                    if (currItem.dir == nextItem.dir)
                     {
-                        nextItem.g_cost += 20;
+                        nextItem.wall_cost = std::max(currItem.wall_cost, occupancy);
+                    }
+                    else
+                    {
+                        nextItem.g_cost += 5;
                         //if (containsWall(g, Cell(curr.x+offset.x()*0.15/g.info.resolution,
                         //                         curr.y+offset.y()*0.15/g.info.resolution), 0.1))
                         //    nextItem.g_cost += 1;
                         //else
                         //    nextItem.g_cost += 20;
-                        //nextItem.g_cost += currItem.wall_cost;
+                        nextItem.wall_cost = occupancy;
+                        nextItem.acc_wall_cost += currItem.wall_cost;
+                        nextItem.segments++;
                     }
-                    else
-                        ;//nextItem.wall_cost = std::max(nextItem.wall_cost, currItem.wall_cost);
 
                     queue.push(nextItem);
                 }
