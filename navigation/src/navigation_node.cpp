@@ -47,6 +47,7 @@ namespace wheatley
         nav_msgs::OccupancyGrid inflated_map;
 
         geometry_msgs::Point goal;
+        bool explore;
 
     public:
         Navigator()
@@ -55,6 +56,7 @@ namespace wheatley
             , active(false)
             , executor_ready(false)
             , robot_outer_diameter(requireParameter<double>("/base/outer_diameter"))
+            , explore(requireParameter<int>("/phase") == 1)
         {
             double rate = requireParameter<double>("pathfinding_rate");
 
@@ -122,7 +124,7 @@ namespace wheatley
 
         void run_pathfinding()
         {
-            if (!active || !executor_ready) //don't bother if the executor is turning
+            if ((!active && !explore) || !executor_ready) //don't bother if the executor is turning
                 return;
 
             if (map.header.frame_id == "")
@@ -137,11 +139,14 @@ namespace wheatley
                 return;
             }
 
-            static gm::Point prev_goal;
-            if (prev_goal.x != goal.x && prev_goal.y != goal.y)
+            if (!explore)
             {
-                prev_goal = goal;
-                ROS_INFO("navigating to %5.2f,%-5.2f", goal.x, goal.y);
+                static gm::Point prev_goal;
+                if (prev_goal.x != goal.x && prev_goal.y != goal.y)
+                {
+                    prev_goal = goal;
+                    ROS_INFO("navigating to %5.2f,%-5.2f", goal.x, goal.y);
+                }
             }
 
             tf::StampedTransform robot_transform;
@@ -153,13 +158,16 @@ namespace wheatley
             gu::Cell goal_cell = gu::pointCell(inflated_map.info, goal);
             boost::optional<gu::Cell> free_goal_cell = gu::closestFree(inflated_map, goal_cell, 0.3);
 
+            if (explore)
+                free_goal_cell = free_robot_cell; //ugly fix :D
+
             if (!free_robot_cell || !free_goal_cell)
             {
                 ROS_ERROR("unable to find any close by free point");
                 return;
             }
 
-            boost::optional<gu::AStarResult> astar = gu::shortestPathAStar(inflated_map, *free_robot_cell, *free_goal_cell, currDirection);
+            boost::optional<gu::AStarResult> astar = gu::shortestPathAStar(inflated_map, *free_robot_cell, *free_goal_cell, explore, currDirection);
 
             if (!astar)
             {
