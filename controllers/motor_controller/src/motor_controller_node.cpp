@@ -72,7 +72,7 @@ public:
         double D = (error - last_error) / elapsed;
         last_error = error;
         double speed = 0;
-        if (twi.linear.x != 0)
+        if (twi.linear.x != 0 | twi.angular.z != 0)
         {
             if (I_memory > 0)
             {

@@ -5,6 +5,11 @@
 
 ros::Publisher pub;
 
+template <typename T> T clamp(const T& value, const T& low, const T& high)
+{
+  return value < low ? low : (value > high ? high : value);
+}
+
 struct param_t {
   double p1;
   double p2;
@@ -67,12 +72,12 @@ void adcCallback(const ras_arduino_msgs::ADConverter::ConstPtr &msg)
 {
   sensors::Distance out;
   out.header.stamp = ros::Time::now();
-  out.left_front = round(poly(msg->ch1, param_ch1)*10)/1000;
-  out.front = round(poly(msg->ch2, param_ch2)*10)/1000;
-  out.left_rear = round(poly(msg->ch3, param_ch3)*10)/1000;
-  out.right_rear = round(poly(msg->ch4, param_ch4)*10)/1000;
-  out.rear = round(poly(msg->ch5, param_ch5)*10)/1000;
-  out.right_front = round(poly(msg->ch6, param_ch6)*10)/1000;
+  out.left_front = std::max(round(poly(msg->ch1, param_ch1)*10)/1000,-0.05);
+  out.front = std::max(round(poly(msg->ch2, param_ch2)*10)/1000,-0.05);
+  out.left_rear = std::max(round(poly(msg->ch3, param_ch3)*10)/1000,-0.05);
+  out.right_rear = std::max(round(poly(msg->ch4, param_ch4)*10)/1000,-0.05);
+  out.rear = std::max(round(poly(msg->ch5, param_ch5)*10)/1000,-0.05);
+  out.right_front = std::max(round(poly(msg->ch6, param_ch6)*10)/1000,-0.05);
 
   pub.publish(out);
 }
