@@ -134,9 +134,9 @@ target_link_libraries(color_detector_node
   ${OpenCV_LIBS}
 )
 
-# image detector node
-add_executable(image_detector_node src/image_detector_node.cpp)
-target_link_libraries(image_detector_node
+# image object detector node
+add_executable(image_object_detector_node src/image_object_detector_node.cpp)
+target_link_libraries(image_object_detector_node
   ${catkin_LIBRARIES}
   ${OpenCV_LIBS}
 )
