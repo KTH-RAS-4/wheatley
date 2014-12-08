@@ -45,6 +45,7 @@
 #include <occupancy_grid_utils/NavigationFunction.h>
 #include <boost/shared_ptr.hpp>
 #include <boost/optional.hpp>
+#include <boost/function.hpp>
 #include <set>
 
 namespace occupancy_grid_utils
@@ -63,9 +64,8 @@ namespace occupancy_grid_utils
 /// for this).
 /// Rounds up when converting from meters to cells
 nav_msgs::OccupancyGrid inflateObstacles (const nav_msgs::OccupancyGrid& g,
-                                          float impassableRadius,
-                                          float passableRadius,
-                                          bool allow_unknown=false);
+                                          boost::function<signed char (float)> distanceToOccupancyFn,
+                                          bool allow_unknown = false);
 
 
 /************************************************************
