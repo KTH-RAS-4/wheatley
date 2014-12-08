@@ -375,7 +375,7 @@ nm::OccupancyGrid inflateObstacles (const nm::OccupancyGrid& g,
                 if (withinBounds(g.info, c2))
                 {
                     const index_t ind2 = cellIndex(g.info, c2);
-                    if (!seen[ind2])
+                    if (!seen[ind2] && g.data[ind2] != UNKNOWN)
                         queue.push(InflationQueueItem(q.center, c2));
                 }
             }
