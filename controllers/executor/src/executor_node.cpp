@@ -266,9 +266,9 @@ namespace wheatley
 
         bool align(double speed)
         {
-            double error = angles::shortest_angular_distance(theta, desiredTheta);
+            double error = angles::shortest_angular_distance(theta, desiredTheta)*180/M_PI;
 
-            if (std::abs(error) < 1*M_PI/180)
+            if (std::abs(error) < 3)
             {
                 geometry_msgs::Twist twist;
                 pub_motor_twist.publish(twist);
@@ -278,7 +278,7 @@ namespace wheatley
             else
             {
                 geometry_msgs::Twist twist;
-                twist.angular.z = clamp(10*error, -speed, speed);
+                twist.angular.z = clamp(error/10, -speed, speed);
                 pub_motor_twist.publish(twist);
                 return false;
             }
