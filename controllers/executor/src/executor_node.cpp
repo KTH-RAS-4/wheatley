@@ -185,7 +185,7 @@ namespace wheatley
                 else if (state == "LEFT")
                 {
                     static bool align_done = false;
-                    if (!align_done && align(0.2)) //align just finished
+                    if (!align_done && align(0.75)) //align just finished
                     {
                         count = 0;
                         align_done = true;
@@ -216,7 +216,7 @@ namespace wheatley
                 else if (state == "RIGHT")
                 {
                     static bool align_done = false;
-                    if (!align_done && align(0.2)) //align just finished
+                    if (!align_done && align(0.75)) //align just finished
                     {
                         count = 0;
                         align_done = true;
@@ -287,7 +287,7 @@ namespace wheatley
         bool follow(double speed, double frontDistance)
         {
             geometry_msgs::Twist twist;
-            if (distance.front > 0.30)
+            if (distance.front > 0.35)
             {
                 twist.linear.x = speed;
                 pub_wall_twist.publish(twist);
@@ -295,7 +295,7 @@ namespace wheatley
             }
             else if (distance.front > frontDistance)
             {
-                twist.linear.x = speed/2;
+                twist.linear.x = speed*0.75;
                 pub_wall_twist.publish(twist);
                 return true;
             }

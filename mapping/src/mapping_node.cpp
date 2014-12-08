@@ -123,7 +123,7 @@ public:
         fixed_frame_ = "map";
         resolution_ = 0.01;
         robot_frame = "robot";
-        local_grid_size_ = 5.0;
+        local_grid_size_ = 15.0;
 
         grid_pub_ = handle.advertise<nm::OccupancyGrid>("/map", 100);
         temp_grid_pub_ = handle.advertise<nm::OccupancyGrid>("/temp_map", 100);

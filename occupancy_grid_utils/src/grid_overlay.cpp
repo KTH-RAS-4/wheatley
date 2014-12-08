@@ -271,10 +271,10 @@ void addCloud (OverlayClouds* overlay, LocalizedCloud::ConstPtr cloud, const int
             }
 
             if (last_ind && hasEndpoint) {
-                /*if(IsWindowFree(overlay, p, 0.02) == UNOCCUPIED) {
-                    ROS_INFO("Windows not free");
+                if(IsWindowFree(overlay, p, 0.02) == UNOCCUPIED) {
+                    ROS_INFO("Windows is unoccupied");
                     break;
-                }*/
+                }
                 // If the last cell equals the point (i.e., point is not off the grid), update hit counts
                 const Cell last_cell = indexCell(overlay->grid.info, *last_ind);
                 if (last_cell == pointCell(overlay->grid.info, p)) {
