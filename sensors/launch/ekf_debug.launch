@@ -1,0 +1,11 @@
+<!---->
+
+<launch>
+	<include file="$(find sensors)/launch/ekf.launch"/>
+	
+	<remap from="/sensors/ir/distances" to="/sensors/ekf/distances"/>
+	<remap from="/sensors/ir/points" to="/sensors/ekf/points"/>
+	<remap from="/sensors/ir/point_clouds" to="/sensors/ekf/point_clouds"/>
+	<include file="$(find sensors)/launch/ir_points.launch"/>
+</launch>
+

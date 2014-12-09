@@ -44,10 +44,6 @@ namespace wheatley
         const string fixed_frame;
         const string robot_frame;
 
-        double MAX_RANGE_SHORT_DISTANCE_SENSOR;
-        double MAX_RANGE_LONG_DISTANCE_SENSOR;
-        double ROBOT_SENSORS_GAP_DISTANCE;
-
     public:
         KalmanNode()
             : fixed_frame("map")
@@ -77,6 +73,12 @@ namespace wheatley
 
         void callback_ir(const sensors::Distance::ConstPtr &realIR)
         {
+            if (!tfl.waitForTransform(fixed_frame, robot_frame, realIR->header.stamp, ros::Duration(0.2)))
+            {
+                ROS_ERROR_STREAM("timeout waiting for transform from "<<robot_frame<<" to "<<fixed_frame);
+                return;
+            }
+
             gm::Pose pose = getPose(tfl, realIR->header.stamp, robot_frame, fixed_frame);
             sensors::Distance simulatedIR = simulateIrDistances(pose, realIR->header.stamp);
             pub_sim_ir.publish(simulatedIR);
@@ -128,7 +130,7 @@ namespace wheatley
                     return (tf_hit - pose.getOrigin()).length();
                 }
             }
-            return -1;
+            return -0.1;
         }
 
         void run()
