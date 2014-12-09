@@ -39,6 +39,26 @@ string color_names[] = {
     "Purple"
 };
 
+string simple_shapes[] = {
+    "", // wall
+    "Cube", // red
+    "", // orange
+    "Cube", // yellow
+    "Cube", // green
+    "Cube", // blue
+    "" // purple
+};
+
+string complex_shapes[] = {
+    "", // wall
+    "Sphere", // red
+    "Star", // orange
+    "Sphere", // yellow
+    "Sphere", // green
+    "", // blue
+    "Cross" // purple
+};
+
 // hue min max values
 float object_color_hue[] = {
     -10, 180, // wall
@@ -134,6 +154,7 @@ class ImageObjectDetectionNode
     image_transport::ImageTransport it;
     image_transport::Subscriber image_sub;
     ros::Subscriber object_sub;
+    ros::Publisher object_pub;
 
     Mat image;
     Mat result;
@@ -146,8 +167,9 @@ public:
     ImageObjectDetectionNode()
     : it(handle)
     {
-        image_sub = it.subscribe("/camera/rgb/image_raw", 1, &ImageObjectDetectionNode::imageHandle, this);
-        object_sub = handle.subscribe("object_detection/detected_objects", 1, &ImageObjectDetectionNode::objectHandle, this);
+        object_pub = handle.advertise<vision_msgs::Object>("/object_recognition/detected_objects", 100);
+        //image_sub = it.subscribe("/camera/rgb/image_raw", 1, &ImageObjectDetectionNode::imageHandle, this);
+        object_sub = handle.subscribe("object_detection/objects", 1, &ImageObjectDetectionNode::objectHandle, this);
 
         if (visual_debugging)
         {
@@ -402,11 +424,30 @@ private:
             }
         }
         //polylines(result, polygons, true, Scalar(255,255,255), 1, 8, 0);
+        int foundidx = 0, foundsize = 0;
         for (int i = 0; i < boundingBoxes.size() && i < polygons.size(); i++)
         {
+            if (boundingBoxes[i].width*boundingBoxes[i].height > foundsize)
+            {
+                foundidx = i;
+                foundsize = boundingBoxes[i].width*boundingBoxes[i].height;
+            }
             rectangle(result, boundingBoxes[i], Scalar(255,0,255), 1, 8, 0);
 	        cout << "found " << color_names[color] << " object with " << polygons[i].size() << " vertices [" << obj.x << " " << obj.y << " " << obj.z << "]" << endl;
         }
+
+        if (polygons[foundidx].size() <= 6)
+        {
+            // found simple shape
+            obj.type += " " + simple_shapes[foundidx];
+        }
+        else
+        {
+            // found complex shape
+            obj.type += " " + complex_shapes[foundidx];
+        }
+
+        object_pub.publish(obj);
 
         if (visual_debugging)
         {
