@@ -18,6 +18,8 @@ static const string WINDOW_2 = "Image";
 
 bool visual_debugging = true;
 
+double approx_epsilon = 5;
+
 // objects
 static const int WALL = 0x0;
 //static const int FLOOR = 0x1;
@@ -54,7 +56,7 @@ string complex_shapes[] = {
     "Sphere", // red
     "Star", // orange
     "Sphere", // yellow
-    "Sphere", // green
+    "Cylinder", // green
     "", // blue
     "Cross" // purple
 };
@@ -65,8 +67,8 @@ float object_color_hue[] = {
 //	0, 180, // floor
     -8, 0, // red
     1, 10, // orange
-    15, 25, // yellow
-    25, 70, // green
+    15, 30, // yellow
+    30, 70, // green
     70, 125, // blue
     125, 160 // purple
 };
@@ -77,8 +79,8 @@ float object_color_saturation[] = {
 //    0, 255, // floor
     90, 255, // red
     120, 255, // orange
-    90, 255, // yellow
-    127, 255, // green
+    140, 255, // yellow
+    60, 255, // green
     60, 255, // blue
     80, 255 // purple
 };
@@ -168,8 +170,8 @@ public:
     : it(handle)
     {
         object_pub = handle.advertise<vision_msgs::Object>("/object_recognition/detected_objects", 100);
-        //image_sub = it.subscribe("/camera/rgb/image_raw", 1, &ImageObjectDetectionNode::imageHandle, this);
-        object_sub = handle.subscribe("object_detection/objects", 1, &ImageObjectDetectionNode::objectHandle, this);
+        image_sub = it.subscribe("/camera/rgb/image_raw", 1, &ImageObjectDetectionNode::imageHandle, this);
+        object_sub = handle.subscribe("object_detection/detected_objects", 1, &ImageObjectDetectionNode::objectHandle, this);
 
         if (visual_debugging)
         {
@@ -177,7 +179,7 @@ public:
             namedWindow(WINDOW_2);
         }
 
-        int erosion_size = 6;
+        int erosion_size = 3;
         erosion_element = getStructuringElement(MORPH_ELLIPSE, Size(2*erosion_size+1, 2*erosion_size+1), Point(erosion_size, erosion_size));
         int dilation_size = 5;
         dilation_element = getStructuringElement(MORPH_ELLIPSE, Size(2*dilation_size+1, 2*dilation_size+1), Point(dilation_size, dilation_size));
@@ -342,17 +344,36 @@ private:
         waitKey(10);
     }
 
-    void objectHandle(const vision_msgs::Object& obj)
+    void objectHandle(const vision_msgs::Object& msg)
     {
+		vision_msgs::Object obj = msg;
 
-        Vec3b detected_color = Vec3b(obj.b, obj.g, obj.r);
-        int color = getColor(detected_color);
+		int color = -1;
+
+		if (msg.type == "RED")
+			color = RED;
+		else if (msg.type == "Orange")
+			color = ORANGE;
+		else if (msg.type == "Yellow")
+			color = YELLOW;
+		else if (msg.type == "Green")
+			color = GREEN;
+		else if (msg.type == "Blue")
+			color = BLUE;
+		else if (msg.type == "Purple")
+			color = PURPLE;
+
+//       Vec3b detected_color = Vec3b(obj.b, obj.g, obj.r);
+//        int color = getColor(detected_color);
+
+		cout << "-------" << endl;
 
         if (color < 0)
         {
-            cout << "color not detected [" << obj.x << " " << obj.y << " " << obj.z << "]" << endl;
+            cout << "color not detected [" << obj.r << " " << obj.g << " " << obj.b << "]" << endl;
             return;
         }
+
 
         // detect objects
         Mat marker;
@@ -391,7 +412,7 @@ private:
         int boundingThreshold = 10;
         for (int i = 0; i < contours.size(); i++)
         {
-            approxPolyDP(contours[i], polygon, 5, true);
+            approxPolyDP(contours[i], polygon, approx_epsilon, true);
             bounds = boundingRect(Mat(polygon));
             bool match = false;
             for (int j = 0; j < boundingBoxes.size() && j < polygons.size(); j++)
@@ -423,7 +444,7 @@ private:
                 boundingBoxes.push_back(bounds);
             }
         }
-        //polylines(result, polygons, true, Scalar(255,255,255), 1, 8, 0);
+        polylines(result, polygons, true, Scalar(0,0,255), 1, 8, 0);
         int foundidx = 0, foundsize = 0;
         for (int i = 0; i < boundingBoxes.size() && i < polygons.size(); i++)
         {
@@ -439,13 +460,15 @@ private:
         if (polygons[foundidx].size() <= 6)
         {
             // found simple shape
-            obj.type += " " + simple_shapes[foundidx];
+            obj.type += " " + simple_shapes[color];
         }
         else
         {
             // found complex shape
-            obj.type += " " + complex_shapes[foundidx];
+            obj.type += " " + complex_shapes[color];
         }
+
+		cout << "published " << obj.type << " (" << polygons[foundidx].size() << " vertices)" << endl;
 
         object_pub.publish(obj);
 
