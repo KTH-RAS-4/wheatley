@@ -2,8 +2,9 @@
 
 <launch>
 	<node pkg="sensors" type="ekf"
-		name="ekf" output="screen" clear_params="true">
+		name="ekf" output="screen" clear_params="true" ns="sensors">
 		<rosparam command="load" file="$(find sensors)/config/ekf_settings.yaml"/>
+		<remap from="~/map_in" to="/map"/>
 	</node>
 </launch>
 
