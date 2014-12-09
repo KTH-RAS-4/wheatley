@@ -47,6 +47,11 @@ namespace wheatley
     {
       return value < low ? low : (value > high ? high : value);
     }
+
+    template <typename T> int sgn(T val)
+    {
+        return (T(0) < val) - (val < T(0));
+    }
 }
 
 #endif

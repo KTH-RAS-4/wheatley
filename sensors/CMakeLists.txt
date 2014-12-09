@@ -14,6 +14,8 @@ find_package(catkin REQUIRED COMPONENTS
   tf
   pcl_ros
   sensor_msgs
+  occupancy_grid_utils
+  wheatley_common
 )
 
 ## System dependencies are found with CMake's conventions
@@ -87,7 +89,7 @@ generate_messages(
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-  CATKIN_DEPENDS message_runtime ras_arduino_msgs roscpp visualization_msgs std_msgs nav_msgs tf
+  CATKIN_DEPENDS message_runtime ras_arduino_msgs roscpp visualization_msgs std_msgs nav_msgs tf occupancy_grid_utils wheatley_common
 #  INCLUDE_DIRS include
 #  LIBRARIES sensors
 #  DEPENDS system_lib
@@ -111,17 +113,23 @@ include_directories(
 
 ## Declare a cpp executable
 add_executable(pose src/pose_node.cpp)
+add_executable(ekf src/ekf_node.cpp)
 add_executable(ir_distances src/ir_distances_node.cpp)
 add_executable(ir_points src/ir_points_node.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 add_dependencies(pose pose_generate_messages_cpp)
+add_dependencies(ekf pose_generate_messages_cpp)
 add_dependencies(ir_distances pose_generate_messages_cpp)
 add_dependencies(ir_points pose_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(pose
+  ${catkin_LIBRARIES}
+)
+
+target_link_libraries(ekf
   ${catkin_LIBRARIES}
 )
 
@@ -132,4 +140,3 @@ target_link_libraries(ir_distances
 target_link_libraries(ir_points
   ${catkin_LIBRARIES}
 )
-
