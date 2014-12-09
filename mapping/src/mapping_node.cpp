@@ -196,7 +196,7 @@ public:
         std::vector<sensor_msgs::PointCloud2> clouds = msg.point_clouds;
         std::vector<u_int8_t> hasEndpoint = msg.hasEndpoint;
 
-        for(int pc = 2; pc < 6; pc++) {
+        for(int pc = 0; pc < 6; pc++) {
             string ir_frame = clouds[pc].header.frame_id;
             ros::Time stamp = clouds[pc].header.stamp;
             try {

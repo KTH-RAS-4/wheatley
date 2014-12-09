@@ -169,7 +169,7 @@ namespace wheatley
 
                 if (state == "FORWARD")
                 {
-                    if (!follow(0.2, 0.10))
+                    if (!follow(0.2, 0.05))
                         state = "STOP";
                 }
                 else if (state == "STOP")
@@ -182,10 +182,43 @@ namespace wheatley
                         pub_motor_twist.publish(twist);
                     }
                 }
+                else if (state == "BACK");
+                {
+                    static tf::Point prev_pos;
+                    if (state != prev_state)
+                    {
+                        tf::pointMsgToTF(pose.pose.pose.position, prev_pos);
+                        geometry_msgs::Twist twist;
+                        twist.linear.x = -0.2;
+                        twist.angular.z = 0;
+                        pub_motor_twist.publish(twist);
+                    }
+                    else
+                    {
+                        tf::Point curr_pos;
+                        tf::pointMsgToTF(pose.pose.pose.position, curr_pos);
+
+                        if (prev_pos.distance(curr_pos) > 0.05)
+                        {
+                            state = "STOP";
+                            geometry_msgs::Twist twist;
+                            twist.linear.x = 0;
+                            twist.angular.z = 0;
+                            pub_motor_twist.publish(twist);
+                        }
+                        else
+                        {
+                            geometry_msgs::Twist twist;
+                            twist.linear.x = -0.2;
+                            twist.angular.z = 0;
+                            pub_motor_twist.publish(twist);
+                        }
+                    }
+                }
                 else if (state == "LEFT")
                 {
                     static bool align_done = false;
-                    if (!align_done && align(0.75)) //align just finished
+                    if (!align_done && align(1.5)) //align just finished
                     {
                         count = 0;
                         align_done = true;
@@ -216,7 +249,7 @@ namespace wheatley
                 else if (state == "RIGHT")
                 {
                     static bool align_done = false;
-                    if (!align_done && align(0.75)) //align just finished
+                    if (!align_done && align(1.5)) //align just finished
                     {
                         count = 0;
                         align_done = true;
@@ -295,7 +328,8 @@ namespace wheatley
             }
             else if (distance.front > frontDistance)
             {
-                twist.linear.x = speed*0.75;
+                twist.linear.x = clamp(speed*0.5*(1+(distance.front-frontDistance)), 0.0, speed);
+                ROS_INFO_STREAM(twist.linear.x);
                 pub_wall_twist.publish(twist);
                 return true;
             }
