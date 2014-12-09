@@ -16,7 +16,8 @@ using namespace cv;
 static const string WINDOW_1 = "Image mask";
 static const string WINDOW_2 = "Image";
 
-bool visual_debugging = true;
+bool visual_debugging = false;
+bool verbose = true;
 
 double approx_epsilon = 5;
 
@@ -64,7 +65,7 @@ string complex_shapes[] = {
 // hue min max values
 float object_color_hue[] = {
     -10, 180, // wall
-//	0, 180, // floor
+//  0, 180, // floor
     -8, 0, // red
     1, 10, // orange
     15, 30, // yellow
@@ -150,6 +151,17 @@ int color_list[] = {
     BLUE
 };
 
+int detect_iterations = 10;
+int detect_id = 0;
+
+struct detected_object {
+    int color;
+    int iterations;
+	int candidates[2];
+    map<int, int> vertices;
+	vision_msgs::Object object;
+};
+
 class ImageObjectDetectionNode
 {
     ros::NodeHandle handle;
@@ -164,6 +176,8 @@ class ImageObjectDetectionNode
 
     Mat erosion_element;
     Mat dilation_element;
+
+    map<int, detected_object> detected_objects;
 
 public:
     ImageObjectDetectionNode()
@@ -210,133 +224,213 @@ private:
             return;
         }
 
-        // normalize the colors
-        //cvtColor(image, image, CV_BGR2YCrCb); //change the color image from BGR to YCrCb format
-        //split(image, channels); //split the image into channels
-        //equalizeHist(channels[0], channels[0]); //equalize histogram on the 1st channel (Y)
-        //merge(channels, image); //merge 3 channels including the modified 1st channel into one image
-        //cvtColor(image, image, CV_YCrCb2BGR); //change the color image from YCrCb to BGR format (to display image properly)
-
-        // extract wall sample color
-        /*Mat bin, bin_sat, bin_val;
-        cvtColor(image, image, CV_BGR2HSV);
-        vector<Mat> channels;
-        split(image, channels);
-        threshold(channels[1], bin_sat, 80, 255, 0);
-        bitwise_not(bin_sat, bin_sat);
-        threshold(channels[2], bin_val, 200, 255, 0);
-        cvtColor(image, image, CV_HSV2BGR);
-        bitwise_and(bin_sat, bin_val, bin, noArray());
-        Scalar average = mean(image, bin);
-
-        // color correction based on sample color
-        split(image, channels);
-        double min, max, wmax;
-        wmax = 230;
-        //cout << "-----" << endl;
-        minMaxLoc(channels[0], &min, &max);
-        normalize(channels[0], channels[0], min, max + wmax - average[0], NORM_MINMAX, -1, noArray());
-        //cout << max + wmax - average[2] << " (" << wmax - average[0] << ")" << endl;
-        minMaxLoc(channels[1], &min, &max);
-        normalize(channels[1], channels[1], min, max + wmax - average[1], NORM_MINMAX, -1, noArray());
-        //cout << max + wmax - average[1] << " (" << wmax - average[1] << ")" << endl;
-        minMaxLoc(channels[2], &min, &max);
-        normalize(channels[2], channels[2], min, max + wmax - average[2], NORM_MINMAX, -1, noArray());
-        //cout << max + wmax - average[2] << " (" << wmax - average[2] << ")" << endl;
-        merge(channels, image);*/
-        
-        // apply gaussian filter
-        GaussianBlur(image, image, Size(9, 9), 3, 0, BORDER_DEFAULT);
-
-        // erosion
-        //erode(image, image, erosion_element);
-        // dilation
-        //dilate(image, image, dilation_element);
-
-		/*int color = GREEN;
-
-        // detect objects
-        Mat marker;
-        Mat mask = maskColor(image, color);
-        erode(mask, marker, erosion_element);
-        mask = maskReconstruction(marker, mask);
-        result = Mat::zeros(image.rows, image.cols, CV_8UC3);
-        Vec3b bgr = Vec3b(255,255,255);
-        Vec3b* _result;
-        float* _mask;
-        for (int i = 0; i < image.rows; i++)
+        if (detected_objects.size() > 0)
         {
-            _result = result.ptr<Vec3b>(i);
-            _mask = mask.ptr<float>(i);
-            for (int j = 0; j < image.cols; j++)
-            {
-                if (_mask[j] > 0)
-                {
-                    _result[j] = bgr;
-                }
-            }
-        }
+            // normalize the colors
+            //cvtColor(image, image, CV_BGR2YCrCb); //change the color image from BGR to YCrCb format
+            //split(image, channels); //split the image into channels
+            //equalizeHist(channels[0], channels[0]); //equalize histogram on the 1st channel (Y)
+            //merge(channels, image); //merge 3 channels including the modified 1st channel into one image
+            //cvtColor(image, image, CV_YCrCb2BGR); //change the color image from YCrCb to BGR format (to display image properly)
 
-        // edge detection
-        Mat edges;
-        Canny(result, edges, 20, 40, 3, false);
-        /// Find contours
-        vector<vector<Point> > contours;
-        vector<Vec4i> hierarchy;
-        findContours(edges, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0,0));
-        // find polygons
-        vector<vector<Point> > polygons;
-        vector<Point> polygon;
-        vector<Rect> boundingBoxes;
-        Rect bounds;
-        int boundingThreshold = 10;
-        for (int i = 0; i < contours.size(); i++)
-        {
-            approxPolyDP(contours[i], polygon, 5, true);
-            bounds = boundingRect(Mat(polygon));
-            bool match = false;
-            for (int j = 0; j < boundingBoxes.size() && j < polygons.size(); j++)
+            // extract wall sample color
+            /*Mat bin, bin_sat, bin_val;
+            cvtColor(image, image, CV_BGR2HSV);
+            vector<Mat> channels;
+            split(image, channels);
+            threshold(channels[1], bin_sat, 80, 255, 0);
+            bitwise_not(bin_sat, bin_sat);
+            threshold(channels[2], bin_val, 200, 255, 0);
+            cvtColor(image, image, CV_HSV2BGR);
+            bitwise_and(bin_sat, bin_val, bin, noArray());
+            Scalar average = mean(image, bin);
+
+            // color correction based on sample color
+            split(image, channels);
+            double min, max, wmax;
+            wmax = 230;
+            //cout << "-----" << endl;
+            minMaxLoc(channels[0], &min, &max);
+            normalize(channels[0], channels[0], min, max + wmax - average[0], NORM_MINMAX, -1, noArray());
+            //cout << max + wmax - average[2] << " (" << wmax - average[0] << ")" << endl;
+            minMaxLoc(channels[1], &min, &max);
+            normalize(channels[1], channels[1], min, max + wmax - average[1], NORM_MINMAX, -1, noArray());
+            //cout << max + wmax - average[1] << " (" << wmax - average[1] << ")" << endl;
+            minMaxLoc(channels[2], &min, &max);
+            normalize(channels[2], channels[2], min, max + wmax - average[2], NORM_MINMAX, -1, noArray());
+            //cout << max + wmax - average[2] << " (" << wmax - average[2] << ")" << endl;
+            merge(channels, image);*/
+            
+            // apply gaussian filter
+            GaussianBlur(image, image, Size(9, 9), 3, 0, BORDER_DEFAULT);
+
+            // erosion
+            //erode(image, image, erosion_element);
+            // dilation
+            //dilate(image, image, dilation_element);
+
+            // loop over the detected objects
+            for (map<int, detected_object>::iterator it = detected_objects.begin(); it != detected_objects.end(); it++)
             {
-                // if the new bounds are enclosing
-                if (bounds.x-boundingThreshold <= boundingBoxes[j].x &&
-                    bounds.y-boundingThreshold <= boundingBoxes[j].y &&
-                    bounds.width+boundingThreshold >= boundingBoxes[j].width &&
-                    bounds.height+boundingThreshold >= boundingBoxes[j].height)
+                detected_object obj = it->second;
+                int color = obj.color;
+
+				cout << "checking " << obj.object.type << " iteration " << obj.iterations << endl;
+
+                // detect objects
+                Mat marker;
+                Mat mask = maskColor(image, color);
+                erode(mask, marker, erosion_element);
+                mask = maskReconstruction(marker, mask);
+                result = Mat::zeros(image.rows, image.cols, CV_8UC3);
+                Vec3b bgr = Vec3b(255,255,255);
+                Vec3b* _result;
+                float* _mask;
+                for (int i = 0; i < image.rows; i++)
                 {
-                    //rectangle(result, boundingBoxes[j], Scalar(0,0,255), 1, 8, 0);
-                    polygons.erase(polygons.begin()+j);
-                    boundingBoxes.erase(boundingBoxes.begin()+j);
-                    j--;
+                    _result = result.ptr<Vec3b>(i);
+                    _mask = mask.ptr<float>(i);
+                    for (int j = 0; j < image.cols; j++)
+                    {
+                        if (_mask[j] > 0)
+                        {
+                            _result[j] = bgr;
+                        }
+                    }
                 }
-                // if the new bounds is enclosed
-                else if (bounds.x >= boundingBoxes[j].x &&
-                    bounds.y >= boundingBoxes[j].y &&
-                    bounds.width <= boundingBoxes[j].width &&
-                    bounds.height <= boundingBoxes[j].height)
+
+                // edge detection
+                Mat edges;
+                Canny(result, edges, 20, 40, 3, false);
+                /// Find contours
+                vector<vector<Point> > contours;
+                vector<Vec4i> hierarchy;
+                findContours(edges, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0,0));
+                // find polygons
+                vector<vector<Point> > polygons;
+                vector<Point> polygon;
+                vector<Rect> boundingBoxes;
+                Rect bounds;
+                int boundingThreshold = 10;
+                for (int i = 0; i < contours.size(); i++)
                 {
-                    match = true;
-                    break;
+                    approxPolyDP(contours[i], polygon, approx_epsilon, true);
+                    bounds = boundingRect(Mat(polygon));
+                    bool match = false;
+                    for (int j = 0; j < boundingBoxes.size() && j < polygons.size(); j++)
+                    {
+                        // if the new bounds are enclosing
+                        if (bounds.x-boundingThreshold <= boundingBoxes[j].x &&
+                            bounds.y-boundingThreshold <= boundingBoxes[j].y &&
+                            bounds.width+boundingThreshold >= boundingBoxes[j].width &&
+                            bounds.height+boundingThreshold >= boundingBoxes[j].height)
+                        {
+                            //rectangle(result, boundingBoxes[j], Scalar(0,0,255), 1, 8, 0);
+                            polygons.erase(polygons.begin()+j);
+                            boundingBoxes.erase(boundingBoxes.begin()+j);
+                            j--;
+                        }
+                        // if the new bounds is enclosed
+                        else if (bounds.x >= boundingBoxes[j].x &&
+                            bounds.y >= boundingBoxes[j].y &&
+                            bounds.width <= boundingBoxes[j].width &&
+                            bounds.height <= boundingBoxes[j].height)
+                        {
+                            match = true;
+                            break;
+                        }
+                    }
+                    if (!match)
+                    {
+                        polygons.push_back(polygon);
+                        boundingBoxes.push_back(bounds);
+                    }
                 }
+                polylines(result, polygons, true, Scalar(0,0,255), 1, 8, 0);
+                int foundidx = 0, foundsize = 0;
+                for (int i = 0; i < boundingBoxes.size() && i < polygons.size(); i++)
+                {
+                    if (boundingBoxes[i].width*boundingBoxes[i].height > foundsize)
+                    {
+                        foundidx = i;
+                        foundsize = boundingBoxes[i].width*boundingBoxes[i].height;
+                    }
+                    rectangle(result, boundingBoxes[i], Scalar(255,0,255), 1, 8, 0);
+                }
+
+                if (visual_debugging)
+                {
+                    imshow(WINDOW_2, result);
+                }
+
+                int vertices;
+
+				/*
+                vertices = polygons[foundidx].size();
+                if (obj.vertices.find(vertices) == obj.vertices.end())
+                {
+                    obj.vertices[vertices] = 0;
+                }
+                obj.vertices[vertices]++;*/
+
+				if (polygons[foundidx].size() <= 6)
+				{
+					// found simple shape
+					obj.candidates[0]++;
+				}
+				else
+				{
+					// found complex shape
+					obj.candidates[1]++;
+				}
+                obj.iterations++;
+
+				if (verbose)
+				{
+					cout << "found " << color_names[color] << " object with " << polygons[foundidx].size() << " vertices (" << obj.candidates[0] << " : " << obj.candidates[1] << ")" << endl;
+				}
+
+                if (obj.iterations >= detect_iterations)
+                {
+					int highest_count = 0;
+                    /*
+                    for (map<int, int>::iterator vit = obj.vertices.begin(); vit != obj.vertices.end(); vit++)
+                    {
+                        if (vit->second > highest_count)
+                        {
+                            vertices = vit->first;
+                            highest_count = vit->second;
+                        }
+                    }*/
+
+                    if (obj.candidates[0] > obj.candidates[1])
+                    {
+                        // found simple shape
+						highest_count = obj.candidates[0];
+                        obj.object.type += " " + simple_shapes[color];
+                    }
+                    else
+                    {
+                        // found complex shape
+						highest_count = obj.candidates[1];
+                        obj.object.type += " " + complex_shapes[color];
+                    }
+
+                    cout << "published " << obj.object.type << " (" << highest_count << " candidates)" << endl;
+
+                    object_pub.publish(obj.object);
+
+                    detected_objects.erase(it);
+                    it--;
+                }
+				else
+				{
+					it->second = obj;
+				}
             }
-            if (!match)
-            {
-                polygons.push_back(polygon);
-                boundingBoxes.push_back(bounds);
-            }
-        }
-        //polylines(result, polygons, true, Scalar(255,255,255), 1, 8, 0);
-        for (int i = 0; i < boundingBoxes.size() && i < polygons.size(); i++)
-        {
-            rectangle(result, boundingBoxes[i], Scalar(255,0,255), 1, 8, 0);
-	        cout << "found " << color_names[color] << " object with " << polygons[i].size() << endl;
         }
 
         if (visual_debugging)
-        {
-            imshow(WINDOW_2, result);
-        }*/
-
-		if (visual_debugging)
         {
             imshow(WINDOW_1, image);
         }
@@ -346,136 +440,42 @@ private:
 
     void objectHandle(const vision_msgs::Object& msg)
     {
-		vision_msgs::Object obj = msg;
+        int color = -1;
 
-		int color = -1;
+        if (msg.type == "Red")
+            color = RED;
+        else if (msg.type == "Orange")
+            color = ORANGE;
+        else if (msg.type == "Yellow")
+            color = YELLOW;
+        else if (msg.type == "Green")
+            color = GREEN;
+        else if (msg.type == "Blue")
+            color = BLUE;
+        else if (msg.type == "Purple")
+            color = PURPLE;
 
-		if (msg.type == "RED")
-			color = RED;
-		else if (msg.type == "Orange")
-			color = ORANGE;
-		else if (msg.type == "Yellow")
-			color = YELLOW;
-		else if (msg.type == "Green")
-			color = GREEN;
-		else if (msg.type == "Blue")
-			color = BLUE;
-		else if (msg.type == "Purple")
-			color = PURPLE;
-
-//       Vec3b detected_color = Vec3b(obj.b, obj.g, obj.r);
-//        int color = getColor(detected_color);
-
-		cout << "-------" << endl;
+        if (verbose) {
+            cout << "--- got detect request (" << msg.type << ")" << endl;
+        }
 
         if (color < 0)
         {
-            cout << "color not detected [" << obj.r << " " << obj.g << " " << obj.b << "]" << endl;
+            if (verbose) {
+                cout << "color not detected [" << msg.r << " " << msg.g << " " << msg.b << "]" << endl;
+            }
             return;
         }
 
-
-        // detect objects
-        Mat marker;
-        Mat mask = maskColor(image, color);
-        erode(mask, marker, erosion_element);
-        mask = maskReconstruction(marker, mask);
-        result = Mat::zeros(image.rows, image.cols, CV_8UC3);
-        Vec3b bgr = Vec3b(255,255,255);
-        Vec3b* _result;
-        float* _mask;
-        for (int i = 0; i < image.rows; i++)
-        {
-            _result = result.ptr<Vec3b>(i);
-            _mask = mask.ptr<float>(i);
-            for (int j = 0; j < image.cols; j++)
-            {
-                if (_mask[j] > 0)
-                {
-                    _result[j] = bgr;
-                }
-            }
-        }
-
-        // edge detection
-        Mat edges;
-        Canny(result, edges, 20, 40, 3, false);
-        /// Find contours
-        vector<vector<Point> > contours;
-        vector<Vec4i> hierarchy;
-        findContours(edges, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0,0));
-        // find polygons
-        vector<vector<Point> > polygons;
-        vector<Point> polygon;
-        vector<Rect> boundingBoxes;
-        Rect bounds;
-        int boundingThreshold = 10;
-        for (int i = 0; i < contours.size(); i++)
-        {
-            approxPolyDP(contours[i], polygon, approx_epsilon, true);
-            bounds = boundingRect(Mat(polygon));
-            bool match = false;
-            for (int j = 0; j < boundingBoxes.size() && j < polygons.size(); j++)
-            {
-                // if the new bounds are enclosing
-                if (bounds.x-boundingThreshold <= boundingBoxes[j].x &&
-                    bounds.y-boundingThreshold <= boundingBoxes[j].y &&
-                    bounds.width+boundingThreshold >= boundingBoxes[j].width &&
-                    bounds.height+boundingThreshold >= boundingBoxes[j].height)
-                {
-                    //rectangle(result, boundingBoxes[j], Scalar(0,0,255), 1, 8, 0);
-                    polygons.erase(polygons.begin()+j);
-                    boundingBoxes.erase(boundingBoxes.begin()+j);
-                    j--;
-                }
-                // if the new bounds is enclosed
-                else if (bounds.x >= boundingBoxes[j].x &&
-                    bounds.y >= boundingBoxes[j].y &&
-                    bounds.width <= boundingBoxes[j].width &&
-                    bounds.height <= boundingBoxes[j].height)
-                {
-                    match = true;
-                    break;
-                }
-            }
-            if (!match)
-            {
-                polygons.push_back(polygon);
-                boundingBoxes.push_back(bounds);
-            }
-        }
-        polylines(result, polygons, true, Scalar(0,0,255), 1, 8, 0);
-        int foundidx = 0, foundsize = 0;
-        for (int i = 0; i < boundingBoxes.size() && i < polygons.size(); i++)
-        {
-            if (boundingBoxes[i].width*boundingBoxes[i].height > foundsize)
-            {
-                foundidx = i;
-                foundsize = boundingBoxes[i].width*boundingBoxes[i].height;
-            }
-            rectangle(result, boundingBoxes[i], Scalar(255,0,255), 1, 8, 0);
-	        cout << "found " << color_names[color] << " object with " << polygons[i].size() << " vertices [" << obj.x << " " << obj.y << " " << obj.z << "]" << endl;
-        }
-
-        if (polygons[foundidx].size() <= 6)
-        {
-            // found simple shape
-            obj.type += " " + simple_shapes[color];
-        }
-        else
-        {
-            // found complex shape
-            obj.type += " " + complex_shapes[color];
-        }
-
-		cout << "published " << obj.type << " (" << polygons[foundidx].size() << " vertices)" << endl;
-
-        object_pub.publish(obj);
-
-        if (visual_debugging)
-        {
-            imshow(WINDOW_2, result);
-        }
+        // add the object to be recognized
+        detected_object obj;
+		obj.color = color;
+		obj.iterations = 0;
+		obj.candidates[0] = 0;
+		obj.candidates[1] = 0;
+		obj.object = msg;
+        detected_objects[detect_id] = obj;
+        detect_id++;
     }
 
     /**
@@ -517,7 +517,7 @@ private:
 
     Mat maskColor(const Mat src, int color)
     {
-		Mat Tmp;
+        Mat Tmp;
 
         cvtColor(src, Tmp, CV_BGR2HSV);
 
