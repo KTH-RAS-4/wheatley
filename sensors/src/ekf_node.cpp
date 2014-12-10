@@ -50,6 +50,11 @@ namespace wheatley
         const string fixed_frame;
         const string robot_frame;
 
+        Eigen::Matrix3f prev_sigma;//[3X3]
+        double Q; //5 cm
+        double lambda; //chi2inv(0.8,1);
+        Eigen::Matrix3f R;//[3X3]
+
     public:
         KalmanNode()
             : fixed_frame("map")
@@ -71,6 +76,16 @@ namespace wheatley
             sub_ir = nh.subscribe("/sensors/ir/distances", 1, &KalmanNode::callback_ir, this);
             pub_sim_ir = nh.advertise<sensors::Distance>("simulated_ir_distances", 1);
 
+            prev_sigma << 0.05,    0, 0,
+                             0, 0.05, 0,
+                             0,    0, 0.01;//[3X3]
+            Q=0.05; //5 cm
+            lambda=1.0742; //chi2inv(0.8,1);
+
+            R << 0.05,    0, 0,
+                    0, 0.05, 0,
+                    0,    0, 0.01;//[3X3]
+
             loadParameters();
         }
 
@@ -90,24 +105,53 @@ namespace wheatley
             gm::Pose pose = getPose(tfl, realIR->header.stamp, robot_frame, fixed_frame);
             sensors::Distance simulatedIR = simulateIrDistances(pose, realIR->header.stamp);
             pub_sim_ir.publish(simulatedIR);
-            calc(*realIR, simulatedIR, pose);
+
+            static bool first_pose_callback = true;
+            static gm::Pose prev_pose;
+
+            if (!first_pose_callback)
+                calc(*realIR, simulatedIR, pose, prev_pose);
+
+            prev_pose = pose;
+            first_pose_callback = false;
         }
 
-        void calc(const sensors::Distance& real, const sensors::Distance& simulated, const gm::Pose& pose)
+        void calc(const sensors::Distance& real, const sensors::Distance& simulated, const gm::Pose& pose, const gm::Pose& prev_pose)
         {
-            static gm::Pose prev_pose;
             double theta = tf::getYaw(pose.orientation);
-
             double u_x = pose.position.x-prev_pose.position.x;
             double u_y = pose.position.y-prev_pose.position.y;
 
+            //prev_sigma [3x3]
+
+            Eigen::VectorXd inliers(6);//[6X1]
+            Eigen::VectorXf nu(6);//[6X1]
+            Eigen::MatrixXf H_buffer(6,3) ;//[6X3]
+            Eigen::Matrix3f sigma,G;//[3X3]
+
+            G<< 1,0,-u_y,
+                0,1, u_x,
+                0,0,  1;
+
+            sigma=G*prev_sigma*G.transpose()+R;
+
+
+
+            int i;
+            double x,y;
+            for (i=0;i<6;i++){
+
+                H_buffer(i,0)=x;
+                H_buffer(i,1)=y;
+                H_buffer(i,2)=0;
+            }
 
 
 
 
 
 
-            prev_pose = pose;
+
         }
 
         sensors::Distance simulateIrDistances(const gm::Pose& pose, const ros::Time& stamp)
@@ -164,11 +208,15 @@ namespace wheatley
 
 int main (int argc, char **argv)
 {
-
-    if (1){
-    Eigen::Matrix3d sigma,G,R,I;//[3X3]
-    Eigen::Vector3d mu,a;//[3X1]
+/*
+    if (0){
+    Eigen::Matrix3d sigma,G,R,I,k,u;//[3X3]
+    Eigen::Vector3d mu,a,u1,u2,u3,u4;//[3X1]
     Eigen::RowVector3d H,b,c,i,d;//[1X3]
+
+    int j=4;
+    Eigen::MatrixXd n(3,j) ;//[3Xj]
+    Eigen::MatrixXd n_t(j,3) ;//[jX3]
 
     R(0,0)=1;
     R(0,1)=0;
@@ -190,8 +238,6 @@ int main (int argc, char **argv)
     I(2,1)=0;
     I(2,2)=1;
 
-    G=R*R;
-
     H(0,0)=1;
     H(0,1)=2;
     H(0,2)=3;
@@ -204,15 +250,28 @@ int main (int argc, char **argv)
     mu(1,0)=20;
     mu(2,0)=30;
 
+    u1<<1,2,3;
+    u2<<11,22,33;
+    u3<<111,222,333;
+    u4<<1111,2222,3333;
 
-    a=R*mu; //[3X1]=[3x3][3x1]
+    n << u1,u2,u3,u4;
+    n_t=n.transpose();
+
+    //////////////////////////////
+
+    G=R*R;
     b=H*R;//[1X3]=(1X3)(3X1)
+    a=R*mu; //[3X1]=[3x3][3x1]
 
     double num =H*mu; //[1x1]=[1x3][3x1]
 
     c=H+(10*i);//sum a constant to a vector
 
+    d=mu.transpose();
+    sigma=R.inverse();
 
+     k <<1,2,3,4,5,6,7,8,9;
 
     ROS_INFO("hola %f",G(0,0));
     ROS_INFO("hola %f",G(2,2));
@@ -229,7 +288,110 @@ int main (int argc, char **argv)
     ROS_INFO("hola %f",d(0,0));
     ROS_INFO("hola %f",d(0,1));
     ROS_INFO("hola %f",d(0,2));
+    ROS_INFO("hola %f",sigma(0,0));
+    ROS_INFO("hola %f",sigma(1,1));
+    ROS_INFO("hola %f",sigma(2,2));
+    ROS_INFO("hola %f",k(0,0));
+    ROS_INFO("hola %f",k(1,1));
+    ROS_INFO("hola %f",k(2,2));
+
+    ROS_INFO("hola %f",u1(0,0));
+    ROS_INFO("hola %f",u1(1,0));
+    ROS_INFO("hola %f",u1(2,0));
+    ROS_INFO("hola %f",u2(0,0));
+    ROS_INFO("hola %f",u2(1,0));
+    ROS_INFO("hola %f",u2(2,0));
+    ROS_INFO("hola %f",u3(0,0));
+    ROS_INFO("hola %f",u3(1,0));
+    ROS_INFO("hola %f",u3(2,0));
+    ROS_INFO("hola %f",u4(0,0));
+    ROS_INFO("hola %f",u4(1,0));
+    ROS_INFO("hola %f",u4(2,0));
+
+//    ROS_INFO("\nhola %f",u(0,1));
+//    ROS_INFO("hola %f",u(0,2));
+//    ROS_INFO("hola %f",u(0,0));
+
+    ROS_INFO_STREAM("n = " << n);
+
+    ROS_INFO_STREAM("n.transpose() = \n" << n_t);
+    ROS_INFO_STREAM("n.transpose() = \n" << n_t(1,1));
+
+
     }
+
+        Eigen::VectorXf diff(6);
+
+
+    if(1){
+        Eigen::VectorXf diff(6);
+        Eigen::VectorXd inliers(6);
+        diff<<1,2,3,4,5,6;
+        ROS_INFO_STREAM("diff = \n" << diff);
+        ROS_INFO_STREAM("diff(5) = " << diff(5));
+
+
+        Eigen::MatrixXf H_buffer(6,3) ;//[6X3]
+        double x,y;
+        x=1;
+        y=11;
+        for (int hhh=0;hhh<6;hhh++){
+            H_buffer(hhh,0)=x*hhh;
+            H_buffer(hhh,1)=y*hhh;
+            H_buffer(hhh,2)=0;
+        }
+
+        ROS_INFO_STREAM("H_buffer = \n" << H_buffer);
+        ROS_INFO_STREAM("H_buffe(5,2) = " << H_buffer(5,1));
+
+        double num_inliers=0;
+        for (int hhh=0;hhh<6;hhh++){
+            H_buffer(hhh,0)=x*hhh;
+            H_buffer(hhh,1)=y*hhh;
+            H_buffer(hhh,2)=0;
+        }
+
+
+        int result;
+        for (int o=0;o<6;o++){
+
+            ROS_INFO_STREAM("diff(5) = " << diff(o));
+            result=diff(o);
+            if (result%2)
+                inliers(o)=0;
+            else
+            {
+                inliers(o)=1;
+                num_inliers++;
+            }
+
+        }
+        ROS_INFO_STREAM("inliers = \n" << inliers);
+        Eigen::VectorXf nu(num_inliers);
+        Eigen::MatrixXf H_hat(num_inliers,3);
+        int oo=0;
+        for ( int o=0;o<6;o++)
+        {
+            if(inliers(o))
+            {
+                nu(oo)=diff(o);
+                H_hat(oo,0)=H_buffer(o,0);
+                H_hat(oo,1)=H_buffer(o,1);
+                H_hat(oo,2)=H_buffer(o,2);
+                oo++;
+            }
+        }
+        ROS_INFO_STREAM("H_hat = \n" << H_hat);
+        ROS_INFO_STREAM("nu = \n" << nu);
+
+        Eigen::Vector3f pose1;
+        pose1=H_hat*nu;
+        ROS_INFO_STREAM("pose = \n" << pose1);
+
+
+    }
+    */
+
 
     ros::init(argc, argv, "ekf_node");
     wheatley::KalmanNode ekf_node;
