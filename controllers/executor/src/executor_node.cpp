@@ -115,6 +115,8 @@ namespace wheatley
                 desiredTheta = angles::normalize_angle(desiredTheta + M_PI/2);
             else if (state == "RIGHT")
                 desiredTheta = angles::normalize_angle(desiredTheta - M_PI/2);
+
+            publishState();
         }
 
         void distanceCallback(const sensors::Distance::ConstPtr &msg)
@@ -160,6 +162,8 @@ namespace wheatley
                 ready = false;
                 state = "BACK";
             }
+
+            publishState();
         }
 
         void poseCallback(const nav_msgs::Odometry::ConstPtr &msg)
@@ -190,7 +194,6 @@ namespace wheatley
         {
             while (ros::ok())
             {
-                static string prev_state = "";
                 if (state == "FORWARD")
                 {
                     if (!follow(0.2, 0.08))
@@ -312,21 +315,27 @@ namespace wheatley
                     }
                 }
 
-                if (prev_state != state)
-                {
-                    std_msgs::String msg_state;
-                    msg_state.data = state;
-                    pub_state.publish(msg_state);
-
-                    ROS_INFO("%7s->%-7s: desiredTheta: %.1f, theta: %.1f",
-                             prev_state.data(), state.data(),
-                             desiredTheta*180/M_PI, theta*180/M_PI);
-
-                    prev_state = state;
-                }
+                publishState();
 
                 ros::spinOnce();
                 loop_rate.sleep();
+            }
+        }
+
+        void publishState()
+        {
+            static string prev_state = "";
+            if (prev_state != state)
+            {
+                std_msgs::String msg_state;
+                msg_state.data = state;
+                pub_state.publish(msg_state);
+
+                ROS_INFO("%7s->%-7s: desiredTheta: %.1f, theta: %.1f",
+                         prev_state.data(), state.data(),
+                         desiredTheta*180/M_PI, theta*180/M_PI);
+
+                prev_state = state;
             }
         }
 
