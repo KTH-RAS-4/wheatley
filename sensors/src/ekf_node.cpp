@@ -1,4 +1,5 @@
 #include <ros/ros.h>
+#include <ras_arduino_msgs/Odometry.h>
 #include <nav_msgs/Odometry.h>
 #include <geometry_msgs/Twist.h>
 #include <tf/LinearMath/Quaternion.h>
@@ -11,10 +12,14 @@
 #include <nav_msgs/OccupancyGrid.h>
 #include <occupancy_grid_utils/ray_tracer.h>
 #include <occupancy_grid_utils/coordinate_conversions.h>
+#define _USE_MATH_DEFINES
+#include <cmath>
 #include <map>
 #include <sensors/Distance.h>
 #include <wheatley_common/common.h>
 #include <boost/foreach.hpp>
+#include <Eigen/Core>
+#include <Eigen/LU>
 
 
 using std::string;
@@ -29,6 +34,7 @@ namespace wheatley
     private:
         ros::Subscriber sub_map;
         ros::Subscriber sub_ir;
+        ros::Subscriber sub_encoders;
         ros::Publisher pub_sim_ir;
         tf::TransformListener tfl;
 
@@ -64,6 +70,8 @@ namespace wheatley
             sub_map = nh.subscribe("map_in", 1, &KalmanNode::callback_map, this);
             sub_ir = nh.subscribe("/sensors/ir/distances", 1, &KalmanNode::callback_ir, this);
             pub_sim_ir = nh.advertise<sensors::Distance>("simulated_ir_distances", 1);
+
+            loadParameters();
         }
 
         void callback_map(const nm::OccupancyGrid::ConstPtr& msg)
@@ -85,14 +93,22 @@ namespace wheatley
             calc(*realIR, simulatedIR, pose);
         }
 
-
-
         void calc(const sensors::Distance& real, const sensors::Distance& simulated, const gm::Pose& pose)
         {
+            static gm::Pose prev_pose;
             double theta = tf::getYaw(pose.orientation);
+
+            double u_x = pose.position.x-prev_pose.position.x;
+            double u_y = pose.position.y-prev_pose.position.y;
+
+
+
+
+
+
+
+            prev_pose = pose;
         }
-
-
 
         sensors::Distance simulateIrDistances(const gm::Pose& pose, const ros::Time& stamp)
         {
@@ -133,6 +149,12 @@ namespace wheatley
             return -0.1;
         }
 
+        void loadParameters()
+        {
+            //nh.getParam("/base/diameter", baseDiameter);
+
+        }
+
         void run()
         {
             ros::spin();
@@ -142,6 +164,73 @@ namespace wheatley
 
 int main (int argc, char **argv)
 {
+
+    if (1){
+    Eigen::Matrix3d sigma,G,R,I;//[3X3]
+    Eigen::Vector3d mu,a;//[3X1]
+    Eigen::RowVector3d H,b,c,i,d;//[1X3]
+
+    R(0,0)=1;
+    R(0,1)=0;
+    R(0,2)=0;
+    R(1,0)=0;
+    R(1,1)=2;
+    R(1,2)=0;
+    R(2,0)=0;
+    R(2,1)=0;
+    R(2,2)=3;
+
+    I(0,0)=1;
+    I(0,1)=0;
+    I(0,2)=0;
+    I(1,0)=0;
+    I(1,1)=1;
+    I(1,2)=0;
+    I(2,0)=0;
+    I(2,1)=0;
+    I(2,2)=1;
+
+    G=R*R;
+
+    H(0,0)=1;
+    H(0,1)=2;
+    H(0,2)=3;
+
+    i(0,0)=1;
+    i(0,1)=1;
+    i(0,2)=1;
+
+    mu(0,0)=10;
+    mu(1,0)=20;
+    mu(2,0)=30;
+
+
+    a=R*mu; //[3X1]=[3x3][3x1]
+    b=H*R;//[1X3]=(1X3)(3X1)
+
+    double num =H*mu; //[1x1]=[1x3][3x1]
+
+    c=H+(10*i);//sum a constant to a vector
+
+
+
+    ROS_INFO("hola %f",G(0,0));
+    ROS_INFO("hola %f",G(2,2));
+    ROS_INFO("hola %f",b(0,0));
+    ROS_INFO("hola %f",b(0,1));
+    ROS_INFO("hola %f",b(0,2));
+    ROS_INFO("hola %f",a(0,0));
+    ROS_INFO("hola %f",a(1,0));
+    ROS_INFO("hola %f",a(2,0));
+    ROS_INFO("hola %f",num);
+    ROS_INFO("hola %f",c(0,0));
+    ROS_INFO("hola %f",c(0,1));
+    ROS_INFO("hola %f",c(0,2));
+    ROS_INFO("hola %f",d(0,0));
+    ROS_INFO("hola %f",d(0,1));
+    ROS_INFO("hola %f",d(0,2));
+    }
+
     ros::init(argc, argv, "ekf_node");
     wheatley::KalmanNode ekf_node;
     ekf_node.run();
