@@ -118,38 +118,107 @@ namespace wheatley
 
         void calc(const sensors::Distance& real, const sensors::Distance& simulated, const gm::Pose& pose, const gm::Pose& prev_pose)
         {
-            double theta = tf::getYaw(pose.orientation);
             double u_x = pose.position.x-prev_pose.position.x;
             double u_y = pose.position.y-prev_pose.position.y;
 
-            //prev_sigma [3x3]
+            int NUM_MEASUREMENTS=6,num_inliers=0;
 
-            Eigen::VectorXd inliers(6);//[6X1]
-            Eigen::VectorXf nu(6);//[6X1]
-            Eigen::MatrixXf H_buffer(6,3) ;//[6X3]
+            Eigen::VectorXd inliers(NUM_MEASUREMENTS);//[6X1]
+            Eigen::VectorXf nu_buffer(NUM_MEASUREMENTS);//[6X1]
+            Eigen::MatrixXf H_buffer(NUM_MEASUREMENTS,3) ;//[6X3]
             Eigen::Matrix3f sigma,G;//[3X3]
+            Eigen::Vector3f mu,prev_mu,update; //[3X1]
+
+            double theta = tf::getYaw(pose.orientation);
+            prev_mu<<pose.position.x, pose.position.y, theta;
 
             G<< 1,0,-u_y,
                 0,1, u_x,
                 0,0,  1;
 
+
             sigma=G*prev_sigma*G.transpose()+R;
 
+            H_buffer(0,0)=real.front*cos(theta)/simulated.front;
+            H_buffer(0,1)=real.front*sin(theta)/simulated.front;
+            H_buffer(0,2)=0;
+            nu_buffer(0)=real.front-simulated.front;
 
+            H_buffer(1,0)=real.rear*cos(theta)/simulated.rear;
+            H_buffer(1,1)=real.rear*sin(theta)/simulated.rear;
+            H_buffer(1,2)=0;
+            nu_buffer(1)=real.rear-simulated.rear;
 
-            int i;
-            double x,y;
-            for (i=0;i<6;i++){
+            H_buffer(2,0)=real.left_front*cos(theta)/simulated.left_front;
+            H_buffer(2,1)=real.left_front*sin(theta)/simulated.left_front;
+            H_buffer(2,2)=0;
+            nu_buffer(2)=real.left_front-simulated.left_front;
 
-                H_buffer(i,0)=x;
-                H_buffer(i,1)=y;
-                H_buffer(i,2)=0;
+            H_buffer(3,0)=real.left_rear*cos(theta)/simulated.left_rear;
+            H_buffer(3,1)=real.left_rear*sin(theta)/simulated.left_rear;
+            H_buffer(3,2)=0;
+            nu_buffer(3)=real.left_rear-simulated.left_rear;
+
+            H_buffer(4,0)=real.right_front*cos(theta)/simulated.right_front;
+            H_buffer(4,1)=real.right_front*sin(theta)/simulated.right_front;
+            H_buffer(4,2)=0;
+            nu_buffer(4)=real.right_front-simulated.right_front;
+
+            H_buffer(5,0)=real.right_rear*cos(theta)/simulated.right_rear;
+            H_buffer(5,1)=real.right_rear*sin(theta)/simulated.right_rear;
+            H_buffer(5,2)=0;
+            nu_buffer(5)=real.right_rear-simulated.right_rear;
+
+            Eigen::RowVector3f hi; //[1x3]
+            double S,D;
+            for(int i=0;i<NUM_MEASUREMENTS;i++){
+                 hi<< H_buffer(i,0), H_buffer(i,1), H_buffer(i,2);
+                 S=hi*sigma*hi.transpose()+Q;
+                 D=nu_buffer(i)*nu_buffer(i)/S;
+                 if (D>=lambda)
+                 {
+                    inliers(i)=1;
+                    num_inliers++;
+                 }
+                 else
+                    inliers(i)=0;
+            }
+
+            Eigen::VectorXf nu(num_inliers);
+            Eigen::MatrixXf H_hat(num_inliers,3);
+
+            int j=0;
+            for ( int i=0;i<NUM_MEASUREMENTS;i++)
+            {
+                if(inliers(i))
+                {
+                    nu(j)=nu_buffer(i);
+                    H_hat(j,0)=H_buffer(i,0);
+                    H_hat(j,1)=H_buffer(i,1);
+                    H_hat(j,2)=H_buffer(i,2);
+                    j++;
+                }
             }
 
 
+           Eigen::MatrixXf I(3,3);
+           I = Eigen::MatrixXf::Identity(3,3);
 
+           Eigen::MatrixXf S_hat(num_inliers,num_inliers);
+           Eigen::MatrixXf Q_hat(num_inliers,num_inliers);
+           Q_hat = Q * Eigen::MatrixXf::Identity(num_inliers,num_inliers);
 
+           S_hat=H_hat*sigma*H_hat.transpose()+Q_hat;
+           Eigen::MatrixXf K(3,num_inliers);
 
+           K=sigma*H_hat.transpose()*S_hat.inverse();
+
+           update=K*nu;
+           mu=prev_mu+update;
+
+           sigma=(I-K*H_hat)*prev_sigma;
+
+           prev_sigma=sigma;
 
 
         }
@@ -208,6 +277,108 @@ namespace wheatley
 
 int main (int argc, char **argv)
 {
+
+/*
+    if(1)
+    {
+        int dim=5;
+        Eigen::MatrixXf I(dim,dim);
+        I = 1.3 * Eigen::MatrixXf::Identity(dim,dim);
+        ROS_INFO_STREAM("I*13= \n" << I);
+    }
+*/
+
+/*
+    if(1){
+        Eigen::VectorXf diff(6);
+        Eigen::VectorXd inliers(6);
+        diff<<1,2,3,4,5,6;
+        ROS_INFO_STREAM("diff = \n" << diff);
+        ROS_INFO_STREAM("diff(5) = " << diff(5));
+
+
+        Eigen::MatrixXf H_buffer1(6,3) ;//[6X3]
+        double x,y;
+        x=1;
+        y=11;
+        for (int hhh=0;hhh<6;hhh++){
+            H_buffer1(hhh,0)=x*hhh;
+            H_buffer1(hhh,1)=y*hhh;
+            H_buffer1(hhh,2)=0;
+        }
+
+        ROS_INFO_STREAM("H_buffer1 = \n" << H_buffer1);
+        ROS_INFO_STREAM("H_buffe(5,2) = " << H_buffer1(5,1));
+
+        double num_inliers=0;
+        for (int hhh=0;hhh<6;hhh++){
+            H_buffer1(hhh,0)=x*hhh;
+            H_buffer1(hhh,1)=y*hhh;
+            H_buffer1(hhh,2)=0;
+        }
+
+
+        int result;
+        for (int o=0;o<6;o++){
+
+            ROS_INFO_STREAM("diff(5) = " << diff(o));
+            result=diff(o);
+            if (result%2)
+                inliers(o)=0;
+            else
+            {
+                inliers(o)=1;
+                num_inliers++;
+            }
+
+        }
+        ROS_INFO_STREAM("inliers = \n" << inliers);
+        Eigen::VectorXf nu(num_inliers);
+        Eigen::MatrixXf H_hat(num_inliers,3);
+        int oo=0;
+        for ( int o=0;o<6;o++)
+        {
+            if(inliers(o))
+            {
+                nu(oo)=diff(o);
+                H_hat(oo,0)=H_buffer1(o,0);
+                H_hat(oo,1)=H_buffer1(o,1);
+                H_hat(oo,2)=H_buffer1(o,2);
+                oo++;
+            }
+        }
+        ROS_INFO_STREAM("H_hat = \n" << H_hat);
+        ROS_INFO_STREAM("nu = \n" << nu);
+
+        Eigen::Vector3f pose1,h1t;//[3x1]
+        pose1=H_hat*nu;
+        ROS_INFO_STREAM("pose = \n" << pose1);
+
+        Eigen::RowVector3f h1; //[1x3]
+        h1<< H_buffer1(4,0), H_buffer1(4,1), H_buffer1(4,2);
+        ROS_INFO_STREAM("h1 = " << h1);
+
+        double Q1; //5 cm
+        //double lambda; //chi2inv(0.8,1);
+        Eigen::Matrix3f R1;//[3X3]
+
+        Q1=0.05; //5 cm
+        //lambda=1.0742; //chi2inv(0.8,1);
+
+        R1 << 0.05,    0, 0,
+                0, 0.05, 0,
+                0,    0, 0.01;//[3X3]
+
+        //h1t=h1.transpose();
+
+        double pose2=h1*R1*h1.transpose()+Q1;
+
+        ROS_INFO_STREAM("result = " << pose2);
+
+
+    }
+
+    */
 /*
     if (0){
     Eigen::Matrix3d sigma,G,R,I,k,u;//[3X3]
@@ -321,77 +492,7 @@ int main (int argc, char **argv)
     }
 
         Eigen::VectorXf diff(6);
-
-
-    if(1){
-        Eigen::VectorXf diff(6);
-        Eigen::VectorXd inliers(6);
-        diff<<1,2,3,4,5,6;
-        ROS_INFO_STREAM("diff = \n" << diff);
-        ROS_INFO_STREAM("diff(5) = " << diff(5));
-
-
-        Eigen::MatrixXf H_buffer(6,3) ;//[6X3]
-        double x,y;
-        x=1;
-        y=11;
-        for (int hhh=0;hhh<6;hhh++){
-            H_buffer(hhh,0)=x*hhh;
-            H_buffer(hhh,1)=y*hhh;
-            H_buffer(hhh,2)=0;
-        }
-
-        ROS_INFO_STREAM("H_buffer = \n" << H_buffer);
-        ROS_INFO_STREAM("H_buffe(5,2) = " << H_buffer(5,1));
-
-        double num_inliers=0;
-        for (int hhh=0;hhh<6;hhh++){
-            H_buffer(hhh,0)=x*hhh;
-            H_buffer(hhh,1)=y*hhh;
-            H_buffer(hhh,2)=0;
-        }
-
-
-        int result;
-        for (int o=0;o<6;o++){
-
-            ROS_INFO_STREAM("diff(5) = " << diff(o));
-            result=diff(o);
-            if (result%2)
-                inliers(o)=0;
-            else
-            {
-                inliers(o)=1;
-                num_inliers++;
-            }
-
-        }
-        ROS_INFO_STREAM("inliers = \n" << inliers);
-        Eigen::VectorXf nu(num_inliers);
-        Eigen::MatrixXf H_hat(num_inliers,3);
-        int oo=0;
-        for ( int o=0;o<6;o++)
-        {
-            if(inliers(o))
-            {
-                nu(oo)=diff(o);
-                H_hat(oo,0)=H_buffer(o,0);
-                H_hat(oo,1)=H_buffer(o,1);
-                H_hat(oo,2)=H_buffer(o,2);
-                oo++;
-            }
-        }
-        ROS_INFO_STREAM("H_hat = \n" << H_hat);
-        ROS_INFO_STREAM("nu = \n" << nu);
-
-        Eigen::Vector3f pose1;
-        pose1=H_hat*nu;
-        ROS_INFO_STREAM("pose = \n" << pose1);
-
-
-    }
-    */
-
+*/
 
     ros::init(argc, argv, "ekf_node");
     wheatley::KalmanNode ekf_node;
