@@ -2,6 +2,7 @@
 #include <ros/wall_timer.h>
 #include <nav_msgs/OccupancyGrid.h>
 #include <nav_msgs/Path.h>
+#include <nav_msgs/Odometry.h>
 #include <std_msgs/String.h>
 #include <occupancy_grid_utils/ray_tracer.h>
 #include <occupancy_grid_utils/shortest_path.h>
@@ -30,41 +31,44 @@ namespace wheatley
     private:
         ros::Subscriber sub_map;
         ros::Subscriber sub_clicked_point;
-        ros::Subscriber sub_executor_state;
+        ros::Subscriber sub_pose;
 
-        ros::Publisher pub_executor_order;
         ros::Publisher pub_path;
         ros::Publisher pub_map;
         tf::TransformListener tfl;
         ros::WallTimer timer_pathfinding;
         const string fixed_frame;
         const string robot_frame;
-        const double robot_outer_diameter;
-        bool active;
-        bool executor_ready;
-        string prev_order;
+        const double robot_diameter;
+        bool has_goal;
 
         nav_msgs::OccupancyGrid map;
         nav_msgs::OccupancyGrid inflated_map;
+        gm::Pose pose;
+        gm::PointStamped home;
 
-        geometry_msgs::Point goal;
-        bool explore;
+        gm::Point goal;
+        const int phase;
+        ros::Time last_input;
+
+        double timeout;
 
     public:
         Navigator()
             : fixed_frame("map")
             , robot_frame("robot")
-            , active(false)
-            , executor_ready(false)
-            , robot_outer_diameter(requireParameter<double>("/base/outer_diameter"))
-            , explore(requireParameter<int>("/phase") == 1)
+            , has_goal(false)
+            , last_input(-1000)
+            , robot_diameter(requireParameter<double>("/base/diameter"))
+            , phase(requireParameter<int>("/phase"))
         {
             double rate = requireParameter<double>("pathfinding_rate");
+            double timeout = requireParameter<double>("timeout");
+
 
             sub_map = nh.subscribe("map_in", 1, &Navigator::callback_map, this);
             sub_clicked_point = nh.subscribe("/clicked_point", 1, &Navigator::callback_clicked_point, this);
-            sub_executor_state = nh.subscribe("executor_state", 1, &Navigator::callback_executor_state, this);
-            pub_executor_order = nh.advertise<std_msgs::String>("executor_order", 1, true);
+            sub_pose = nh.subscribe("pose", 1, &Navigator::callback_pose, this);
             pub_path = nh.advertise<nav_msgs::Path>("planned_path", 1);
             pub_map = nh.advertise<nav_msgs::OccupancyGrid>("map_out", 1);
             timer_pathfinding = nh.createWallTimer(ros::WallDuration(1/rate), &Navigator::callback_timer, this);
@@ -72,8 +76,8 @@ namespace wheatley
 
         signed char occupancyFunction(float distance)
         {
-            const float min = robot_outer_diameter/2;
-            const float max = robot_outer_diameter/2 + 0.3;
+            const float min = robot_diameter/2;
+            const float max = robot_diameter/2 + 0.3;
 
             if (distance <= min)
                 return gu::OCCUPIED;
@@ -86,6 +90,18 @@ namespace wheatley
             else
                 return gu::UNKNOWN;
         }
+
+        void callback_pose(const nav_msgs::Odometry::ConstPtr& msg)
+        {
+            static bool firstPose = true;
+            if (firstPose)
+            {
+                firstPose = false;
+                home.point.x = msg->pose.pose.position.x;
+                home.point.y = msg->pose.pose.position.y;
+            }
+        }
+
         void callback_map(const nav_msgs::OccupancyGrid::ConstPtr& msg)
         {
             ROS_INFO_ONCE("got first map");
@@ -101,20 +117,12 @@ namespace wheatley
 
         void callback_clicked_point(const geometry_msgs::PointStamped::ConstPtr& msg)
         {
-            goal = msg->point;
-            active = true;
-            prev_order.clear();
-            run_pathfinding();
-        }
-
-        void callback_executor_state(const std_msgs::String::ConstPtr& msg)
-        {
-            ROS_INFO_STREAM_ONCE("got first state from executor: " << msg->data);
-            if (msg->data == "STOP")
-                prev_order.clear();
-            if (msg->data == "STOP" || msg->data == "FORWARD")
-                executor_ready = true;
-            run_pathfinding();
+            if (phase == 0)
+            {
+                goal = msg->point;
+                has_goal = true;
+                run_pathfinding();
+            }
         }
 
         void callback_timer(const ros::WallTimerEvent&)
@@ -124,7 +132,21 @@ namespace wheatley
 
         void run_pathfinding()
         {
-            if ((!active && !explore) || !executor_ready) //don't bother if the executor is turning
+            static bool timedOut = true;
+            if ((ros::Time::now()-last_input).toSec() > timeout)
+            {
+                static bool timedOut = false;
+                if (!timedOut)
+                {
+                    timedOut = true;
+                    goal = home.point;
+                    has_goal = true;
+                    run_pathfinding();
+                    ROS_DEBUG("timeout, going home!");
+                }
+            }
+
+            if (phase != 1 && !has_goal)
                 return;
 
             if (map.header.frame_id == "")
@@ -139,7 +161,7 @@ namespace wheatley
                 return;
             }
 
-            if (!explore)
+            if (phase != 1)
             {
                 static gm::Point prev_goal;
                 if (prev_goal.x != goal.x && prev_goal.y != goal.y)
@@ -158,7 +180,7 @@ namespace wheatley
             gu::Cell goal_cell = gu::pointCell(inflated_map.info, goal);
             boost::optional<gu::Cell> free_goal_cell = gu::closestFree(inflated_map, goal_cell, 0.3);
 
-            if (explore)
+            if (phase == 1)
                 free_goal_cell = free_robot_cell; //ugly fix :D
 
             if (!free_robot_cell || !free_goal_cell)
@@ -167,7 +189,7 @@ namespace wheatley
                 return;
             }
 
-            boost::optional<gu::AStarResult> astar = gu::shortestPathAStar(inflated_map, *free_robot_cell, *free_goal_cell, explore, currDirection);
+            boost::optional<gu::AStarResult> astar = gu::shortestPathAStar(inflated_map, *free_robot_cell, *free_goal_cell, phase == 1, currDirection);
 
             if (!astar)
             {
@@ -178,41 +200,8 @@ namespace wheatley
             gu::Path path = (*astar).first;
             std::vector<gm::Point> points = getPoints(inflated_map, path);
 
-            if (points.size() < 4)
-            {
-                publishPath(std::vector<gm::Point>());
-                active = false;
-                publishOrder("STOP");
-            }
-            else
-            {
-                publishPath(points);
-
-                angles::StraightAngle nextDirection = angles::StraightAngle::getClosest(points[0], points[1]);
-                double diff = angles::shortest_angular_distance(currDirection.angle(), nextDirection.angle());
-
-                if (diff > 0)
-                    publishOrder("LEFT");
-                else if (diff < 0)
-                    publishOrder("RIGHT");
-                else
-                    publishOrder("FORWARD");
-            }
-        }
-
-        void publishOrder(string order)
-        {
-            if (executor_ready && prev_order != order)
-            {
-                prev_order = order;
-
-                if (order == "LEFT" || order == "RIGHT" || order == "BACK")
-                    executor_ready = false;
-
-                std_msgs::String msg_order;
-                msg_order.data = order;
-                pub_executor_order.publish(msg_order);
-            }
+            publishPath(points);
+            last_input = ros::Time::now();
         }
 
         void publishPath(const std::vector<gm::Point>& path)

@@ -3,9 +3,15 @@
 <launch>
 	<node pkg="navigation" type="navigation_node"
 			name="navigator" output="screen" clear_params="true">
-		<rosparam command="load" file="$(find navigation)/config/settings.yaml"/>
+		<rosparam command="load" file="$(find navigation)/config/navigator.yaml"/>
 		<remap from="~/map_in" to="/map"/>
 		<remap from="~/map_out" to="~/inflated_map"/>
+	</node>
+	<node pkg="navigation" type="path_following_node"
+			name="path_follower" output="screen" clear_params="true">
+		<rosparam command="load" file="$(find navigation)/config/path_follower.yaml"/>
+		<remap from="~/pose" to="/sensors/pose"/>
+		<remap from="~/path" to="navigator/planned_path"/>
 		<remap from="~/executor_state" to="/executor/state"/>
 		<remap from="~/executor_order" to="/executor/order"/>
 	</node>
