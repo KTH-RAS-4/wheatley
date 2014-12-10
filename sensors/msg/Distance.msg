@@ -6,3 +6,4 @@ float64 left_front
 float64 left_rear
 float64 right_front
 float64 right_rear
+bool bumper

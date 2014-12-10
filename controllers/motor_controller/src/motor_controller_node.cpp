@@ -72,7 +72,12 @@ public:
         double D = (error - last_error) / elapsed;
         last_error = error;
         double speed = 0;
-        if (twi.linear.x != 0 | twi.angular.z != 0)
+        if (twi.linear.x == 0 && twi.angular.z == 0)
+        {
+            speed = kP*error + kD*D;
+            errors = boost::circular_buffer<double>(I_memory, 0);
+
+        } else
         {
             if (I_memory > 0)
             {
@@ -82,10 +87,6 @@ public:
             errors.push_back(error*elapsed);
 
             speed = kP*error + kD*D + kI*I;
-        } else
-        {
-            speed = kP*error + kD*D;
-            errors = boost::circular_buffer<double>(I_memory, 0);
 
         }
         int sign = sgn(speed);

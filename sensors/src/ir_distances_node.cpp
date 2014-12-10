@@ -78,6 +78,7 @@ void adcCallback(const ras_arduino_msgs::ADConverter::ConstPtr &msg)
   out.right_rear = std::max(round(poly(msg->ch4, param_ch4)*10)/1000,-0.05);
   out.rear = std::max(round(poly(msg->ch5, param_ch5)*10)/1000,-0.05);
   out.right_front = std::max(round(poly(msg->ch6, param_ch6)*10)/1000,-0.05);
+  out.bumper = msg->ch7 > 200;
 
   pub.publish(out);
 }

@@ -57,7 +57,10 @@ namespace wheatley
         bool poseCorrL;
         bool poseCorrR;
         int count;
-
+        bool crashL;
+        bool crashR;
+        bool crash;
+        bool ready;
         double maxWallAlignDistance;
         double maxWallAlignAngle;
 
@@ -92,6 +95,10 @@ namespace wheatley
             tfl.lookupTransform("robot", "ir_right_rear",  now, tf_right_rear);
             lL = tf_left_front.getOrigin().distance(tf_left_rear.getOrigin());
             lR = tf_right_front.getOrigin().distance(tf_right_rear.getOrigin());
+            ready = true;
+            crashL = false;
+            crashR = false;
+            crash = false;
         }
 
 
@@ -135,6 +142,24 @@ namespace wheatley
                 }
                 avgRightDiff = sumR / (double) count;
             }
+
+            if (distance.bumper && state == "LEFT" && ready)
+            {
+                state = "BACK";
+                crashL = true;
+                ready = false;
+            }
+            else if (distance.bumper && state == "RIGHT" && ready)
+            {
+                state = "BACK";
+                crashR = true;
+                ready = false;
+            } else if (distance.bumper && state == "FORWARD" && ready)
+            {
+                crash = true;
+                ready = false;
+                state = "BACK";
+            }
         }
 
         void poseCallback(const nav_msgs::Odometry::ConstPtr &msg)
@@ -166,11 +191,11 @@ namespace wheatley
             while (ros::ok())
             {
                 static string prev_state = "";
-
                 if (state == "FORWARD")
                 {
-                    if (!follow(0.2, 0.05))
+                    if (!follow(0.2, 0.08))
                         state = "STOP";
+                        ready = true;
                 }
                 else if (state == "STOP")
                 {
@@ -179,39 +204,46 @@ namespace wheatley
                         geometry_msgs::Twist twist;
                         twist.linear.x = 0;
                         twist.angular.z = 0;
-                        pub_motor_twist.publish(twist);
+                        pub_wall_twist.publish(twist);
+                        ready = true;
                     }
                 }
-                else if (state == "BACK");
+                else if (state == "BACK")
                 {
                     static tf::Point prev_pos;
                     if (state != prev_state)
-                    {
                         tf::pointMsgToTF(pose.pose.pose.position, prev_pos);
+
+                    tf::Point curr_pos;
+                    tf::pointMsgToTF(pose.pose.pose.position, curr_pos);
+
+                    if (prev_pos.distance(curr_pos) < 0.02)
+                    {
                         geometry_msgs::Twist twist;
                         twist.linear.x = -0.2;
-                        twist.angular.z = 0;
                         pub_motor_twist.publish(twist);
                     }
                     else
                     {
-                        tf::Point curr_pos;
-                        tf::pointMsgToTF(pose.pose.pose.position, curr_pos);
-
-                        if (prev_pos.distance(curr_pos) > 0.05)
+                        geometry_msgs::Twist twist;
+                        pub_motor_twist.publish(twist);
+                        if (crashR)
+                        {
+                            state = "RIGHT";
+                            crashR = false;
+                        } else if (crashL)
+                        {
+                            state = "LEFT";
+                            crashL = false;
+                        }
+                        else if (crash)
+                        {
+                            state = "LEFT";
+                            crash = false;
+                            desiredTheta = angles::normalize_angle(desiredTheta + M_PI/2);
+                        } else
                         {
                             state = "STOP";
-                            geometry_msgs::Twist twist;
-                            twist.linear.x = 0;
-                            twist.angular.z = 0;
-                            pub_motor_twist.publish(twist);
-                        }
-                        else
-                        {
-                            geometry_msgs::Twist twist;
-                            twist.linear.x = -0.2;
-                            twist.angular.z = 0;
-                            pub_motor_twist.publish(twist);
                         }
                     }
                 }
@@ -224,7 +256,7 @@ namespace wheatley
                         align_done = true;
                         poseCorrR = true;
                     }
-                    if (align_done && count == 1 &&
+                    else if (align_done && count == 1 &&
                             (distance.right_front >= maxWallAlignDistance ||
                              distance.right_rear >= maxWallAlignDistance))
                     {
@@ -234,7 +266,7 @@ namespace wheatley
                         align_done = false;
                         poseCorrR = false;
                     }
-                    if (align_done && count >= 10)
+                    else if (align_done && count >= 10)
                     {
                         if (std::abs(avgRightDiff) <= maxWallAlignAngle)
                             publishOdometry(ros::Time(), avgRightDiff);
@@ -244,6 +276,7 @@ namespace wheatley
                         state = "STOP";
                         align_done = false;
                         poseCorrR = false;
+                        ready = true;
                     }
                 }
                 else if (state == "RIGHT")
@@ -275,6 +308,7 @@ namespace wheatley
                         state = "STOP";
                         align_done = false;
                         poseCorrL = false;
+                        ready = true;
                     }
                 }
 
@@ -301,7 +335,7 @@ namespace wheatley
         {
             double error = angles::shortest_angular_distance(theta, desiredTheta)*180/M_PI;
 
-            if (std::abs(error) < 3)
+            if (std::abs(error) < 1)
             {
                 geometry_msgs::Twist twist;
                 pub_motor_twist.publish(twist);
@@ -311,7 +345,7 @@ namespace wheatley
             else
             {
                 geometry_msgs::Twist twist;
-                twist.angular.z = clamp(error/10, -speed, speed);
+                twist.angular.z = clamp(error/8, -speed, speed);
                 pub_motor_twist.publish(twist);
                 return false;
             }
@@ -323,19 +357,20 @@ namespace wheatley
             if (distance.front > 0.35)
             {
                 twist.linear.x = speed;
+                twist.angular.z = 0;
                 pub_wall_twist.publish(twist);
                 return true;
             }
             else if (distance.front > frontDistance)
             {
-                twist.linear.x = clamp(speed*0.5*(1+(distance.front-frontDistance)), 0.0, speed);
-                ROS_INFO_STREAM(twist.linear.x);
+                twist.linear.x = clamp(speed*0.9*(1+(distance.front-frontDistance)), 0.0, speed);
                 pub_wall_twist.publish(twist);
                 return true;
             }
             else
             {
                 twist.linear.x = 0;
+                twist.angular.z = 0;
                 pub_wall_twist.publish(twist);
                 ros::Duration(0.5).sleep();
                 return false;

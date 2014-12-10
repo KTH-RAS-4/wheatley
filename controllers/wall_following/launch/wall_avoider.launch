@@ -2,7 +2,7 @@
 
 <launch>
     <node pkg="wall_following" type="wall_avoider_node"
-        	name="wall_avoider" clear_params="true">
+        	name="wall_avoider" clear_params="true" output="screen">
         <rosparam command="load" file="$(find wall_following)/config/settings.yaml"/>
         <remap from="~/twist_out" to="/motor_controller/twist"/>
         <remap from="~/twist_in" to="~/twist"/>

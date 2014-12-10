@@ -3,8 +3,15 @@
 #include <geometry_msgs/Twist.h>
 #include <algorithm>
 
-int left = 0;
-int right = 0;
+float IR = 0.0;
+float IL = 0.0;
+float last_errorL;
+float last_errorR;
+bool left = false;
+bool right = false;
+double PIDR;
+double PIDL;
+
 
 template <typename T> T CLAMP(const T& value, const T& low, const T& high)
 {
@@ -28,10 +35,12 @@ private:
 
 
   sensors::Distance distance;
+  ros::Rate loop_rate;
 
 public:
   WallFollowingControllerNode()
     : n("~")
+    , loop_rate(1)
   {
     init();
   }
@@ -42,6 +51,10 @@ public:
   
   void init()
   {
+
+    double rate = 100;
+    //n.getParam("rate", rate);
+    loop_rate = ros::Rate(rate);
     sub_distance = n.subscribe("/sensors/ir/distances", 1, &WallFollowingControllerNode::distanceCallback, this);
     sub_twist = n.subscribe("twist_in", 1, &WallFollowingControllerNode::twistCallback, this);
     pub_twist = n.advertise<geometry_msgs::Twist>("twist_out", 1);
@@ -67,89 +80,83 @@ public:
   void calc()
   {
     geometry_msgs::Twist twist_out;
-
-    float minDistance = 0.05;
+    float minDistance = 0.03;
     float minFrontDistance = 0.08;
     float minStraight = 0.005;
-    float small_turn = 0.25;//.15
-    ROS_INFO("small_turn:  [%f]", small_turn);
+    float small_turn = 0.35;//.15
+    //ROS_INFO("small_turn:  [%f]", small_turn);
+    float errorL = minDistance - distance.left_front;
+    float errorR = minDistance - distance.right_front;
+    float Kp = 10;
+    float Ki = 1;
+    float Kd = 0.4;
+    double elapsed = loop_rate.expectedCycleTime().toSec();
+    float DL = (errorL - last_errorL) / elapsed;
+    float DR = (errorR - last_errorR) / elapsed;
+    IL += errorL*elapsed;
+    IR += errorR*elapsed;
+    last_errorL = errorL;
+    last_errorR = errorR;
 
-    //move forward and turn sligthly to right
-    if (distance.right_front < minDistance && distance.right_front < distance.right_rear)
+    if (elapsed > 0.12 || twist_in.linear.x == 0)
     {
+        PIDL = 0;
+        PIDR = 0;
+        IL = 0;
+        IR = 0;
+    }
+
+    if (distance.right_front < minDistance)
+    {
+        PIDR = Kp*errorR + Ki*IR + Kd*DR;
+        ROS_INFO_STREAM("right init");
+        right = true;
+    }
+    else if (right && distance.right_front <= minDistance + 0.03)
+    {
+        PIDR = Kp*errorR + Ki*IR + Kd*DR;
+        ROS_INFO_STREAM("right continue");
+    }
+    else if (right && distance.right_front > minDistance + 0.03)
+    {
+        twist_out = twist_in;
+        right= false;
+        IR = 0;
+        PIDR = 0;
+        ROS_INFO_STREAM("right end");
+    }
+    if (distance.left_front < minDistance)
+    {
+        PIDL = -(Kp*errorL + Ki*IL + Kd*DL);
+        left = true;
+        ROS_INFO_STREAM("left init");
+    }
+    else if (left && distance.left_front <= minDistance + 0.03)
+    {
+        PIDL = -(Kp*errorL + Ki*IL + Kd*DL);
+        ROS_INFO_STREAM("left continue");
+    }
+    else if (left && distance.left_front > minDistance + 0.03)
+    {
+        twist_out = twist_in;
+        left = false;
+        IL = 0;
+        PIDL = 0;
+        ROS_INFO_STREAM("left end");
+    }
+
+    if ((left || right) && twist_in.linear.x != 0)
+    {
+        twist_out.angular.z = PIDL + PIDR;
         twist_out.linear.x = twist_in.linear.x;
-        twist_out.angular.z = small_turn;
-        right = 1;
-    }
-    //check if it has turn to much to the rigth, and alinght the sensors at margin: minStraight distance
-    else if (right == 1 && distance.right_front >  minDistance && distance.right_rear > minDistance)
-    {
-        //for over turning, correct by tuning to left. no linear speed until is straigth
-        if(distance.right_front > distance.right_rear && abs(distance.right_front-distance.right_rear) > minStraight)
-        {
-            twist_out.linear.x = 0;
-            twist_out.angular.z = -small_turn;
-        }
-         //only turn to right
-        else if(distance.right_front < distance.right_rear && abs(distance.right_front-distance.right_rear) > minStraight)
-        {
-            twist_out.linear.x = 0;
-            twist_out.angular.z = small_turn;
-        }
-        //move as twist_in
-        else
-            twist_out = twist_in;
-            right = 0;
-    }
-    //
-    else if (right == 1 &&  std::abs(distance.right_front-distance.right_rear) < minStraight)
+        ROS_INFO_STREAM("fix");
+    } else
     {
         twist_out = twist_in;
-        right= 0;
-    }
-    else if (distance.left_front < minDistance && distance.left_front < distance.left_rear)
-    {
-        twist_out.linear.x = twist_in.linear.x;
-        twist_out.angular.z = -small_turn;
-        left = 1;
-    }
-    else if (left == 1 && distance.left_front >  minDistance && distance.left_rear > minDistance)
-    {
-        if(distance.left_front > distance.left_rear && abs(distance.left_front-distance.left_rear) > minStraight)
-        {
-            twist_out.linear.x = 0;
-            twist_out.angular.z = small_turn;
-        }
-        else if(distance.left_front < distance.left_rear && abs(distance.left_front-distance.left_rear) > minStraight)
-        {
-            twist_out.linear.x = 0;
-            twist_out.angular.z = -small_turn;
-        }
-        else
-            twist_out = twist_in;
-            left = 0;
-    }
-    else if (left == 1 &&  std::abs(distance.left_front-distance.left_rear) < minStraight)
-    {
-        twist_out = twist_in;
-        left = 0;
-    }
-    else
-        twist_out = twist_in;
-
-    if (distance.front < minFrontDistance)
-    {
-        twist_out.linear.x = 0;
-        twist_out.angular.z = 0;
     }
 
-    //float x = CLAMP(0.05-distance.right_front, 0, 0.01);
-
-    //twist_out.linear.x = twist_in.linear.x; //stop when close in the front
-    //twist_out.angular.z = (1-x)*twist_in.angular.z + 2*x;
-
-    ROS_INFO("twist_in:  [%6.1f, %6.1f]", twist_in.linear.x, twist_in.angular.z);
-    ROS_INFO("twist_out: [%6.1f, %6.1f]", twist_out.linear.x, twist_out.angular.z);
+    //ROS_INFO("twist_in:  [%6.1f, %6.1f]", twist_in.linear.x, twist_in.angular.z);
+    //ROS_INFO("twist_out: [%6.1f, %6.1f]", twist_out.linear.x, twist_out.angular.z);
 
     pub_twist.publish(twist_out);
   }
