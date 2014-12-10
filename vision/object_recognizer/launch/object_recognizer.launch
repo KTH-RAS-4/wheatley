@@ -1,0 +1,13 @@
+<!-- wall avoider launch file -->
+
+<launch>
+    <node pkg="object_detection" type="object_detection_node"
+        name="object_detection" output="log" clear_params="true" respawn="true"> 
+    </node>
+    <node pkg="object_recognizer" type="object_collector_node"
+        name="object_collector" output="screen" clear_params="true"> 
+    </node>
+    <node pkg="object_recognizer" type="image_object_detector_node"
+        name="image_object_detector" output="screen" clear_params="true" respawn="true"> 
+    </node>
+</launch>

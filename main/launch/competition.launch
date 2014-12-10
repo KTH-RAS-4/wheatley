@@ -1,0 +1,10 @@
+<!---->
+
+<launch>
+	<arg name="phase"/>   
+    <param name="/phase" value="$(arg phase)"/>
+	
+	<include file="$(find mapping)/launch/mapping.launch"/>
+	<include file="$(find navigation)/launch/navigator.launch"/>
+	<include file="$(find object_recognizer)/launch/object_recognizer.launch"/>
+</launch>

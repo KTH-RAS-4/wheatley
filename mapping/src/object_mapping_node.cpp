@@ -57,7 +57,7 @@ private:
     ros::Publisher rviz_object_pub_;
     ros::Publisher object_pub_;
     boost::mutex mutex_;
-    std::string state;
+    int phase;
     /****************************************
      * Stores
      ****************************************/
@@ -71,7 +71,7 @@ private:
 public:
     MapNode(const ros::NodeHandle& nh_)
         : nh(nh_)
-        , state(requireParameter<std::string>("run_state"))
+        , phase(requireParameter<int>("/phase"))
     {
         rviz_object_pub_ = nh.advertise<visualization_msgs::MarkerArray>("map_objects", 100);
         object_pub_ = nh.advertise<vision_msgs::Object>("/object/placement", 100);
@@ -218,7 +218,7 @@ public:
         object_collector.push_back(new_object);
         echoObjects();
         object_pub_.publish(new_object);
-        if(state == "WRITE")
+        if(phase == 1)
             write2File(new_object);
 
     }
@@ -229,9 +229,9 @@ public:
 
     void run()
     {
-        if(state == "WRITE")
+        if(phase == 1)
             remove("/home/ras/catkin_ws/src/wheatley/objects.txt");
-        if(state == "READ")
+        if(phase == 2)
             readFromFile();
         ros::spin();
 

@@ -5,6 +5,7 @@
 	<include file="$(find main)/launch/tf_world_to_map.launch"/>
 	<include file="$(find main)/launch/robot_model.launch"/>
 	<include file="$(find main)/launch/arduino.launch"/>
+	<include file="$(find main)/launch/primesense.launch"/>
 	<include file="$(find xbox)/launch/xbox.launch"/>
 	<include file="$(find sensors)/launch/ir_distances.launch"/>
 	<include file="$(find sensors)/launch/ir_points.launch"/>
@@ -13,7 +14,10 @@
 	<include file="$(find motor_controller)/launch/motor_controller.launch"/>
 	<include file="$(find wall_following)/launch/wall_avoider.launch"/>
 	<include file="$(find executor)/launch/executor.launch"/>
+	
+	<node pkg="object_detection" type="cloud_preprocessing_node"
+        name="cloud_preprocessing" output="screen" clear_params="true"/>
+	
+	<node name="espeak_node" pkg="ras_espeak" type="espeak_node" output="log"/>
 	<!--<include file="$(find sound_play)/soundplay_node.launch"/>-->
-	<node name="espeak_node" pkg="ras_espeak" type="espeak_node" output="log">
-	</node>
 </launch>
