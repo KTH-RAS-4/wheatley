@@ -193,10 +193,16 @@ public:
 
     void mapIr(const sensors::SensorClouds &msg)
     {
+        if (!isMapping)
+            return;
+
         std::vector<sensor_msgs::PointCloud2> clouds = msg.point_clouds;
         std::vector<u_int8_t> hasEndpoint = msg.hasEndpoint;
 
         for(int pc = 0; pc < 6; pc++) {
+            if (pc == 1) //skip rear sensor
+                continue;
+
             string ir_frame = clouds[pc].header.frame_id;
             ros::Time stamp = clouds[pc].header.stamp;
             try {
