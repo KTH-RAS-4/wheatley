@@ -31,6 +31,7 @@ namespace wheatley
         ros::Subscriber sub_map;
         ros::Subscriber sub_clicked_point;
         ros::Subscriber sub_executor_state;
+
         ros::Publisher pub_executor_order;
         ros::Publisher pub_path;
         ros::Publisher pub_map;
@@ -85,7 +86,6 @@ namespace wheatley
             else
                 return gu::UNKNOWN;
         }
-
         void callback_map(const nav_msgs::OccupancyGrid::ConstPtr& msg)
         {
             ROS_INFO_ONCE("got first map");
@@ -206,7 +206,7 @@ namespace wheatley
             {
                 prev_order = order;
 
-                if (order == "LEFT" || order == "RIGHT")
+                if (order == "LEFT" || order == "RIGHT" || order == "BACK")
                     executor_ready = false;
 
                 std_msgs::String msg_order;
