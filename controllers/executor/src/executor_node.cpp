@@ -194,11 +194,15 @@ namespace wheatley
         {
             while (ros::ok())
             {
+                static string prev_state = "";
+
                 if (state == "FORWARD")
                 {
                     if (!follow(0.2, 0.08))
+                    {
                         state = "STOP";
                         ready = true;
+                    }
                 }
                 else if (state == "STOP")
                 {
@@ -316,6 +320,8 @@ namespace wheatley
                 }
 
                 publishState();
+
+                prev_state = state;
 
                 ros::spinOnce();
                 loop_rate.sleep();
