@@ -35,6 +35,7 @@ namespace wheatley
         const int phase;
         const double stoppingDistance;
         const double maxProjectionDistance;
+        const double maxSkipTurnGoTurnBackDistance;
 
         std::vector<tf::Pose> path;
         tf::Pose pose;
@@ -50,6 +51,7 @@ namespace wheatley
             , phase(requireParameter<int>("/phase"))
             , stoppingDistance(requireParameter<double>("stopping_distance"))
             , maxProjectionDistance(requireParameter<double>("max_projection_distance"))
+            , maxSkipTurnGoTurnBackDistance(requireParameter<double>("max_skip_turn_go_turn_back_distance"))
         {
             pub_executor_order = nh.advertise<std_msgs::String>("executor_order", 1, true);
             sub_executor_state = nh.subscribe("executor_state", 1, &PathFollower::callback_executor_state, this);
@@ -78,7 +80,7 @@ namespace wheatley
 
             //set theta to the closest
             tf::Quaternion q;
-            q.setRPY(0,0, yaw(pose.getRotation()).angle());
+            q.setRPY(0,0, yaw(pose).angle());
             pose.setRotation(q);
 
             run_change_direction();
@@ -105,7 +107,7 @@ namespace wheatley
 
             tf::Pose goal = path.back();
 
-            if (yaw(pose.getRotation()) == yaw(goal.getRotation()) &&
+            if (yaw(pose) == yaw(goal) &&
                     pose.getOrigin().distance(goal.getOrigin()) <= stoppingDistance)
             {
                 publishOrder("STOP");
@@ -113,14 +115,38 @@ namespace wheatley
             }
             else
             {
-                boost::optional<tf::Pose> closest = getClosest(path, pose, maxProjectionDistance);
-                if (closest)
+                boost::optional<int> currIndex = getClosestIndex(path, pose, maxProjectionDistance);
+                if (currIndex)
                 {
-                    double diff = angleDiff(pose, *closest);
+                    int currTurn = turnDiff(pose, path[*currIndex]);
 
-                    if (diff > 0)
+                    int nextTurnIndex = -1;
+                    for (int i=*currIndex+1; i<path.size(); i++)
+                    {
+                        if (turnDiff(path[i-1], path[i]) != 0)
+                        {
+                            nextTurnIndex = i;
+                            break;
+                        }
+                    }
+
+                    if (nextTurnIndex != -1)
+                    {
+                        int nextTurn = turnDiff(path[nextTurnIndex-1], path[nextTurnIndex]);
+                        double distanceToNextTurn = path[*currIndex].getOrigin().distance(path[nextTurnIndex].getOrigin());
+
+                        //if turning 180 and the next turn is to the left, turn back to the right instead
+                        if (currTurn == 2 && nextTurn == 1)
+                            currTurn = -2;
+
+                        //skip turning left just to turn right again shortly
+                        if (distanceToNextTurn <= maxSkipTurnGoTurnBackDistance && currTurn == -nextTurn)
+                            currTurn = 0;
+                    }
+
+                    if (currTurn > 0)
                         publishOrder("LEFT");
-                    else if (diff < 0)
+                    else if (currTurn < 0)
                         publishOrder("RIGHT");
                     else
                         publishOrder("FORWARD");
@@ -145,36 +171,35 @@ namespace wheatley
             }
         }
 
-        static angles::StraightAngle yaw(tf::Quaternion q)
+        static angles::StraightAngle yaw(tf::Pose p)
         {
-            return angles::StraightAngle::getClosest(tf::getYaw(q));
+            return angles::StraightAngle::getClosest(tf::getYaw(p.getRotation()));
         }
 
-        static double angleDiff(tf::Pose a, tf::Pose b)
+        static int turnDiff(tf::Pose a, tf::Pose b)
         {
-            return angles::shortest_angular_distance(yaw(a.getRotation()).angle(),
-                                                     yaw(b.getRotation()).angle());
+            //-1 for -90 degrees
+            // 0 for 0 degrees
+            // 1 for 90 degrees
+            // 2 for 180 degrees
+            return (yaw(b).index()-yaw(a).index()+2)%4 - 2;
         }
 
-        static boost::optional<tf::Pose> getClosest(std::vector<tf::Pose> path, tf::Pose pose, double maxDistance)
+        static boost::optional<int> getClosestIndex(std::vector<tf::Pose> path, tf::Pose pose, double maxDistance)
         {
             double best = maxDistance;
-            boost::optional<tf::Pose> closest;
+            boost::optional<int> closest;
 
             for (int i=0; i<path.size(); i++)
             {
-                double anglediff = fabs(angleDiff(pose, path[i])/M_PI);
-                //anglediff is
-                // 0 for 0 degrees wrong,
-                // 1 for 90 degrees wrong
-                // 2 for 180 degrees wrong
+                int turndiff = abs(turnDiff(pose, path[i]));
 
                 double distance = pose.getOrigin().distance(path[i].getOrigin());
-                double dist = distance * (anglediff+1) + anglediff*0.02; //great way of measuring similarity :D
+                double dist = distance * (turndiff+1) + turndiff*0.02; //great way of measuring similarity :D
                 if (best >= dist)
                 {
                     best = dist;
-                    closest = path[i];
+                    closest = i;
                 }
             }
 
