@@ -36,7 +36,6 @@ namespace wheatley
         ros::Subscriber sub_ir;
         ros::Subscriber sub_encoders;
         ros::Publisher pub_sim_ir;
-        tf::TransformListener tfl;
 
         tf::StampedTransform tf_front;
         tf::StampedTransform tf_rear;
@@ -44,6 +43,7 @@ namespace wheatley
         tf::StampedTransform tf_left_rear;
         tf::StampedTransform tf_right_front;
         tf::StampedTransform tf_right_rear;
+        tf::TransformListener tfl;
 
         nm::OccupancyGrid map;
 
@@ -51,7 +51,7 @@ namespace wheatley
         const string robot_frame;
 
         Eigen::Matrix3f prev_sigma;//[3X3]
-        double Q; //5 cm
+        double Q,r1,r2,r3; //5 cmr = requireParameter<double>("r");r = requireParameter<double>("r");
         double lambda; //chi2inv(0.8,1);
         Eigen::Matrix3f R;//[3X3]
 
@@ -76,17 +76,25 @@ namespace wheatley
             sub_ir = nh.subscribe("/sensors/ir/distances", 1, &KalmanNode::callback_ir, this);
             pub_sim_ir = nh.advertise<sensors::Distance>("simulated_ir_distances", 1);
 
+            //intial sigma Covariance matrix
             prev_sigma << 0.05,    0, 0,
                              0, 0.05, 0,
-                             0,    0, 0.01;//[3X3]
-            Q=0.05; //5 cm
-            lambda=1.0742; //chi2inv(0.8,1);
-
-            R << 0.05,    0, 0,
-                    0, 0.05, 0,
-                    0,    0, 0.01;//[3X3]
+                            0,    0, 0.01;//[3X3]
 
             loadParameters();
+
+            //proces noice
+            R <<   r1,    0,  0,
+                    0,   r2,  0,
+                    0,    0, r3;//[3X3]
+        }
+        void loadParameters()
+        {
+            lambda = requireParameter<double>("lambda");
+            Q = requireParameter<double>("Q");
+            r1 = requireParameter<double>("r1");
+            r2 = requireParameter<double>("r2");
+            r3 = requireParameter<double>("r3");
         }
 
         void callback_map(const nm::OccupancyGrid::ConstPtr& msg)
@@ -110,35 +118,41 @@ namespace wheatley
             static gm::Pose prev_pose;
 
             if (!first_pose_callback)
-                calc(*realIR, simulatedIR, pose, prev_pose);
+                calc_ekf(*realIR, simulatedIR, pose, prev_pose);
 
             prev_pose = pose;
             first_pose_callback = false;
         }
 
-        void calc(const sensors::Distance& real, const sensors::Distance& simulated, const gm::Pose& pose, const gm::Pose& prev_pose)
+        void calc_ekf(const sensors::Distance& real, const sensors::Distance& simulated, const gm::Pose& pose, const gm::Pose& prev_pose)
         {
+            //get the Ut
             double u_x = pose.position.x-prev_pose.position.x;
             double u_y = pose.position.y-prev_pose.position.y;
 
             int NUM_MEASUREMENTS=6,num_inliers=0;
 
+            //initialize matrix and vectors
             Eigen::VectorXd inliers(NUM_MEASUREMENTS);//[6X1]
             Eigen::VectorXf nu_buffer(NUM_MEASUREMENTS);//[6X1]
             Eigen::MatrixXf H_buffer(NUM_MEASUREMENTS,3) ;//[6X3]
             Eigen::Matrix3f sigma,G;//[3X3]
             Eigen::Vector3f mu,prev_mu,update; //[3X1]
 
+            //get the pose
             double theta = tf::getYaw(pose.orientation);
             prev_mu<<pose.position.x, pose.position.y, theta;
 
+            //jacobian
             G<< 1,0,-u_y,
                 0,1, u_x,
                 0,0,  1;
 
-
+            //predicted sigma (covarianze matrix)
             sigma=G*prev_sigma*G.transpose()+R;
 
+            //jacobian and nu for all the measuremts.
+            //data association is implicit in simulated (measuremt model)
             H_buffer(0,0)=real.front*cos(theta)/simulated.front;
             H_buffer(0,1)=real.front*sin(theta)/simulated.front;
             H_buffer(0,2)=0;
@@ -169,6 +183,7 @@ namespace wheatley
             H_buffer(5,2)=0;
             nu_buffer(5)=real.right_rear-simulated.right_rear;
 
+            //detect outliers
             Eigen::RowVector3f hi; //[1x3]
             double S,D;
             for(int i=0;i<NUM_MEASUREMENTS;i++){
@@ -184,9 +199,9 @@ namespace wheatley
                     inliers(i)=0;
             }
 
+            //compute the H and nu for inliers.
             Eigen::VectorXf nu(num_inliers);
             Eigen::MatrixXf H_hat(num_inliers,3);
-
             int j=0;
             for ( int i=0;i<NUM_MEASUREMENTS;i++)
             {
@@ -200,7 +215,7 @@ namespace wheatley
                 }
             }
 
-
+           //compute K kalman gain
            Eigen::MatrixXf I(3,3);
            I = Eigen::MatrixXf::Identity(3,3);
 
@@ -213,13 +228,13 @@ namespace wheatley
 
            K=sigma*H_hat.transpose()*S_hat.inverse();
 
+           //compute the update
            update=K*nu;
            mu=prev_mu+update;
 
            sigma=(I-K*H_hat)*prev_sigma;
 
            prev_sigma=sigma;
-
 
         }
 
@@ -262,12 +277,6 @@ namespace wheatley
             return -0.1;
         }
 
-        void loadParameters()
-        {
-            //nh.getParam("/base/diameter", baseDiameter);
-
-        }
-
         void run()
         {
             ros::spin();
@@ -277,6 +286,10 @@ namespace wheatley
 
 int main (int argc, char **argv)
 {
+    ros::init(argc, argv, "ekf_node");
+    wheatley::KalmanNode ekf_node;
+    ekf_node.run();
+}
 
 /*
     if(1)
@@ -286,9 +299,7 @@ int main (int argc, char **argv)
         I = 1.3 * Eigen::MatrixXf::Identity(dim,dim);
         ROS_INFO_STREAM("I*13= \n" << I);
     }
-*/
 
-/*
     if(1){
         Eigen::VectorXf diff(6);
         Eigen::VectorXd inliers(6);
@@ -378,8 +389,6 @@ int main (int argc, char **argv)
 
     }
 
-    */
-/*
     if (0){
     Eigen::Matrix3d sigma,G,R,I,k,u;//[3X3]
     Eigen::Vector3d mu,a,u1,u2,u3,u4;//[3X1]
@@ -493,12 +502,6 @@ int main (int argc, char **argv)
 
         Eigen::VectorXf diff(6);
 */
-
-    ros::init(argc, argv, "ekf_node");
-    wheatley::KalmanNode ekf_node;
-    ekf_node.run();
-}
-
 
 /*
 MAX_RANGE_LONG_DISTANCE_SENSOR=0.60;
