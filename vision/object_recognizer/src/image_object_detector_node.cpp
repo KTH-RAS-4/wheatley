@@ -421,6 +421,9 @@ private:
                 obj.vertices[vertices]++;*/
                 if (foundidx != -1)
                 {
+                    float average_angle = calculateAverageAngle(polygons[foundidx]);
+                    cout << "average angle: " << average_angle << endl;
+
                     /*if (color == BLUE)
                     {
 						cout << "got blue object" << endl;
@@ -824,6 +827,51 @@ private:
         {
             return false;
         }
+    }
+
+    float calculateAverageAngle(vector<Point> polygon)
+    {
+        vector<Point> hull;
+        convexHull(polygon, hull, true, false);
+
+        vector<Point>::iterator prev = polygon.begin();
+        vector<Point>::iterator cur = prev+1;
+        vector<Point>::iterator next = cur+1;
+
+        Mat v1, v2;
+        float angle, average_angle;
+        average_angle = 0;
+
+        while (cur != polygon.begin())
+        {
+            v1 = Mat(1, 1, CV_32FC2, Scalar((*cur).x-(*prev).x, (*cur).y-(*prev).y));
+            v2 = Mat(1, 1, CV_32FC2, Scalar((*next).x-(*cur).x, (*next).y-(*cur).y));
+
+            angle = acos(v1.dot(v2));
+
+            if (pointPolygonTest(hull, Point((*cur).x, (*cur).y), false))
+            {
+                angle = -angle;
+            }
+
+            average_angle += angle;
+
+            prev++;
+            cur++;
+            next++;
+            if (cur == polygon.end())
+            {
+                cur = polygon.begin();
+            }
+            if (next == polygon.end())
+            {
+                next = polygon.begin();
+            }
+        }
+
+        average_angle /= polygon.size();
+
+        return average_angle;
     }
 
 };
