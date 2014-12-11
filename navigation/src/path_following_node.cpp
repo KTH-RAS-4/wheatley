@@ -45,6 +45,8 @@ namespace wheatley
         const double prevPoseSaveRate;
         const double prevPoseAvoidDistance;
         const double newOrderCooldown;
+        const double maxSkipForwardAndTurn;
+        const double belowWhichSpeedClassifiesAsSlow;
 
         boost::circular_buffer<tf::Stamped<tf::Pose> > prev_poses;
         std::vector<tf::Pose> path;
@@ -69,6 +71,8 @@ namespace wheatley
             , maxProjectionDistance(requireParameter<double>("max_projection_distance"))
             , maxSkipTurnGoTurnBackDistance(requireParameter<double>("max_skip_turn_go_turn_back_distance"))
             , newOrderCooldown(requireParameter<double>("new_order_cooldown"))
+            , maxSkipForwardAndTurn(requireParameter<double>("max_skip_forward_and_turn"))
+            , belowWhichSpeedClassifiesAsSlow(requireParameter<double>("below_which_speed_classifies_as_slow"))
             , prev_poses(ceil(prevPoseMemory*prevPoseSaveRate))
         {
             pub_executor_order = nh.advertise<std_msgs::String>("executor_order", 1, true);
@@ -190,11 +194,11 @@ namespace wheatley
                         if (distanceToNextTurn <= maxSkipTurnGoTurnBackDistance && currTurn == -nextTurn)
                             currTurn = 0;
 
-                        if (distanceToNextTurn <= maxSkipForwardAndTurn && speed < 0.1 && currTurn == 0 && nextTurn != 0)
+                        if (distanceToNextTurn <= maxSkipForwardAndTurn && speed < belowWhichSpeedClassifiesAsSlow && currTurn == 0 && nextTurn != 0)
                             currTurn = nextTurn;
                     }
 
-                    if (prev_order == "FORWARD" && distance.front < (speed > 0.1? maxStopForwardDistance : minStopForwardDistance))
+                    if (prev_order == "FORWARD" && distance.front < (speed > belowWhichSpeedClassifiesAsSlow? maxStopForwardDistance : minStopForwardDistance))
                     {
                         if (currTurn == 0)
                         {
