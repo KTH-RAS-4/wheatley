@@ -212,16 +212,15 @@ namespace wheatley
 
             for (int i=0; i<path.size(); i++)
             {
-                gm::Point curr = path[i];
-                gm::Point next;
-                if (i==path.size()-1)
-                    next = path[i];
+                double angle;
+                if (i<path.size()-1)
+                    angle = angles::angleOf(path[i], path[i+1]);
                 else
-                    next = path[i+1];
+                    angle = angles::angleOf(path[i-1], path[i]);
 
                 gm::PoseStamped pose;
-                pose.pose.position = curr;
-                tf::Quaternion q = tf::createQuaternionFromYaw(angles::angleOf(curr, next));
+                pose.pose.position = path[i];
+                tf::Quaternion q = tf::createQuaternionFromYaw(angle);
                 tf::quaternionTFToMsg(q, pose.pose.orientation);
                 pose.header.frame_id = inflated_map.header.frame_id;
                 pose.header.stamp = ros::Time(0); //TODO: should maybe be the approximate time in the future
