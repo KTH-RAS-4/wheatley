@@ -15,6 +15,7 @@
 #include <sensors/Distance.h>
 #include <wheatley_common/common.h>
 #include <wheatley_common/angles.h>
+#include <boost/circular_buffer.hpp>
 #define _USE_MATH_DEFINES
 #include <cmath>
 
@@ -38,7 +39,11 @@ namespace wheatley
         const double stoppingDistance;
         const double maxProjectionDistance;
         const double maxSkipTurnGoTurnBackDistance;
+        const double prevPoseMemory;
+        const double prevPoseSaveRate;
+        const double prevPoseAvoidDistance;
 
+        boost::circular_buffer<tf::Point> prev_points;
         std::vector<tf::Pose> path;
         sensors::Distance distance;
         tf::Pose pose;
@@ -52,9 +57,13 @@ namespace wheatley
             , robot_frame("robot")
             , executor_ready(false)
             , phase(requireParameter<int>("/phase"))
+            , prevPoseMemory(requireParameter<double>("prev_pose_memory"))
+            , prevPoseSaveRate(requireParameter<double>("prev_pose_save_rate"))
+            , prevPoseAvoidDistance(requireParameter<double>("prev_pose_avoid_distance"))
             , stoppingDistance(requireParameter<double>("stopping_distance"))
             , maxProjectionDistance(requireParameter<double>("max_projection_distance"))
             , maxSkipTurnGoTurnBackDistance(requireParameter<double>("max_skip_turn_go_turn_back_distance"))
+            , prev_points(ceil(prevPoseMemory*prevPoseSaveRate))
         {
             pub_executor_order = nh.advertise<std_msgs::String>("executor_order", 1, true);
             sub_executor_state = nh.subscribe("executor_state", 1, &PathFollower::callback_executor_state, this);
@@ -87,12 +96,17 @@ namespace wheatley
         void callback_pose(const nav_msgs::Odometry::ConstPtr& msg)
         {
             tf::poseMsgToTF(msg->pose.pose, pose);
-
             //set theta to the closest
             tf::Quaternion q;
             q.setRPY(0,0, yaw(pose).angle());
             pose.setRotation(q);
 
+            static ros::Time prev_save_time(-1000);
+            if ((msg->header.stamp - prev_save_time).toSec() > 1/prevPoseSaveRate)
+            {
+                prev_save_time = msg->header.stamp;
+                prev_points.push_back(pose.getOrigin());
+            }
             run_change_direction();
         }
 
@@ -117,7 +131,19 @@ namespace wheatley
 
             tf::Pose goal = path.back();
 
-            if (yaw(pose) == yaw(goal) &&
+            bool headingForPreviousPosition = false;
+            tf::Point forwardPoint = pose * tf::Vector3(prevPoseAvoidDistance*1.5, 0, 0);
+            for (int i=0; i<prev_points.size(); i++)
+            {
+                if (forwardPoint.distance2(prev_points[i]) < pow(prevPoseAvoidDistance,2))
+                {
+                    headingForPreviousPosition = true;
+                    break;
+                }
+            }
+
+            if (headingForPreviousPosition &&
+                    yaw(pose) == yaw(goal) &&
                     pose.getOrigin().distance(goal.getOrigin()) <= stoppingDistance)
             {
                 publishOrder("STOP");
@@ -155,14 +181,18 @@ namespace wheatley
                             currTurn = 0;
                     }
 
-                    if (currTurn == 0 && prev_order == "FORWARD" && distance.front < 0.08)
+                    if (prev_order == "FORWARD" && distance.front < 0.08)
                     {
-                        if (nextTurn != 0)
-                            currTurn = nextTurn;
-                        else
-                            currTurn = 2;
+                        if (currTurn == 0)
+                        {
+                            if (nextTurn != 0)
+                                currTurn = nextTurn;
+                            else
+                                currTurn = 2;
+                        }
                     }
-
+                    else if (prev_order == "FORWARD" && !headingForPreviousPosition)
+                        currTurn = 0; //don't interrupt a good forward
 
                     if (currTurn > 0)
                         publishOrder("LEFT");
@@ -215,7 +245,7 @@ namespace wheatley
                 int turndiff = abs(turnDiff(pose, path[i]));
 
                 double distance = pose.getOrigin().distance(path[i].getOrigin());
-                double dist = distance + turndiff*0.05; //even greater way of measuring similarity :D
+                double dist = distance + turndiff*0.03; //even greater way of measuring similarity :D
                 if (best >= dist)
                 {
                     best = dist;
