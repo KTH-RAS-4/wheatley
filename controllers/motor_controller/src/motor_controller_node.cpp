@@ -74,9 +74,9 @@ public:
         double speed = 0;
         if (twi.linear.x == 0 && twi.angular.z == 0)
         {
-            speed = kP*error + kD*D;
+            speed = 0;
             errors = boost::circular_buffer<double>(I_memory, 0);
-
+            I = 0;
         } else
         {
             if (I_memory > 0)

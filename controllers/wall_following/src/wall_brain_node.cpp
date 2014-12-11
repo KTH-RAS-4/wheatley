@@ -8,6 +8,8 @@
 #include <tf/tf.h>
 #include <algorithm>
 #include <sound_play/SoundRequest.h>
+#include <angles/angles.h>
+#include <wheatley_common/common.h>
 
 template <typename T> int sgn(T val)
 {
@@ -20,15 +22,15 @@ template <typename T> T CLAMP(const T& value, const T& low, const T& high)
 }
 
 enum state { FOLLOW, ALIGN, FIND_ALIGNMENT };
+namespace wheatley {
 
-class WallBrain
+class WallBrain : NiceBaseClass
 {
 private:
   ros::NodeHandle n;
   ros::NodeHandle n1;
-  ros::Publisher pub_speaker;
-  ros::Publisher motor_twist;
-  ros::Publisher wall_twist;
+  ros::Publisher pub_motor_twist;
+  ros::Publisher pub_wall_twist;
 
   ros::Subscriber sub_distance;
   ros::Subscriber sub_pose;
@@ -37,7 +39,7 @@ private:
   nav_msgs::Odometry pose;
   sensors::Distance distance;
   ros::Rate loop_rate;
-  double alignment;
+  double desiredTheta;
   double theta;
 
 public:
@@ -60,8 +62,8 @@ public:
 
     sub_distance = n.subscribe("/sensors/ir/distances", 1000, &WallBrain::distanceCallback, this);
     sub_pose = n.subscribe("/sensors/pose", 1000, &WallBrain::poseCallback, this);
-    motor_twist = n.advertise<geometry_msgs::Twist>("/motor_controller/twist", 1000);
-    wall_twist = n.advertise<geometry_msgs::Twist>("/wall_avoider/twist", 1000);
+    pub_motor_twist = n.advertise<geometry_msgs::Twist>("/motor_controller/twist", 1000);
+    pub_wall_twist = n.advertise<geometry_msgs::Twist>("/wall_avoider/twist", 1000);
 
 
 
@@ -80,7 +82,7 @@ public:
 
   void run()
   {
-    enum state state = FIND_ALIGNMENT;
+    enum state state = FOLLOW;
     ROS_INFO("state: FIND_ALIGNMENT");
 
     int a=0;
@@ -100,7 +102,7 @@ public:
           }
           break;
       case ALIGN:
-          if (align(0.2))
+          if (align(1.4))
             {
               state = FOLLOW;
               ROS_INFO("state: FOLLOW");
@@ -108,12 +110,12 @@ public:
           }
           break;
       case FOLLOW:
-          if (!follow(0.16, 0.15))
+          if (!follow(0.2, 0.15))
           {
               if (distance.right_front > 0.2)
-                  alignment = theta-M_PI/2;
+                  desiredTheta = theta-M_PI/2;
               else
-                  alignment = theta+M_PI/2;             
+                  desiredTheta = theta+M_PI/2;
               state = ALIGN;
               ROS_INFO("state: ALIGN");
               ros::Duration(0.2).sleep();
@@ -144,9 +146,9 @@ public:
     if ((sgn(l) != sgn(l2) && l != 0 && l2 != 0) ||
         (sgn(r) != sgn(r2) && r != 0 && r2 != 0))
     {
-        alignment = theta;
+        desiredTheta = theta;
         geometry_msgs::Twist twist;
-        motor_twist.publish(twist);
+        pub_motor_twist.publish(twist);
         return true;
     }
     else
@@ -155,7 +157,7 @@ public:
         r = r2;
         geometry_msgs::Twist twist;
         twist.angular.z = speed;
-        motor_twist.publish(twist);
+        pub_motor_twist.publish(twist);
     }
  }
 
@@ -171,54 +173,54 @@ public:
 
   bool align(double speed)
   {
-    double error = angleDiff(alignment, theta);
+      double error = angles::shortest_angular_distance(theta, desiredTheta)*180/M_PI;
 
-    if (std::abs(error) < 3*M_PI/180)//error should be in radians. 3 degres=3*3.1415/180 rad = 0.05 rad
-    {
-        ROS_INFO("state: ****************TURNED 90 DEGREES COMPLETE ******************");
-        geometry_msgs::Twist twist;
-        motor_twist.publish(twist);
-        return true;
-    }
-    else
-    {
-        geometry_msgs::Twist twist;
-        twist.angular.z = CLAMP(10*error, -speed, speed);
-        motor_twist.publish(twist);
-        return false;
-    }
- }
+      if (std::abs(error) < 1)
+      {
+          geometry_msgs::Twist twist;
+          pub_motor_twist.publish(twist);
+          ros::Duration(0.5).sleep();
+          return true;
+      }
+      else
+      {
+          geometry_msgs::Twist twist;
+          twist.angular.z = clamp(error/4, -speed, speed);
+          pub_motor_twist.publish(twist);
+          return false;
+      }
+  }
 
   bool follow(double speed, double frontDistance)
   {
       geometry_msgs::Twist twist;
-    if (distance.front > 0.30)
-    {
-        //geometry_msgs::Twist twist;
-        twist.linear.x = speed;
-        wall_twist.publish(twist);
-        return true;
-    }
-    else if (distance.front > frontDistance)
-    {
-        //geometry_msgs::Twist twist;
-        twist.linear.x = 0.10;
-        wall_twist.publish(twist);
-        return true;
-    }
-    else
-    {
-        //geometry_msgs::Twist twist;
-        twist.linear.x = 0;
-        geometry_msgs::Twist twist;
-        wall_twist.publish(twist);
-        return false;
-    }
+      if (distance.front > 0.35)
+      {
+          twist.linear.x = speed;
+          twist.angular.z = 0;
+          pub_wall_twist.publish(twist);
+          return true;
+      }
+      else if (distance.front > frontDistance)
+      {
+          twist.linear.x = clamp(speed*0.9*(1+(distance.front-frontDistance)), 0.0, speed);
+          pub_wall_twist.publish(twist);
+          return true;
+      }
+      else
+      {
+          twist.linear.x = 0;
+          twist.angular.z = 0;
+          pub_wall_twist.publish(twist);
+          ros::Duration(0.5).sleep();
+          return false;
+      }
   }
 };
-
+}
 int main (int argc, char **argv){
   ros::init(argc, argv, "wall_brain");
-  WallBrain my_node;
+  wheatley::WallBrain my_node;
   my_node.run();
 }
+

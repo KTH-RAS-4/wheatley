@@ -9,6 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   roscpp
   std_msgs
+  wheatley_common
 )
 
 ## System dependencies are found with CMake's conventions
@@ -84,7 +85,7 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES wall_following_controller
-#  CATKIN_DEPENDS sensor_msgs geometry_msgs roscpp
+  CATKIN_DEPENDS sensor_msgs geometry_msgs roscpp wheatley_common
 #  DEPENDS system_lib
 )
 
