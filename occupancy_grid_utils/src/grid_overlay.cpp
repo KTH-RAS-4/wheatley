@@ -271,7 +271,7 @@ void addCloud (OverlayClouds* overlay, LocalizedCloud::ConstPtr cloud, const int
             }
 
             if (last_ind && hasEndpoint) {
-                if(IsWindowFree(overlay, p, 0.01) == UNOCCUPIED) {
+                if(IsWindowFree(overlay, p, 0.02) == UNOCCUPIED) {
                     //ROS_INFO("Window is unoccupied");
                     break;
                 }
