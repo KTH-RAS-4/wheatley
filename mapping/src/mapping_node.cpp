@@ -119,7 +119,7 @@ public:
         grid_construction_interval_ = 0.1;
         mark_pose_explored_rate = 10;
         history_length_ = 10000;
-        robot_outer_diameter = 0.255;
+        robot_outer_diameter = 0.24;//0.255;
         fixed_frame_ = "map";
         resolution_ = 0.01;
         robot_frame = "robot";
@@ -193,8 +193,8 @@ public:
 
     void mapIr(const sensors::SensorClouds &msg)
     {
-        if (!isMapping)
-            return;
+        /*if (!isMapping)
+            return;*/
 
         std::vector<sensor_msgs::PointCloud2> clouds = msg.point_clouds;
         std::vector<u_int8_t> hasEndpoint = msg.hasEndpoint;
@@ -225,7 +225,7 @@ public:
                 loc_cloud->header.frame_id = fixed_frame_;
 
                 Lock lock(mutex_);
-                gu::addCloud(&map, loc_cloud, 15, hasEndpoint[pc]);
+                gu::addCloud(&map, loc_cloud, 25, hasEndpoint[pc]);
 
                 //last_cloud_=loc_cloud;
                 //clouds_.push_back(last_cloud_);
