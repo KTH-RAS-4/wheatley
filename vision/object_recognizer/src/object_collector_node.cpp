@@ -62,15 +62,15 @@ float object_color_saturation[] = {
 float object_color_value[] = {
     0, 255,
     0, 0,
-    130, 255,
+    160, 255,   //yellow
     0, 0,
     0, 0,
     0, 179,     //green
     0, 0,
     180, 255    //light green
-
 };
 
+map<string, bool> object_found;
 map<int, string > object_color_map;
 
 int relevant_iterations = 10;
@@ -106,6 +106,7 @@ public:
         object_color_map[PURPLE] = "Purple";
         object_color_map[RED] = "Red";
         object_color_map[LIGHT_GREEN] = "Light Green";
+
     }
     ~StoredObject() {
 
@@ -164,7 +165,8 @@ public:
     }
 
     void publish() {
-        if(!identified) {
+        if(!identified && !object_found[this->type]) {
+            object_found[this->type] = true;
             ROS_INFO("Publishing");
             pub_detected_object.publish(this->object);
             cout << "Found " << object.type << endl;
@@ -202,7 +204,7 @@ public:
             }
             else
             {
-                this->type = "object";
+                this->type = this->object.type = "object";
             }
             this->object.type = this->type;
         }
@@ -240,6 +242,17 @@ public:
         sub_image = handle.subscribe("camera/rgb/image_raw", 1, &ObjectCollectorNode::storeImage, this);
         sub_object = handle.subscribe("object_detection/objects", 1, &ObjectCollectorNode::objectHandle, this);
         sub_identified_object = handle.subscribe("object_recognition/detected_objects", 1, &ObjectCollectorNode::shapeDetected, this);
+
+        object_found["Red Cube"] = false;
+        object_found["Red Ball"] = false;
+        object_found["Yellow Cube"] = false;
+        object_found["Yellow Ball"] = false;
+        object_found["Green Cube"] = false;
+        object_found["Green Cylinder"] = false;
+        object_found["Patric"] = false;
+        object_found["Purple Cross"] = false;
+        object_found["Blue Triangle"] = false;
+        object_found["Blue Cube"] = false;
     }
 
     ~ObjectCollectorNode()
@@ -336,6 +349,8 @@ public:
                     if (v >= object_color_value[object*2] && v <= object_color_value[object*2+1])
                     {
                         type = object;
+                    } else {
+                        type = WALL;
                     }
                 }
                 else
@@ -354,6 +369,7 @@ int main(int argc, char** argv)
 {
     ros::init(argc, argv, "object_collector_node");
     ObjectCollectorNode cdn;
+    ros::Duration(5).sleep();
     ros::spin();
     return 0;
 }

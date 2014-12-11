@@ -119,7 +119,7 @@ public:
         grid_construction_interval_ = 0.1;
         mark_pose_explored_rate = 10;
         history_length_ = 10000;
-        robot_outer_diameter = 0.24;//0.255;
+        robot_outer_diameter = 0.22;//0.255;
         fixed_frame_ = "map";
         resolution_ = 0.01;
         robot_frame = "robot";
@@ -170,8 +170,8 @@ public:
 
 
         //Fill init gap
-        robot_pose.position.x += 0.12;
-        gu::addKnownFreePoint(&map, robot_pose.position, robot_outer_diameter/2, 80);
+        //robot_pose.position.x += 0.12;
+        //gu::addKnownFreePoint(&map, robot_pose.position, robot_outer_diameter/2, 10);
 
         current_iteration = 0;
     }
@@ -242,7 +242,7 @@ public:
         ros::Time now = ros::Time::now();
         if (tf_.waitForTransform(fixed_frame_, robot_frame, now, ros::Duration(0.1))) {
 
-            gu::addKnownFreePoint(&map, getPose(now, robot_frame).position, robot_outer_diameter/2, 80);
+            gu::addKnownFreePoint(&map, getPose(now, robot_frame).position, robot_outer_diameter/2, 10);
         }
     }
 
