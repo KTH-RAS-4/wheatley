@@ -20,7 +20,7 @@ using namespace cv;
 static const string WINDOW_1 = "Image mask";
 static const string WINDOW_2 = "Image";
 
-static const string IMAGE_DIR = "~/catkin_ws/src/wheatley/vision/object_recognizer/img/";
+static const string IMAGE_DIR = "/home/ras/catkin_ws/src/wheatley/vision/object_recognizer/img/";
 
 bool visual_debugging = false;
 bool verbose = true;
@@ -256,8 +256,14 @@ private:
             return;
         }
 
+		if (visual_debugging)
+        {
+            imshow(WINDOW_1, image);
+        }
+
         if (detected_objects.size() > 0)
         {
+			cout << "checking " << detected_objects.size() << " objects" << endl;
             // normalize the colors
             //cvtColor(image, image, CV_BGR2YCrCb); //change the color image from BGR to YCrCb format
             //split(image, channels); //split the image into channels
@@ -415,10 +421,18 @@ private:
                 obj.vertices[vertices]++;*/
                 if (foundidx != -1)
                 {
-                    if (color == BLUE)
+                    /*if (color == BLUE)
                     {
+						cout << "got blue object" << endl;
                         // extract the masked part of the image
-                        int isShape = checkObjectShape(image(boundingBoxes[foundidx]), TRIANGLE);
+						Rect mask_rect = boundingBoxes[foundidx];
+						int margin = 15;
+						mask_rect.x -= margin;
+						mask_rect.y -= margin;
+						mask_rect.width += margin*2;
+						mask_rect.height += margin*2;
+                        int isShape = checkObjectShape(frame->image(mask_rect), TRIANGLE);
+						//int isShape = checkObjectShape(image, TRIANGLE);
                         if (isShape)
                         {
                             // found blue triangle (complex shape)
@@ -431,7 +445,7 @@ private:
                         }
                     }
                     else
-                    {
+                    {*/
                         if (polygons[foundidx].size() <= 6)
         				{
         					// found simple shape
@@ -442,11 +456,11 @@ private:
         					// found complex shape
         					obj.candidates[1]++;
         				}
-                    }
+                    //}
                 }
                 obj.iterations++;
 
-                if (verbose && polygons.size() != 0)
+                if (verbose && foundidx != -1)
 				{
                     cout << "found " << color_names[color] << " object with " << polygons[foundidx].size()<< " vertices (" << obj.candidates[0] << " : " << obj.candidates[1] << ")" << endl;
 				}
@@ -539,6 +553,7 @@ private:
 		obj.object = msg;
         detected_objects[detect_id] = obj;
         detect_id++;
+		ROS_INFO_STREAM("Detected object size: " << detected_objects.size());
     }
 
     /**
@@ -669,6 +684,11 @@ private:
         Mat src, img;
         _src.copyTo(src);
 
+		if (src.rows == 0 || src.cols == 0)
+		{
+			return false;
+		}
+
         // normalize and convert to grayscale
         cvtColor(src, src, CV_BGR2GRAY);
         equalizeHist(src, src);
@@ -688,13 +708,15 @@ private:
                 break;
         }
 
-        double size_threshold = 0.7;
+        double size_threshold = 0.1;
         int matches_threshold = 2;
         int found_matches = 0;
 
+		vector<Rect> match_boundaries;
+
         for (vector<Mat>::iterator it = training_imgs.begin(); it != training_imgs.end(); it++)
         {
-            for (int minHessian = 300; minHessian <= 700; minHessian += 100)
+            for (int minHessian = 600; minHessian <= 600; minHessian += 100)
             {
                 img = *it;
 
@@ -717,66 +739,80 @@ private:
                 //-- Step 3: Matching descriptor vectors using FLANN matcher
                 FlannBasedMatcher matcher;
                 vector< DMatch > matches;
-                matcher.match( descriptors_object, descriptors_scene, matches );
+				if (keypoints_object.size() > 0 && keypoints_scene.size() > 0)
+				{
+		            matcher.match( descriptors_object, descriptors_scene, matches );
 
-                double max_dist = 0; double min_dist = 100;
+		            double max_dist = 0; double min_dist = 100;
 
-                //-- Quick calculation of max and min distances between keypoints
-                for( int i = 0; i < descriptors_object.rows; i++ )
-                { double dist = matches[i].distance;
-                if( dist < min_dist ) min_dist = dist;
-                if( dist > max_dist ) max_dist = dist;
-                }
+		            //-- Quick calculation of max and min distances between keypoints
+		            for( int i = 0; i < descriptors_object.rows; i++ )
+		            { double dist = matches[i].distance;
+		            if( dist < min_dist ) min_dist = dist;
+		            if( dist > max_dist ) max_dist = dist;
+		            }
 
-                printf("-- Max dist : %f \n", max_dist );
-                printf("-- Min dist : %f \n", min_dist );
+		            //printf("-- Max dist : %f \n", max_dist );
+		            //printf("-- Min dist : %f \n", min_dist );
 
-                //-- Draw only "good" matches (i.e. whose distance is less than 3*min_dist )
-                vector< DMatch > good_matches;
+		            //-- Draw only "good" matches (i.e. whose distance is less than 3*min_dist )
+		            vector< DMatch > good_matches;
 
-                for( int i = 0; i < descriptors_object.rows; i++ )
-                { if( matches[i].distance < 3*min_dist )
-                 { good_matches.push_back( matches[i]); }
-                }
+		            for( int i = 0; i < descriptors_object.rows; i++ )
+		            { if( matches[i].distance < 3*min_dist )
+		             { good_matches.push_back( matches[i]); }
+		            }
 
-                Mat img_matches;
-                drawMatches( img, keypoints_object, src, keypoints_scene,
-                           good_matches, img_matches, Scalar::all(-1), Scalar::all(-1),
-                           vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
+		            Mat img_matches;
+		            drawMatches( img, keypoints_object, src, keypoints_scene,
+		                       good_matches, img_matches, Scalar::all(-1), Scalar::all(-1),
+		                       vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
 
-                //-- Localize the object
-                vector<Point2f> obj;
-                vector<Point2f> scene;
+		            //-- Localize the object
+		            vector<Point2f> obj;
+		            vector<Point2f> scene;
 
-                for( int i = 0; i < good_matches.size(); i++ )
-                {
-                //-- Get the keypoints from the good matches
-                obj.push_back( keypoints_object[ good_matches[i].queryIdx ].pt );
-                scene.push_back( keypoints_scene[ good_matches[i].trainIdx ].pt );
-                }
+		            for( int i = 0; i < good_matches.size(); i++ )
+		            {
+		            //-- Get the keypoints from the good matches
+		            obj.push_back( keypoints_object[ good_matches[i].queryIdx ].pt );
+		            scene.push_back( keypoints_scene[ good_matches[i].trainIdx ].pt );
+		            }
 
-                if (obj.size() != 0 && scene.size() != 0)
-                {
-                    Mat H = findHomography( obj, scene, CV_RANSAC );
+		            if (obj.size() > 0 && scene.size() > 0)
+		            {
+		                Mat H = findHomography( obj, scene, CV_RANSAC );
 
-                    //-- Get the corners from the image_1 ( the object to be "detected" )
-                    vector<Point2f> obj_corners(4);
-                    obj_corners[0] = cvPoint(0,0);
-                    obj_corners[1] = cvPoint( img.cols, 0 );
-                    obj_corners[2] = cvPoint( img.cols, img.rows );
-                    obj_corners[3] = cvPoint( 0, img.rows );
-                    vector<Point2f> scene_corners(4);
+		                //-- Get the corners from the image_1 ( the object to be "detected" )
+		                vector<Point2f> obj_corners(4);
+		                obj_corners[0] = cvPoint(0,0);
+		                obj_corners[1] = cvPoint( img.cols, 0 );
+		                obj_corners[2] = cvPoint( img.cols, img.rows );
+		                obj_corners[3] = cvPoint( 0, img.rows );
+		                vector<Point2f> scene_corners(4);
 
-                    perspectiveTransform( obj_corners, scene_corners, H);
-                    Rect boundaries = boundingRect(Mat(scene_corners));
+		                perspectiveTransform( obj_corners, scene_corners, H);
+		                Rect boundaries = boundingRect(Mat(scene_corners));
 
-                    if (boundaries.width >= src.cols*size_threshold && boundaries.height >= src.rows*size_threshold)
-                    {
-                        found_matches++;
-                    }
-                }
+		                if (boundaries.width >= src.cols*size_threshold && boundaries.height >= src.rows*size_threshold)
+		                {
+							match_boundaries.push_back(boundaries);
+		                    found_matches++;
+		                }
+		            }
+				}
             }
         }
+
+		Mat debug_img;
+		_src.copyTo(debug_img);
+		for (vector<Rect>::iterator it = match_boundaries.begin(); it != match_boundaries.end(); it++)
+		{
+			rectangle(debug_img, *it, Scalar(0,0,255), 1);
+		}
+
+		namedWindow("SURF debug");
+		imshow("SURF debug", debug_img);
 
         cout << found_matches << " matches for shape " << shape << endl;
 
