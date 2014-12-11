@@ -110,10 +110,10 @@ public:
         pcl::RegionGrowingRGB<pcl::PointXYZRGB> reg;
         reg.setInputCloud (cloud_others);
         reg.setSearchMethod (tree);
-        reg.setDistanceThreshold (0.07);
+        reg.setDistanceThreshold (0.03);
         reg.setPointColorThreshold (15);
         reg.setRegionColorThreshold (15);
-        reg.setMinClusterSize (40);
+        reg.setMinClusterSize (50);
 
         reg.extract (cluster_indices);
 
@@ -145,7 +145,7 @@ public:
             //ROS_INFO("Loop");
             pcl::PointCloud<PointT>::Ptr cloud_cluster (new pcl::PointCloud<PointT>(*cloud_others, it->indices));
 
-            if(cloud_cluster->size() == 0)
+            if(cloud_cluster->size() == 0 || cloud_cluster->size() >= 500)
                 continue;
             Eigen::Vector4f centroid;
             pcl::compute3DCentroid(*cloud_others, it->indices, centroid);
