@@ -156,23 +156,8 @@ public:
             centroid_point.z = centroid[2];
 
             if(tree->nearestKSearch(centroid_point, 1,  pointIdxNKNSearch, pointNKNSquaredDistance) > 0 ) {
-
+                //Object too far away from floor plane -> no object
                 if(pointNKNSquaredDistance[0] > 0.05) {
-
-                    //std::cout << "Distance:" << pointNKNSquaredDistance[0] << std::endl;
-
-                    /*geometry_msgs::Point w;
-                    w.x = cloud_plane->points[ pointIdxNKNSearch[0] ].x;
-                    w.y = cloud_plane->points[ pointIdxNKNSearch[0] ].y;
-                    w.z = cloud_plane->points[ pointIdxNKNSearch[0] ].z;
-
-                    geometry_msgs::Point w2;
-                    w2.x = centroid[0];
-                    w2.y = centroid[1];
-                    w2.z = centroid[2];
-
-                    walls.points.push_back(w);
-                    walls.points.push_back(w2);*/
                     continue;
                 }
             }
@@ -240,7 +225,6 @@ int main (int argc, char** argv)
     // Initialize ROS
     ros::init (argc, argv, "object_detection_node");
     ObjectDetectionNode node;
-    ros::Duration(5).sleep();
     node.run();
     return 0;
 }
