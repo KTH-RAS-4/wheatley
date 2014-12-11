@@ -48,10 +48,12 @@ namespace wheatley
         gm::PointStamped home;
 
         gm::Point goal;
-        const int phase;
+        int phase;
         ros::Time last_input;
 
         double timeout;
+        ros::Time timeWhenLeftHome;
+        double phaseTimeout;
 
     public:
         Navigator()
@@ -72,6 +74,13 @@ namespace wheatley
             pub_path = nh.advertise<nav_msgs::Path>("planned_path", 1);
             pub_map = nh.advertise<nav_msgs::OccupancyGrid>("map_out", 1);
             timer_pathfinding = nh.createWallTimer(ros::WallDuration(1/rate), &Navigator::callback_timer, this);
+            timeWhenLeftHome = ros::Time::now();
+            timeWhenLeftHome = ros::Time::now();
+
+            if (phase == 1)
+                phaseTimeout = 270;
+            else if (phase == 2)
+                phaseTimeout = 150;
         }
 
         signed char occupancyFunction(float distance)
@@ -132,17 +141,27 @@ namespace wheatley
 
         void run_pathfinding()
         {
+            static bool phaseTimedOut = true;
+            if ((ros::Time::now()-timeWhenLeftHome).toSec() > phaseTimeout)
+            {
+                if (!phaseTimedOut)
+                {
+                    phaseTimedOut = true;
+                    goal = home.point;
+                    has_goal = true;
+                    phase = 0;
+                    ROS_INFO("Time is running out, going home!");
+                }
+            }
             static bool timedOut = true;
             if ((ros::Time::now()-last_input).toSec() > timeout)
             {
-                static bool timedOut = false;
                 if (!timedOut)
                 {
                     timedOut = true;
                     goal = home.point;
                     has_goal = true;
-                    run_pathfinding();
-                    ROS_DEBUG("timeout, going home!");
+                    ROS_INFO("timeout, going home!");
                 }
             }
 
@@ -202,6 +221,9 @@ namespace wheatley
 
             publishPath(points);
             last_input = ros::Time::now();
+            timedOut = false;
+            phaseTimedOut = false;
+
         }
 
         void publishPath(const std::vector<gm::Point>& path)

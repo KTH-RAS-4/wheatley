@@ -237,20 +237,24 @@ namespace wheatley
                     {
                         geometry_msgs::Twist twist;
                         pub_motor_twist.publish(twist);
-                        if (crashR)
+                        if (crashR && !distance.bumper)
                         {
                             state = "RIGHT";
                             crashR = false;
-                        } else if (crashL)
+                        } else if (crashL && !distance.bumper)
                         {
                             state = "LEFT";
                             crashL = false;
                         }
-                        else if (crash)
+                        else if (crash && !distance.bumper)
                         {
                             state = "LEFT";
                             crash = false;
                             desiredTheta = angles::normalize_angle(desiredTheta + M_PI/2);
+                        } else if ((crash || crashL || crashR) && distance.bumper)
+                        {
+                            prev_state = "STOP";
+                            state = "BACK";
                         } else
                         {
                             state = "STOP";
@@ -260,7 +264,7 @@ namespace wheatley
                 else if (state == "LEFT")
                 {
                     static bool align_done = false;
-                    if (!align_done && align(1.5)) //align just finished
+                    if (!align_done && align(1.4)) //align just finished
                     {
                         count = 0;
                         align_done = true;
@@ -292,7 +296,7 @@ namespace wheatley
                 else if (state == "RIGHT")
                 {
                     static bool align_done = false;
-                    if (!align_done && align(1.5)) //align just finished
+                    if (!align_done && align(1.4)) //align just finished
                     {
                         count = 0;
                         align_done = true;
@@ -363,7 +367,7 @@ namespace wheatley
             else
             {
                 geometry_msgs::Twist twist;
-                twist.angular.z = clamp(error, -speed, speed);
+                twist.angular.z = clamp(error/4, -speed, speed);
                 pub_motor_twist.publish(twist);
                 return false;
             }
