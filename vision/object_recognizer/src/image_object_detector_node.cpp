@@ -20,7 +20,7 @@ using namespace cv;
 static const string WINDOW_1 = "Image mask";
 static const string WINDOW_2 = "Image";
 
-static const string IMAGE_DIR = "catkinws/src/wheatley/vision/object_recognizer/img/";
+static const string IMAGE_DIR = "~/catkin_ws/src/wheatley/vision/object_recognizer/img/";
 
 bool visual_debugging = false;
 bool verbose = true;
