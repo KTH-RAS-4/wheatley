@@ -194,7 +194,7 @@ int IsWindowFree (OverlayClouds* overlay, const gm::Point& p, const double r)
     const nm::MapMetaData& geom = overlay->grid.info;
     const int cell_radius = floor(r/geom.resolution);
     const Cell c = pointCell(geom, p);
-    bool isUnknown = false;
+    bool isUnknown = 0;
     int a;
     int isUnoccupied=1;
     for (int x= c.x-cell_radius; x<=c.x+cell_radius; x++)
@@ -206,21 +206,21 @@ int IsWindowFree (OverlayClouds* overlay, const gm::Point& p, const double r)
             {
                 const index_t ind = cellIndex(geom, c2);
                a=determineOccupancy (overlay->hit_counts[ind], overlay->pass_through_counts[ind] ,overlay->occupancy_threshold,overlay->min_pass_through);
-               if (a==0)
+               if (a==UNOCCUPIED)
                    isUnoccupied=isUnoccupied*1;
                else
                    isUnoccupied=0;
-               if (a==100)
+               if (a==OCCUPIED)
                     return a;
-                else if(a==255)
-                    isUnknown = true;
+                else if(a==UNKNOWN)
+                    isUnknown++;
             }
         }
     }
-    if(isUnknown)
-        return 255;
+    if(isUnknown > 1)
+        return UNKNOWN;
     else if(isUnoccupied)
-        return 0;
+        return UNOCCUPIED;
     else
         return 33;
     //UNOCCUPIED=0; OCCUPIED=100; UNKNOWN=255; ERROR=33;
@@ -271,8 +271,8 @@ void addCloud (OverlayClouds* overlay, LocalizedCloud::ConstPtr cloud, const int
             }
 
             if (last_ind && hasEndpoint) {
-                if(IsWindowFree(overlay, p, 0.02) == UNOCCUPIED) {
-                    ROS_INFO("Windows is unoccupied");
+                if(IsWindowFree(overlay, p, 0.01) == UNOCCUPIED) {
+                    //ROS_INFO("Window is unoccupied");
                     break;
                 }
                 // If the last cell equals the point (i.e., point is not off the grid), update hit counts

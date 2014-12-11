@@ -112,7 +112,7 @@ add_executable(object_recognizer_node src/object_recognizer_node.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
-# add_dependencies(object_recognizer_node object_recognizer_generate_messages_cpp)
+add_dependencies(object_recognizer_node object_recognizer_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(object_recognizer_node
@@ -122,20 +122,23 @@ target_link_libraries(object_recognizer_node
 
 # The object color trainer
 add_executable(object_color_trainer src/object_color_trainer.cpp)
+add_dependencies(object_color_trainer object_recognizer_generate_messages_cpp)
 target_link_libraries(object_color_trainer
   ${catkin_LIBRARIES}
   ${OpenCV_LIBS}
 )
 
 # color detector node
-add_executable(color_detector_node src/color_detector_node.cpp)
-target_link_libraries(color_detector_node
+add_executable(object_collector_node src/object_collector_node.cpp)
+add_dependencies(object_collector_node object_recognizer_generate_messages_cpp)
+target_link_libraries(object_collector_node
   ${catkin_LIBRARIES}
   ${OpenCV_LIBS}
 )
 
 # image object detector node
 add_executable(image_object_detector_node src/image_object_detector_node.cpp)
+add_dependencies(image_object_detector_node object_recognizer_generate_messages_cpp)
 target_link_libraries(image_object_detector_node
   ${catkin_LIBRARIES}
   ${OpenCV_LIBS}

@@ -61,6 +61,7 @@ namespace wheatley
         bool crashR;
         bool crash;
         bool ready;
+        bool last_bumper;
         double maxWallAlignDistance;
         double maxWallAlignAngle;
 
@@ -99,6 +100,7 @@ namespace wheatley
             crashL = false;
             crashR = false;
             crash = false;
+            last_bumper = false;
         }
 
 
@@ -145,24 +147,25 @@ namespace wheatley
                 avgRightDiff = sumR / (double) count;
             }
 
-            if (distance.bumper && state == "LEFT" && ready)
+            if (last_bumper != distance.bumper && distance.bumper && state == "LEFT" && ready)
             {
                 state = "BACK";
                 crashL = true;
                 ready = false;
             }
-            else if (distance.bumper && state == "RIGHT" && ready)
+            else if (last_bumper != distance.bumper && distance.bumper && state == "RIGHT" && ready)
             {
                 state = "BACK";
                 crashR = true;
                 ready = false;
-            } else if (distance.bumper && state == "FORWARD" && ready)
+            } else if (last_bumper != distance.bumper && distance.bumper && state == "FORWARD" && ready)
             {
                 crash = true;
                 ready = false;
                 state = "BACK";
             }
 
+            last_bumper = distance.bumper;
             publishState();
         }
 
@@ -198,7 +201,7 @@ namespace wheatley
 
                 if (state == "FORWARD")
                 {
-                    if (!follow(0.2, 0.08))
+                    if (!follow(0.2))
                     {
                         state = "STOP";
                         ready = true;
@@ -360,16 +363,16 @@ namespace wheatley
             else
             {
                 geometry_msgs::Twist twist;
-                twist.angular.z = clamp(error/8, -speed, speed);
+                twist.angular.z = clamp(error, -speed, speed);
                 pub_motor_twist.publish(twist);
                 return false;
             }
         }
 
-        bool follow(double speed, double frontDistance)
+        bool follow(double speed)
         {
             geometry_msgs::Twist twist;
-            if (distance.front > 0.35)
+            /*if (distance.front > 0.35)
             {
                 twist.linear.x = speed;
                 twist.angular.z = 0;
@@ -389,7 +392,11 @@ namespace wheatley
                 pub_wall_twist.publish(twist);
                 ros::Duration(0.5).sleep();
                 return false;
-            }
+            }*/
+            twist.linear.x = speed;
+            twist.angular.z = 0;
+            pub_wall_twist.publish(twist);
+            return true;
         }
     };
 }

@@ -54,9 +54,9 @@ string simple_shapes[] = {
 
 string complex_shapes[] = {
     "", // wall
-    "Sphere", // red
+    "Ball", // red
     "Star", // orange
-    "Sphere", // yellow
+    "Ball", // yellow
     "Cylinder", // green
     "", // blue
     "Cross" // purple
@@ -270,7 +270,7 @@ private:
             //dilate(image, image, dilation_element);
 
             // loop over the detected objects
-            for (map<int, detected_object>::iterator it = detected_objects.begin(); it != detected_objects.end(); it++)
+            for (map<int, detected_object>::iterator it = detected_objects.begin(); it != detected_objects.end(); )
             {
                 detected_object obj = it->second;
                 int color = obj.color;
@@ -317,7 +317,7 @@ private:
                     approxPolyDP(contours[i], polygon, approx_epsilon, true);
                     bounds = boundingRect(Mat(polygon));
                     bool match = false;
-                    for (int j = 0; j < boundingBoxes.size() && j < polygons.size(); j++)
+                    for (int j = 0; j < boundingBoxes.size() && j < polygons.size(); )
                     {
                         // if the new bounds are enclosing
                         if (bounds.x-boundingThreshold <= boundingBoxes[j].x &&
@@ -328,7 +328,6 @@ private:
                             //rectangle(result, boundingBoxes[j], Scalar(0,0,255), 1, 8, 0);
                             polygons.erase(polygons.begin()+j);
                             boundingBoxes.erase(boundingBoxes.begin()+j);
-                            j--;
                         }
                         // if the new bounds is enclosed
                         else if (bounds.x >= boundingBoxes[j].x &&
@@ -338,6 +337,8 @@ private:
                         {
                             match = true;
                             break;
+                        } else {
+                            j++;
                         }
                     }
                     if (!match)
@@ -346,7 +347,7 @@ private:
                         boundingBoxes.push_back(bounds);
                     }
                 }
-                polylines(result, polygons, true, Scalar(0,0,255), 1, 8, 0);
+                polylines(result, polygons, true, Scalar(00,255), 1, 8, 0);
                 int foundidx = 0, foundsize = 0;
                 for (int i = 0; i < boundingBoxes.size() && i < polygons.size(); i++)
                 {
@@ -363,6 +364,14 @@ private:
                     imshow(WINDOW_2, result);
                 }
 
+                /*ROS_INFO_STREAM("Polygons size = " << polygons.size());
+                if(polygons.size() == 0) {
+                    obj.iterations++;
+                    it->second = obj;
+                    it++;
+                    return;
+                }*/
+
                 int vertices;
 
 				/*
@@ -373,7 +382,7 @@ private:
                 }
                 obj.vertices[vertices]++;*/
 
-				if (polygons[foundidx].size() <= 6)
+                if (polygons.size() == 0 || polygons[foundidx].size() <= 6)
 				{
 					// found simple shape
 					obj.candidates[0]++;
@@ -385,9 +394,9 @@ private:
 				}
                 obj.iterations++;
 
-				if (verbose)
+                if (verbose && polygons.size() != 0)
 				{
-					cout << "found " << color_names[color] << " object with " << polygons[foundidx].size() << " vertices (" << obj.candidates[0] << " : " << obj.candidates[1] << ")" << endl;
+                    cout << "found " << color_names[color] << " object with " << polygons[foundidx].size()<< " vertices (" << obj.candidates[0] << " : " << obj.candidates[1] << ")" << endl;
 				}
 
                 if (obj.iterations >= detect_iterations)
@@ -420,13 +429,15 @@ private:
 
                     object_pub.publish(obj.object);
 
-                    detected_objects.erase(it);
-                    it--;
+                    detected_objects.erase(it++);
+                    //it--;
                 }
 				else
 				{
 					it->second = obj;
+                    it++;
 				}
+
             }
         }
 
