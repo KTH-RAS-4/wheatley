@@ -43,6 +43,7 @@ namespace wheatley
         const double prevPoseMemory;
         const double prevPoseSaveRate;
         const double prevPoseAvoidDistance;
+        const double newOrderCooldown;
 
         boost::circular_buffer<tf::Point> prev_points;
         std::vector<tf::Pose> path;
@@ -65,6 +66,7 @@ namespace wheatley
             , stopForwardDistance(requireParameter<double>("stop_forward_distance"))
             , maxProjectionDistance(requireParameter<double>("max_projection_distance"))
             , maxSkipTurnGoTurnBackDistance(requireParameter<double>("max_skip_turn_go_turn_back_distance"))
+            , newOrderCooldown(requireParameter<double>("new_order_cooldown"))
             , prev_points(ceil(prevPoseMemory*prevPoseSaveRate))
         {
             pub_executor_order = nh.advertise<std_msgs::String>("executor_order", 1, true);
@@ -133,18 +135,18 @@ namespace wheatley
 
             tf::Pose goal = path.back();
 
-            bool headingForPreviousPosition = false;
+            bool exploringNewFrontiers = true;
             tf::Point forwardPoint = pose * tf::Vector3(prevPoseAvoidDistance*1.5, 0, 0);
             for (int i=0; i<prev_points.size(); i++)
             {
                 if (forwardPoint.distance2(prev_points[i]) < pow(prevPoseAvoidDistance,2))
                 {
-                    headingForPreviousPosition = true;
+                    exploringNewFrontiers = false;
                     break;
                 }
             }
 
-            if (headingForPreviousPosition &&
+            if (!exploringNewFrontiers &&
                     yaw(pose) == yaw(goal) &&
                     pose.getOrigin().distance(goal.getOrigin()) <= stoppingDistance)
             {
@@ -193,8 +195,8 @@ namespace wheatley
                                 currTurn = 2;
                         }
                     }
-                    else if (prev_order == "FORWARD" && !headingForPreviousPosition)
-                        currTurn = 0; //don't interrupt a good forward
+                    else if (prev_order == "FORWARD" && exploringNewFrontiers)
+                        currTurn = 0; //don't interrupt a perfectly good forward
 
                     if (currTurn > 0)
                         publishOrder("LEFT");
@@ -210,16 +212,26 @@ namespace wheatley
 
         void publishOrder(string order)
         {
-            if ((executor_ready || phase == 0) && prev_order != order)
+            static ros::Time prev_order_time(-1000);
+            ros::Time now = ros::Time::now();
+
+            if (prev_order == "FORWARD" && (order == "LEFT" || order == "RIGHT" || order == "BACK"))
+                order = "STOP";
+
+            if (order == "STOP" || (now-prev_order_time).toSec() > newOrderCooldown)
             {
-                prev_order = order;
+                if ((executor_ready || phase == 0) && prev_order != order)
+                {
+                    prev_order = order;
+                    prev_order_time = now;
 
-                if (order == "LEFT" || order == "RIGHT" || order == "BACK")
-                    executor_ready = false;
+                    if (order == "LEFT" || order == "RIGHT" || order == "BACK")
+                        executor_ready = false;
 
-                std_msgs::String msg_order;
-                msg_order.data = order;
-                pub_executor_order.publish(msg_order);
+                    std_msgs::String msg_order;
+                    msg_order.data = order;
+                    pub_executor_order.publish(msg_order);
+                }
             }
         }
 
