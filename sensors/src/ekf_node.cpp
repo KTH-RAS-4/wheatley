@@ -20,6 +20,7 @@
 #include <boost/foreach.hpp>
 #include <Eigen/Core>
 #include <Eigen/LU>
+#include <tf/transform_broadcaster.h>
 
 
 using std::string;
@@ -36,6 +37,8 @@ namespace wheatley
         ros::Subscriber sub_ir;
         ros::Subscriber sub_encoders;
         ros::Publisher pub_sim_ir;
+        ros::Publisher pub_pose_ekf;
+        tf::TransformBroadcaster pub_transform;
 
         tf::StampedTransform tf_front;
         tf::StampedTransform tf_rear;
@@ -75,6 +78,7 @@ namespace wheatley
             sub_map = nh.subscribe("map_in", 1, &KalmanNode::callback_map, this);
             sub_ir = nh.subscribe("/sensors/ir/distances", 1, &KalmanNode::callback_ir, this);
             pub_sim_ir = nh.advertise<sensors::Distance>("simulated_ir_distances", 1);
+            pub_pose_ekf = nh.advertise<nav_msgs::Odometry> ("pose_ekf", 1);
 
             //intial sigma Covariance matrix
             prev_sigma << 0.05,    0, 0,
@@ -126,6 +130,8 @@ namespace wheatley
 
         void calc_ekf(const sensors::Distance& real, const sensors::Distance& simulated, const gm::Pose& pose, const gm::Pose& prev_pose)
         {
+            ros::Time now = ros::Time::now();
+
             //get the Ut
             double u_x = pose.position.x-prev_pose.position.x;
             double u_y = pose.position.y-prev_pose.position.y;
@@ -230,13 +236,45 @@ namespace wheatley
 
            //compute the update
            update=K*nu;
+
+           //update mu
            mu=prev_mu+update;
 
+           //update sigma
            sigma=(I-K*H_hat)*prev_sigma;
-
+           //store sigma for the next iteration
            prev_sigma=sigma;
+           //poblish mu
+
+           publish_pose_ekf(now, mu(0,0), mu(1,0), mu(2,0));
 
         }
+
+    void publish_pose_ekf(ros::Time now,double x,double y,double theta)
+    {
+        //publish "robot" transform
+        tf::Transform transform;
+        transform.setOrigin(tf::Vector3(x, y, 0));
+        tf::Quaternion q;
+        q.setRPY(0, 0, theta);
+        transform.setRotation(q);
+        pub_transform.sendTransform(tf::StampedTransform(transform, now, "map", "robot"));
+
+        //publish pose
+        nav_msgs::Odometry pose;
+        pose.header.stamp = now;
+        //TODO: this is what we would like to do, but rviz Odometry marker doesn't work then
+        //pose.header.frame_id = "robot";
+        //pose.pose.pose.orientation.w = 1;
+        pose.header.frame_id = "map";
+        pose.pose.pose.position.x = x;
+        pose.pose.pose.position.y = y;
+        pose.pose.pose.orientation.x = q.x();
+        pose.pose.pose.orientation.y = q.y();
+        pose.pose.pose.orientation.z = q.z();
+        pose.pose.pose.orientation.w = q.w();
+        pub_pose_ekf.publish(pose);
+    }
 
         sensors::Distance simulateIrDistances(const gm::Pose& pose, const ros::Time& stamp)
         {
@@ -245,12 +283,12 @@ namespace wheatley
 
             sensors::Distance distance;
             distance.header.stamp = stamp;
-            distance.front       = simulateIrSensor(tf_pose * tf_front);
-            distance.rear        = simulateIrSensor(tf_pose * tf_rear);
-            distance.left_front  = simulateIrSensor(tf_pose * tf_left_front);
-            distance.left_rear   = simulateIrSensor(tf_pose * tf_left_rear);
-            distance.right_front = simulateIrSensor(tf_pose * tf_right_front);
-            distance.right_rear  = simulateIrSensor(tf_pose * tf_right_rear);
+            distance.front        = simulateIrSensor(tf_pose * tf_front);
+            distance.rear         = simulateIrSensor(tf_pose * tf_rear);
+            distance.left_front   = simulateIrSensor(tf_pose * tf_left_front);
+            distance.left_rear    = simulateIrSensor(tf_pose * tf_left_rear);
+            distance.right_front  = simulateIrSensor(tf_pose * tf_right_front);
+            distance.right_rear   = simulateIrSensor(tf_pose * tf_right_rear);
             return distance;
         }
 
