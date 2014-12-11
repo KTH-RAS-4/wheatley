@@ -36,6 +36,7 @@ namespace wheatley
         const string robot_frame;
         const int phase;
         const double stoppingDistance;
+        const double stopForwardDistance;
         const double maxProjectionDistance;
         const double maxSkipTurnGoTurnBackDistance;
 
@@ -53,6 +54,7 @@ namespace wheatley
             , executor_ready(false)
             , phase(requireParameter<int>("/phase"))
             , stoppingDistance(requireParameter<double>("stopping_distance"))
+            , stopForwardDistance(requireParameter<double>("stop_forward_distance"))
             , maxProjectionDistance(requireParameter<double>("max_projection_distance"))
             , maxSkipTurnGoTurnBackDistance(requireParameter<double>("max_skip_turn_go_turn_back_distance"))
         {
@@ -155,7 +157,7 @@ namespace wheatley
                             currTurn = 0;
                     }
 
-                    if (currTurn == 0 && prev_order == "FORWARD" && distance.front < 0.08)
+                    if (currTurn == 0 && prev_order == "FORWARD" && distance.front < stopForwardDistance)
                     {
                         if (nextTurn != 0)
                             currTurn = nextTurn;

@@ -142,7 +142,7 @@ namespace wheatley
         void run_pathfinding()
         {
             static bool phaseTimedOut = true;
-            if ((ros::Time::now()-timeWhenLeftHome).toSec() > phaseTimeout)
+            /*if ((ros::Time::now()-timeWhenLeftHome).toSec() > phaseTimeout)
             {
                 if (!phaseTimedOut)
                 {
@@ -152,9 +152,9 @@ namespace wheatley
                     phase = 0;
                     ROS_INFO("Time is running out, going home!");
                 }
-            }
+            }*/
             static bool timedOut = true;
-            if ((ros::Time::now()-last_input).toSec() > timeout)
+            /*if ((ros::Time::now()-last_input).toSec() > timeout)
             {
                 if (!timedOut)
                 {
@@ -163,7 +163,7 @@ namespace wheatley
                     has_goal = true;
                     ROS_INFO("timeout, going home!");
                 }
-            }
+            }*/
 
             if (phase != 1 && !has_goal)
                 return;
