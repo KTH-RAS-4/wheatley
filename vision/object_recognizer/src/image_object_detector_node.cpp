@@ -1,6 +1,7 @@
 #include <iostream>
 #include <math.h>
 #include <ros/ros.h>
+#include <dirent.h>
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/image_encodings.h>
@@ -9,12 +10,17 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
+#include <opencv2/features2d/features2d.hpp>
+#include <opencv2/nonfree/features2d.hpp>
+#include <opencv2/calib3d/calib3d.hpp>
 
 using namespace std;
 using namespace cv;
 
 static const string WINDOW_1 = "Image mask";
 static const string WINDOW_2 = "Image";
+
+static const string IMAGE_DIR = "catkinws/src/wheatley/vision/object_recognizer/img/";
 
 bool visual_debugging = false;
 bool verbose = true;
@@ -30,6 +36,9 @@ static const int YELLOW = 0x3;
 static const int GREEN = 0x4;
 static const int BLUE = 0x5;
 static const int PURPLE = 0x6;
+
+// shapes
+static const int TRIANGLE = 0x10;
 
 string color_names[] = {
     "Wall",
@@ -58,7 +67,7 @@ string complex_shapes[] = {
     "Star", // orange
     "Ball", // yellow
     "Cylinder", // green
-    "", // blue
+    "Triangle", // blue
     "Cross" // purple
 };
 
@@ -179,6 +188,8 @@ class ImageObjectDetectionNode
 
     map<int, detected_object> detected_objects;
 
+    vector<Mat> triangle_imgs;
+
 public:
     ImageObjectDetectionNode()
     : it(handle)
@@ -197,6 +208,27 @@ public:
         erosion_element = getStructuringElement(MORPH_ELLIPSE, Size(2*erosion_size+1, 2*erosion_size+1), Point(erosion_size, erosion_size));
         int dilation_size = 5;
         dilation_element = getStructuringElement(MORPH_ELLIPSE, Size(2*dilation_size+1, 2*dilation_size+1), Point(dilation_size, dilation_size));
+
+        DIR *dir;
+        struct dirent *ent;
+        Mat img;
+        string dir_str;
+        dir_str = IMAGE_DIR + "triangle/";
+        if ((dir = opendir (dir_str.c_str())) != NULL) {
+            while ((ent = readdir (dir)) != NULL) {
+                if (strcmp(ent->d_name, ".") && strcmp(ent->d_name, ".."))
+                {
+                    img = imread(dir_str + ent->d_name, CV_LOAD_IMAGE_GRAYSCALE);
+                    equalizeHist(img, img);
+                    //cvtColor(img, img, CV_GRAY2BGR);
+                    GaussianBlur(img, img, Size(3, 3), 3, 0, BORDER_DEFAULT);
+                    //cvtColor(img, img, CV_BGR2GRAY);
+                    img.convertTo(img, CV_8U);
+                    triangle_imgs.push_back(img);
+                }
+            }
+            closedir (dir);
+        }
     }
 
     ~ImageObjectDetectionNode()
@@ -348,7 +380,7 @@ private:
                     }
                 }
                 polylines(result, polygons, true, Scalar(00,255), 1, 8, 0);
-                int foundidx = 0, foundsize = 0;
+                int foundidx = -1, foundsize = 0;
                 for (int i = 0; i < boundingBoxes.size() && i < polygons.size(); i++)
                 {
                     if (boundingBoxes[i].width*boundingBoxes[i].height > foundsize)
@@ -381,17 +413,37 @@ private:
                     obj.vertices[vertices] = 0;
                 }
                 obj.vertices[vertices]++;*/
-
-                if (polygons.size() == 0 || polygons[foundidx].size() <= 6)
-				{
-					// found simple shape
-					obj.candidates[0]++;
-				}
-				else
-				{
-					// found complex shape
-					obj.candidates[1]++;
-				}
+                if (foundidx != -1)
+                {
+                    if (color == BLUE)
+                    {
+                        // extract the masked part of the image
+                        int isShape = checkObjectShape(image(boundingBoxes[foundidx]), TRIANGLE);
+                        if (isShape)
+                        {
+                            // found blue triangle (complex shape)
+                            obj.candidates[1]++;
+                        }
+                        else
+                        {
+                            // found blue cube (simple shape)
+                            obj.candidates[0]++;
+                        }
+                    }
+                    else
+                    {
+                        if (polygons[foundidx].size() <= 6)
+        				{
+        					// found simple shape
+        					obj.candidates[0]++;
+        				}
+        				else
+        				{
+        					// found complex shape
+        					obj.candidates[1]++;
+        				}
+                    }
+                }
                 obj.iterations++;
 
                 if (verbose && polygons.size() != 0)
@@ -609,6 +661,132 @@ private:
                     }
                 }
             }
+        }
+    }
+
+    bool checkObjectShape(const Mat _src, int shape)
+    {
+        Mat src, img;
+        _src.copyTo(src);
+
+        // normalize and convert to grayscale
+        cvtColor(src, src, CV_BGR2GRAY);
+        equalizeHist(src, src);
+        cvtColor(src, src, CV_GRAY2BGR);
+        GaussianBlur(src, src, Size(3, 3), 3, 0, BORDER_DEFAULT);
+        cvtColor(src, src, CV_BGR2GRAY);
+        src.convertTo(src, CV_8U);
+
+        vector<Mat> training_imgs;
+
+        switch (shape) {
+            case TRIANGLE:
+                training_imgs = triangle_imgs;
+                break;
+            default:
+                return false;
+                break;
+        }
+
+        double size_threshold = 0.7;
+        int matches_threshold = 2;
+        int found_matches = 0;
+
+        for (vector<Mat>::iterator it = training_imgs.begin(); it != training_imgs.end(); it++)
+        {
+            for (int minHessian = 300; minHessian <= 700; minHessian += 100)
+            {
+                img = *it;
+
+                //-- Step 1: Detect the keypoints using SURF Detector
+                SurfFeatureDetector detector( minHessian );
+
+                vector<KeyPoint> keypoints_object, keypoints_scene;
+
+                detector.detect( img, keypoints_object );
+                detector.detect( src, keypoints_scene );
+
+                //-- Step 2: Calculate descriptors (feature vectors)
+                SurfDescriptorExtractor extractor;
+
+                Mat descriptors_object, descriptors_scene;
+
+                extractor.compute( img, keypoints_object, descriptors_object );
+                extractor.compute( src, keypoints_scene, descriptors_scene );
+
+                //-- Step 3: Matching descriptor vectors using FLANN matcher
+                FlannBasedMatcher matcher;
+                vector< DMatch > matches;
+                matcher.match( descriptors_object, descriptors_scene, matches );
+
+                double max_dist = 0; double min_dist = 100;
+
+                //-- Quick calculation of max and min distances between keypoints
+                for( int i = 0; i < descriptors_object.rows; i++ )
+                { double dist = matches[i].distance;
+                if( dist < min_dist ) min_dist = dist;
+                if( dist > max_dist ) max_dist = dist;
+                }
+
+                printf("-- Max dist : %f \n", max_dist );
+                printf("-- Min dist : %f \n", min_dist );
+
+                //-- Draw only "good" matches (i.e. whose distance is less than 3*min_dist )
+                vector< DMatch > good_matches;
+
+                for( int i = 0; i < descriptors_object.rows; i++ )
+                { if( matches[i].distance < 3*min_dist )
+                 { good_matches.push_back( matches[i]); }
+                }
+
+                Mat img_matches;
+                drawMatches( img, keypoints_object, src, keypoints_scene,
+                           good_matches, img_matches, Scalar::all(-1), Scalar::all(-1),
+                           vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
+
+                //-- Localize the object
+                vector<Point2f> obj;
+                vector<Point2f> scene;
+
+                for( int i = 0; i < good_matches.size(); i++ )
+                {
+                //-- Get the keypoints from the good matches
+                obj.push_back( keypoints_object[ good_matches[i].queryIdx ].pt );
+                scene.push_back( keypoints_scene[ good_matches[i].trainIdx ].pt );
+                }
+
+                if (obj.size() != 0 && scene.size() != 0)
+                {
+                    Mat H = findHomography( obj, scene, CV_RANSAC );
+
+                    //-- Get the corners from the image_1 ( the object to be "detected" )
+                    vector<Point2f> obj_corners(4);
+                    obj_corners[0] = cvPoint(0,0);
+                    obj_corners[1] = cvPoint( img.cols, 0 );
+                    obj_corners[2] = cvPoint( img.cols, img.rows );
+                    obj_corners[3] = cvPoint( 0, img.rows );
+                    vector<Point2f> scene_corners(4);
+
+                    perspectiveTransform( obj_corners, scene_corners, H);
+                    Rect boundaries = boundingRect(Mat(scene_corners));
+
+                    if (boundaries.width >= src.cols*size_threshold && boundaries.height >= src.rows*size_threshold)
+                    {
+                        found_matches++;
+                    }
+                }
+            }
+        }
+
+        cout << found_matches << " matches for shape " << shape << endl;
+
+        if (found_matches >= matches_threshold)
+        {
+            return true;
+        }
+        else
+        {
+            return false;
         }
     }
 
