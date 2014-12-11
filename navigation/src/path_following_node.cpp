@@ -12,6 +12,7 @@
 #include <angles/angles.h>
 #include <boost/function.hpp>
 #include <boost/optional.hpp>
+#include <sensors/Distance.h>
 #include <wheatley_common/common.h>
 #include <wheatley_common/angles.h>
 #define _USE_MATH_DEFINES
@@ -29,6 +30,7 @@ namespace wheatley
         ros::Subscriber sub_executor_state;
         ros::Subscriber sub_path;
         ros::Subscriber sub_pose;
+        ros::Subscriber sub_ir_distances;
 
         const string fixed_frame;
         const string robot_frame;
@@ -38,6 +40,7 @@ namespace wheatley
         const double maxSkipTurnGoTurnBackDistance;
 
         std::vector<tf::Pose> path;
+        sensors::Distance distance;
         tf::Pose pose;
 
         bool executor_ready;
@@ -57,6 +60,7 @@ namespace wheatley
             sub_executor_state = nh.subscribe("executor_state", 1, &PathFollower::callback_executor_state, this);
             sub_pose = nh.subscribe("pose", 1, &PathFollower::callback_pose, this);
             sub_path = nh.subscribe("path", 1, &PathFollower::callback_path, this);
+            sub_ir_distances = nh.subscribe ("/sensors/ir/distances", 1, &PathFollower::callback_ir_distances, this);
         }
 
         void callback_path(const nav_msgs::Path::ConstPtr& msg)
@@ -72,6 +76,12 @@ namespace wheatley
             }
 
             run_change_direction();
+        }
+
+        void callback_ir_distances(const sensors::Distance::ConstPtr& msg)
+        {
+            ROS_INFO_STREAM_ONCE("got first ir");
+            distance = *msg;
         }
 
         void callback_pose(const nav_msgs::Odometry::ConstPtr& msg)
@@ -130,9 +140,10 @@ namespace wheatley
                         }
                     }
 
+                    int nextTurn = 0;
                     if (nextTurnIndex != -1)
                     {
-                        int nextTurn = turnDiff(path[nextTurnIndex-1], path[nextTurnIndex]);
+                        nextTurn = turnDiff(path[nextTurnIndex-1], path[nextTurnIndex]);
                         double distanceToNextTurn = path[*currIndex].getOrigin().distance(path[nextTurnIndex].getOrigin());
 
                         //if turning 180 and the next turn is to the left, turn back to the right instead
@@ -143,6 +154,15 @@ namespace wheatley
                         if (distanceToNextTurn <= maxSkipTurnGoTurnBackDistance && currTurn == -nextTurn)
                             currTurn = 0;
                     }
+
+                    if (currTurn == 0 && prev_order == "FORWARD" && distance.front < 0.08)
+                    {
+                        if (nextTurn != 0)
+                            currTurn = nextTurn;
+                        else
+                            currTurn = 2;
+                    }
+
 
                     if (currTurn > 0)
                         publishOrder("LEFT");
@@ -195,7 +215,7 @@ namespace wheatley
                 int turndiff = abs(turnDiff(pose, path[i]));
 
                 double distance = pose.getOrigin().distance(path[i].getOrigin());
-                double dist = distance * (turndiff+1) + turndiff*0.02; //great way of measuring similarity :D
+                double dist = distance + turndiff*0.05; //even greater way of measuring similarity :D
                 if (best >= dist)
                 {
                     best = dist;

@@ -2,7 +2,7 @@
 
 <launch>
 	<node pkg="navigation" type="navigation_node"
-			name="navigator" output="screen" clear_params="true">
+			name="navigator" output="screen" clear_params="true" respawn="true">
 		<rosparam command="load" file="$(find navigation)/config/navigator.yaml"/>
 		<remap from="~/map_in" to="/map"/>
 		<remap from="~/map_out" to="~/inflated_map"/>
