@@ -37,7 +37,8 @@ namespace wheatley
         const string robot_frame;
         const int phase;
         const double stoppingDistance;
-        const double stopForwardDistance;
+        const double minStopForwardDistance;
+        const double maxStopForwardDistance;
         const double maxProjectionDistance;
         const double maxSkipTurnGoTurnBackDistance;
         const double prevPoseMemory;
@@ -45,7 +46,7 @@ namespace wheatley
         const double prevPoseAvoidDistance;
         const double newOrderCooldown;
 
-        boost::circular_buffer<tf::Point> prev_points;
+        boost::circular_buffer<tf::Stamped<tf::Pose> > prev_poses;
         std::vector<tf::Pose> path;
         sensors::Distance distance;
         tf::Pose pose;
@@ -63,11 +64,12 @@ namespace wheatley
             , prevPoseSaveRate(requireParameter<double>("prev_pose_save_rate"))
             , prevPoseAvoidDistance(requireParameter<double>("prev_pose_avoid_distance"))
             , stoppingDistance(requireParameter<double>("stopping_distance"))
-            , stopForwardDistance(requireParameter<double>("stop_forward_distance"))
+            , minStopForwardDistance(requireParameter<double>("min_stop_forward_distance"))
+            , maxStopForwardDistance(requireParameter<double>("max_stop_forward_distance"))
             , maxProjectionDistance(requireParameter<double>("max_projection_distance"))
             , maxSkipTurnGoTurnBackDistance(requireParameter<double>("max_skip_turn_go_turn_back_distance"))
             , newOrderCooldown(requireParameter<double>("new_order_cooldown"))
-            , prev_points(ceil(prevPoseMemory*prevPoseSaveRate))
+            , prev_poses(ceil(prevPoseMemory*prevPoseSaveRate))
         {
             pub_executor_order = nh.advertise<std_msgs::String>("executor_order", 1, true);
             sub_executor_state = nh.subscribe("executor_state", 1, &PathFollower::callback_executor_state, this);
@@ -109,7 +111,7 @@ namespace wheatley
             if ((msg->header.stamp - prev_save_time).toSec() > 1/prevPoseSaveRate)
             {
                 prev_save_time = msg->header.stamp;
-                prev_points.push_back(pose.getOrigin());
+                prev_poses.push_back(tf::Stamped<tf::Pose>(pose, msg->header.stamp, msg->header.frame_id));
             }
             run_change_direction();
         }
@@ -137,9 +139,9 @@ namespace wheatley
 
             bool exploringNewFrontiers = true;
             tf::Point forwardPoint = pose * tf::Vector3(prevPoseAvoidDistance*1.5, 0, 0);
-            for (int i=0; i<prev_points.size(); i++)
+            for (int i=0; i<prev_poses.size(); i++)
             {
-                if (forwardPoint.distance2(prev_points[i]) < pow(prevPoseAvoidDistance,2))
+                if (forwardPoint.distance2(prev_poses[i].getOrigin()) < pow(prevPoseAvoidDistance,2))
                 {
                     exploringNewFrontiers = false;
                     break;
@@ -158,6 +160,10 @@ namespace wheatley
                 boost::optional<int> currIndex = getClosestIndex(path, pose, maxProjectionDistance);
                 if (currIndex)
                 {
+                    tf::Stamped<tf::Pose> pp = prev_poses[prev_poses.size() - 1];
+                    tf::Stamped<tf::Pose> pc = prev_poses[prev_poses.size() - 1 - prevPoseSaveRate];
+                    double speed = pc.getOrigin().distance(pp.getOrigin()) / (pc.stamp_ - pp.stamp_).toSec();
+
                     int currTurn = turnDiff(pose, path[*currIndex]);
 
                     int nextTurnIndex = -1;
@@ -183,9 +189,12 @@ namespace wheatley
                         //skip turning left just to turn right again shortly
                         if (distanceToNextTurn <= maxSkipTurnGoTurnBackDistance && currTurn == -nextTurn)
                             currTurn = 0;
+
+                        if (distanceToNextTurn <= maxSkipForwardAndTurn && speed < 0.1 && currTurn == 0 && nextTurn != 0)
+                            currTurn = nextTurn;
                     }
 
-                    if (prev_order == "FORWARD" && distance.front < stopForwardDistance)
+                    if (prev_order == "FORWARD" && distance.front < (speed > 0.1? maxStopForwardDistance : minStopForwardDistance))
                     {
                         if (currTurn == 0)
                         {
