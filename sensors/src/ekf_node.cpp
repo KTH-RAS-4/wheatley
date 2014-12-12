@@ -91,6 +91,8 @@ namespace wheatley
             R <<   r1,    0,  0,
                     0,   r2,  0,
                     0,    0, r3;//[3X3]
+
+             ROS_INFO_STREAM("constructor");
         }
         void loadParameters()
         {
@@ -104,13 +106,16 @@ namespace wheatley
         void callback_map(const nm::OccupancyGrid::ConstPtr& msg)
         {
             map = *msg;
+             ROS_INFO_STREAM("call back map");
         }
 
         void callback_ir(const sensors::Distance::ConstPtr &realIR)
         {
+             ROS_INFO_STREAM("calbak ir1");
             if (!tfl.waitForTransform(fixed_frame, robot_frame, realIR->header.stamp, ros::Duration(0.2)))
             {
                 ROS_ERROR_STREAM("timeout waiting for transform from "<<robot_frame<<" to "<<fixed_frame);
+                 ROS_INFO_STREAM("call back error");
                 return;
             }
 
@@ -126,10 +131,12 @@ namespace wheatley
 
             prev_pose = pose;
             first_pose_callback = false;
+             ROS_INFO_STREAM("call back ir final");
         }
 
         void calc_ekf(const sensors::Distance& real, const sensors::Distance& simulated, const gm::Pose& pose, const gm::Pose& prev_pose)
         {
+             ROS_INFO_STREAM("calc_ekf");
             ros::Time now = ros::Time::now();
 
             //get the Ut
@@ -252,6 +259,7 @@ namespace wheatley
 
     void publish_pose_ekf(ros::Time now,double x,double y,double theta)
     {
+         ROS_INFO_STREAM("publish ekf pose");
         //publish "robot" transform
         tf::Transform transform;
         transform.setOrigin(tf::Vector3(x, y, 0));
@@ -324,9 +332,12 @@ namespace wheatley
 
 int main (int argc, char **argv)
 {
+     ROS_INFO_STREAM("main 1");
     ros::init(argc, argv, "ekf_node");
     wheatley::KalmanNode ekf_node;
+     ROS_INFO_STREAM("main 2");
     ekf_node.run();
+     ROS_INFO_STREAM("main final");
 }
 
 /*
