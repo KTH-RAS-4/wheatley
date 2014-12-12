@@ -63,6 +63,19 @@ private:
     const double stopBeforeTurningDistance;
     const int time_until_path;
 
+    bool poseCorrL;
+    bool poseCorrR;
+    int count;
+    double leftDiff [10];
+    double rightDiff[10];
+    double lR;
+    double lL;
+    double avgLeftDiff;
+    double avgRightDiff;
+    double maxWallAlignDistance;
+    double maxWallAlignAngle;
+    double minTurnTwist;
+
     boost::circular_buffer<tf::Stamped<tf::Pose> > prev_poses;
     std::vector<tf::Pose> path;
     sensors::Distance distance;
@@ -71,11 +84,13 @@ private:
     bool executor_ready;
     string prev_order;
 
+    ros::Publisher pub_pose_correction;
     ros::Time start_time;
     ros::Rate loop_rate;
     double desiredTheta;
     double theta;
     bool wallBrain;
+    string state_str;
 
 public:
     PathFollower()
@@ -102,7 +117,14 @@ public:
         , theta(0)
         , desiredTheta(0)
         , wallBrain(true)
+        , poseCorrL(false)
+        , poseCorrR(false)
+        , count(0)
+        , maxWallAlignDistance(requireParameter<double>("max_wall_align_distance"))
+        , maxWallAlignAngle(requireParameter<double>("max_wall_align_angle")*M_PI/180)
+        , minTurnTwist(requireParameter<double>("minTurnTwist"))
     {
+        pub_pose_correction = nh.advertise<nav_msgs::Odometry> ("pose_correction", 1);
         pub_executor_order = nh.advertise<std_msgs::String>("executor_order", 1, true);
         sub_executor_state = nh.subscribe("executor_state", 1, &PathFollower::callback_executor_state, this);
         sub_pose = nh.subscribe("pose", 1, &PathFollower::callback_pose, this);
@@ -131,6 +153,29 @@ public:
     {
         ROS_INFO_STREAM_ONCE("got first ir");
         distance = *msg;
+
+        if (poseCorrL)
+        {
+            leftDiff[count++] = atan(-(distance.left_front-distance.left_rear)/lL);
+
+            double sumL;
+            for(int i = 0; i < count; i++)
+            {
+               sumL += leftDiff[i];
+            }
+           avgLeftDiff = sumL / (double) count;
+        }
+        else if (poseCorrR)
+        {
+            rightDiff[count++] = atan((distance.right_front-distance.right_rear)/lR);
+
+            double sumR;
+            for(int i = 0; i < count; i++)
+            {
+               sumR += rightDiff[i];
+            }
+            avgRightDiff = sumR / (double) count;
+        }
     }
 
     void callback_pose(const nav_msgs::Odometry::ConstPtr& msg)
@@ -324,6 +369,24 @@ public:
     }
 
 
+    void publishOdometry(ros::Time now, double diff)
+    {
+      tf::Quaternion q;
+      q.setRPY(0, 0, desiredTheta + diff);
+
+      //publish pose
+      nav_msgs::Odometry pose;
+      pose.header.stamp = now;
+      pose.header.frame_id = "map";
+      pose.pose.pose.orientation.x = q.x();
+      pose.pose.pose.orientation.y = q.y();
+      pose.pose.pose.orientation.z = q.z();
+      pose.pose.pose.orientation.w = q.w();
+
+      pub_pose_correction.publish(pose);
+      ROS_INFO("Corrected pose to: %.1f", (desiredTheta + diff)*180/M_PI);
+    }
+
 
     void run()
     {
@@ -342,20 +405,83 @@ public:
             switch (state)
             {
             case ALIGN:
-                if (align(1.4))
+            {
+                if (state_str == "LEFT")
                 {
-                    state = FOLLOW;
-                    ROS_INFO("state: FOLLOW");
-                    ros::Duration(0.2).sleep();
+                    static bool align_done = false;
+                    if (!align_done && align(1.4)) //align just finished
+                    {
+                        count = 0;
+                        align_done = true;
+                        poseCorrR = true;
+                    }
+                    else if (align_done && count == 1 &&
+                            (distance.right_front >= maxWallAlignDistance ||
+                             distance.right_rear >= maxWallAlignDistance))
+                    {
+                        ROS_INFO("skipping theta correction, distances: %.2f, %.2f > %.2f",
+                                 distance.right_front, distance.right_rear, maxWallAlignDistance);
+                        state = FOLLOW;
+                        ros::Duration(0.4).sleep();
+                        align_done = false;
+                        poseCorrR = false;
+                    }
+                    else if (align_done && count >= 10)
+                    {
+                        if (std::abs(avgRightDiff) <= maxWallAlignAngle)
+                            publishOdometry(ros::Time(), avgRightDiff);
+                        else
+                            ROS_INFO("skipping theta correction, angles: |%.2f| > %.2f",
+                                     avgRightDiff, maxWallAlignAngle);
+                        state = FOLLOW;
+                        ros::Duration(0.4).sleep();
+                        align_done = false;
+                        poseCorrR = false;
+                    }
                 }
+                else if (state_str == "RIGHT")
+                {
+                    static bool align_done = false;
+                    if (!align_done && align(1.4)) //align just finished
+                    {
+                        count = 0;
+                        align_done = true;
+                        poseCorrL = true;
+                    }
+                    if (align_done && count == 1 &&
+                            (distance.left_front >= maxWallAlignDistance ||
+                             distance.left_rear >= maxWallAlignDistance))
+                    {
+                        ROS_INFO("skipping theta correction, distances: %.2f, %.2f > %.2f",
+                                 distance.left_front, distance.left_rear, maxWallAlignDistance);
+                        state = FOLLOW;
+                        ros::Duration(0.4).sleep();
+                        align_done = false;
+                        poseCorrL = false;
+                    }
+                    if (align_done && count >= 10)
+                    {
+                        if (std::abs(avgLeftDiff) <= maxWallAlignAngle)
+                            publishOdometry(ros::Time(), avgLeftDiff);
+                        else
+                            ROS_INFO("skipping theta correction, angles: |%.2f| > %.2f",
+                                     avgLeftDiff, maxWallAlignAngle);
+                        state = FOLLOW;
+                        ros::Duration(0.4).sleep();
+                        align_done = false;
+                        poseCorrL = false;
+                    }
+                }
+
                 break;
+            }
             case FOLLOW:
                 if (!follow(0.2, 0.15))
                 {
-                    if (distance.right_front > 0.2)
-                        desiredTheta = theta-M_PI/2;
-                    else
+                    if (distance.left_front > 0.2)
                         desiredTheta = theta+M_PI/2;
+                    else
+                        desiredTheta = theta-M_PI/2;
                     state = ALIGN;
                     ROS_INFO("state: ALIGN");
                     ros::Duration(0.2).sleep();
