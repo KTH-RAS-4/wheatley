@@ -64,6 +64,7 @@ namespace wheatley
         bool last_bumper;
         double maxWallAlignDistance;
         double maxWallAlignAngle;
+        double minTurnTwist;
 
 
 
@@ -72,6 +73,7 @@ namespace wheatley
             : loop_rate(requireParameter<double>("rate"))
             , maxWallAlignDistance(requireParameter<double>("max_wall_align_distance"))
             , maxWallAlignAngle(requireParameter<double>("max_wall_align_angle")*M_PI/180)
+            , minTurnTwist(requireParameter<double>("minTurnTwist"))
             , poseCorrL(false)
             , poseCorrR(false)
             , desiredTheta(0)
@@ -201,11 +203,11 @@ namespace wheatley
 
                 if (state == "FORWARD")
                 {
-                    if (!follow(0.2))
+                    if (!follow(0.14))
                     {
                         state = "STOP";
-                        ready = true;
                     }
+                    ready = true;
                 }
                 else if (state == "STOP")
                 {
@@ -216,49 +218,6 @@ namespace wheatley
                         twist.angular.z = 0;
                         pub_wall_twist.publish(twist);
                         ready = true;
-                    }
-                }
-                else if (state == "BACK")
-                {
-                    static tf::Point prev_pos;
-                    if (state != prev_state)
-                        tf::pointMsgToTF(pose.pose.pose.position, prev_pos);
-
-                    tf::Point curr_pos;
-                    tf::pointMsgToTF(pose.pose.pose.position, curr_pos);
-
-                    if (prev_pos.distance(curr_pos) < 0.02)
-                    {
-                        geometry_msgs::Twist twist;
-                        twist.linear.x = -0.2;
-                        pub_motor_twist.publish(twist);
-                    }
-                    else
-                    {
-                        geometry_msgs::Twist twist;
-                        pub_motor_twist.publish(twist);
-                        if (crashR && !distance.bumper)
-                        {
-                            state = "RIGHT";
-                            crashR = false;
-                        } else if (crashL && !distance.bumper)
-                        {
-                            state = "LEFT";
-                            crashL = false;
-                        }
-                        else if (crash && !distance.bumper)
-                        {
-                            state = "LEFT";
-                            crash = false;
-                            desiredTheta = angles::normalize_angle(desiredTheta + M_PI/2);
-                        } else if ((crash || crashL || crashR) && distance.bumper)
-                        {
-                            prev_state = "STOP";
-                            state = "BACK";
-                        } else
-                        {
-                            state = "STOP";
-                        }
                     }
                 }
                 else if (state == "LEFT")
@@ -325,6 +284,61 @@ namespace wheatley
                         ready = true;
                     }
                 }
+                else if (state == "BACK")
+                {
+                    static tf::Point prev_pos;
+                    if (state != prev_state)
+                        tf::pointMsgToTF(pose.pose.pose.position, prev_pos);
+
+                    tf::Point curr_pos;
+                    tf::pointMsgToTF(pose.pose.pose.position, curr_pos);
+
+                    if (prev_pos.distance(curr_pos) < 0.02)
+                    {
+                        geometry_msgs::Twist twist;
+                        twist.linear.x = -0.2;
+                        pub_motor_twist.publish(twist);
+                    }
+                    else
+                    {
+                        geometry_msgs::Twist twist;
+                        pub_motor_twist.publish(twist);
+                        if (crashR)// && !distance.bumper)
+                        {
+                            state = "RIGHT";
+                            crashR = false;
+                            geometry_msgs::Twist twist;
+                            twist.linear.x = 0;
+                            twist.angular.z = 0;
+                            pub_wall_twist.publish(twist);
+                        } else if (crashL)// && !distance.bumper)
+                        {
+                            state = "LEFT";
+                            crashL = false;
+                            geometry_msgs::Twist twist;
+                            twist.linear.x = 0;
+                            twist.angular.z = 0;
+                            pub_wall_twist.publish(twist);
+                        }
+                        else if (crash)// && !distance.bumper)
+                        {
+                            state = "LEFT";
+                            crash = false;
+                            desiredTheta = angles::normalize_angle(desiredTheta + M_PI/2);
+                            geometry_msgs::Twist twist;
+                            twist.linear.x = 0;
+                            twist.angular.z = 0;
+                            pub_wall_twist.publish(twist);
+                        /*} else if ((crash || crashL || crashR) && distance.bumper)
+                        {
+                            prev_state = "STOP";
+                            state = "BACK";*/
+                        } else
+                        {
+                            state = "STOP";
+                        }
+                    }
+                }
 
                 publishState();
 
@@ -367,7 +381,14 @@ namespace wheatley
             else
             {
                 geometry_msgs::Twist twist;
-                twist.angular.z = clamp(error/4, -speed, speed);
+                twist.angular.z = clamp(error/3.5, -speed, speed);
+                if (twist.angular.z >= 0 && twist.angular.z < 0.5)
+                {
+                    twist.angular.z = minTurnTwist;
+                } else if (twist.angular.z > -minTurnTwist && twist.angular.z < 0)
+                {
+                    twist.angular.z = -minTurnTwist;
+                }
                 pub_motor_twist.publish(twist);
                 return false;
             }
