@@ -53,10 +53,12 @@ namespace wheatley
         const string fixed_frame;
         const string robot_frame;
 
+        Eigen::Vector3f prev_mu; //[3X1]
         Eigen::Matrix3f prev_sigma;//[3X3]
+        Eigen::Matrix3f R;//[3X3]
         double Q,r1,r2,r3; //5 cmr = requireParameter<double>("r");r = requireParameter<double>("r");
         double lambda; //chi2inv(0.8,1);
-        Eigen::Matrix3f R;//[3X3]
+
 
     public:
         KalmanNode()
@@ -86,6 +88,11 @@ namespace wheatley
                             0,    0, 0.01;//[3X3]
 
             loadParameters();
+
+            //intial position
+            prev_mu<< 0,
+                      0,
+                      0;//[3X1]
 
             //proces noice
             R <<   r1,    0,  0,
@@ -140,8 +147,12 @@ namespace wheatley
             ros::Time now = ros::Time::now();
 
             //get the Ut
-            double u_x = pose.position.x-prev_pose.position.x;
-            double u_y = pose.position.y-prev_pose.position.y;
+            double     u_x = pose.position.x-prev_pose.position.x;
+            double     u_y = pose.position.y-prev_pose.position.y;
+            double u_theta = tf::getYaw(pose.orientation) - tf::getYaw(prev_pose.orientation);
+            //double theta = tf::getYaw(pose.orientation);
+            //get the pose
+            //prev_mu<<pose.position.x, pose.position.y, theta;
 
             int NUM_MEASUREMENTS=6,num_inliers=0;
 
@@ -150,11 +161,14 @@ namespace wheatley
             Eigen::VectorXf nu_buffer(NUM_MEASUREMENTS);//[6X1]
             Eigen::MatrixXf H_buffer(NUM_MEASUREMENTS,3) ;//[6X3]
             Eigen::Matrix3f sigma,G;//[3X3]
-            Eigen::Vector3f mu,prev_mu,update; //[3X1]
+            Eigen::Vector3f mu,update; //[3X1]
 
-            //get the pose
-            double theta = tf::getYaw(pose.orientation);
-            prev_mu<<pose.position.x, pose.position.y, theta;
+            //prediction mu
+            prev_mu(0,0)+=u_x;
+            prev_mu(1,0)+=u_y;
+            prev_mu(2,0)+=u_theta;
+
+            double theta = prev_mu(2,0);
 
             //jacobian
             G<< 1,0,-u_y,
@@ -246,6 +260,7 @@ namespace wheatley
 
            //update mu
            mu=prev_mu+update;
+           prev_mu=mu;//saving for next iteration
 
            //update sigma
            sigma=(I-K*H_hat)*prev_sigma;
@@ -257,7 +272,7 @@ namespace wheatley
 
         }
 
-    void publish_pose_ekf(ros::Time now,double x,double y,double theta)
+        void publish_pose_ekf(ros::Time now,double x,double y,double theta)
     {
          ROS_INFO_STREAM("publish ekf pose");
         //publish "robot" transform

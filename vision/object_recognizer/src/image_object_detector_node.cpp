@@ -421,8 +421,8 @@ private:
                 obj.vertices[vertices]++;*/
                 if (foundidx != -1)
                 {
-                    float average_angle = calculateAverageAngle(polygons[foundidx]);
-                    cout << "average angle: " << average_angle << endl;
+                    //float average_angle = calculateAverageAngle(polygons[foundidx]);
+                    //cout << "average angle: " << average_angle << endl;
 
                     /*if (color == BLUE)
                     {
@@ -838,16 +838,20 @@ private:
         vector<Point>::iterator cur = prev+1;
         vector<Point>::iterator next = cur+1;
 
-        Mat v1, v2;
+        Point_<float> v1, v2;
         float angle, average_angle;
         average_angle = 0;
 
         while (cur != polygon.begin())
         {
-            v1 = Mat(1, 1, CV_32FC2, Scalar((*cur).x-(*prev).x, (*cur).y-(*prev).y));
-            v2 = Mat(1, 1, CV_32FC2, Scalar((*next).x-(*cur).x, (*next).y-(*cur).y));
+            v1 = Point_<float>((*cur).x-(*prev).x, (*cur).y-(*prev).y);
+			v1 = normalizeVector(v1);
+            v2 = Point_<float>((*next).x-(*cur).x, (*next).y-(*cur).y);
+			v2 = normalizeVector(v2);
 
             angle = acos(v1.dot(v2));
+
+			cout << "------- angle " << angle << " " << *prev << " " << *cur << " " << *next << " " << v1 << " " << v2 << endl;
 
             if (pointPolygonTest(hull, Point((*cur).x, (*cur).y), false))
             {
@@ -873,6 +877,15 @@ private:
 
         return average_angle;
     }
+
+	Point_<float> normalizeVector(Point_<float> _p)
+	{
+		Point_<float> p = Point_<float>(_p.x, _p.y);
+		float d = sqrt(p.x*p.x+p.y*p.y);
+		p.x /= d;
+		p.y /= d;
+		return p;
+	}
 
 };
 
