@@ -1,5 +1,10 @@
-Q:      0.05
+Q:      0.52
 lambda: 1.0742
 r1:     0.05
 r2:     0.05
 r3:     0.01
+mu1:    0.00
+mu2:    0.00
+mu3:    0.00
+threshold: 0.00000000001
+static_update_lim: 0

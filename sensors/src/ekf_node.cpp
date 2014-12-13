@@ -28,11 +28,13 @@ namespace gu=occupancy_grid_utils;
 namespace gm=geometry_msgs;
 namespace nm=nav_msgs;
 
+
 namespace wheatley
 {
     class KalmanNode : NiceBaseClass
     {
     private:
+
         ros::Subscriber sub_map;
         ros::Subscriber sub_ir;
         ros::Subscriber sub_encoders;
@@ -56,9 +58,8 @@ namespace wheatley
         Eigen::Vector3f prev_mu; //[3X1]
         Eigen::Matrix3f prev_sigma;//[3X3]
         Eigen::Matrix3f R;//[3X3]
-        double Q,r1,r2,r3; //5 cmr = requireParameter<double>("r");r = requireParameter<double>("r");
-        double lambda; //chi2inv(0.8,1);
-
+        double lambda,Q,threshold;
+        int static_update_lim;
 
     public:
         KalmanNode()
@@ -82,35 +83,49 @@ namespace wheatley
             pub_sim_ir = nh.advertise<sensors::Distance>("simulated_ir_distances", 1);
             pub_pose_ekf = nh.advertise<nav_msgs::Odometry> ("pose_ekf", 1);
 
-            //intial sigma Covariance matrix
-            prev_sigma << 0.05,    0, 0,
-                             0, 0.05, 0,
-                            0,    0, 0.01;//[3X3]
-
             loadParameters();
 
-            //intial position
-            prev_mu<< 0,
-                      0,
-                      0;//[3X1]
+        }
+        void loadParameters()
+        {           
+            double r1     = requireParameter<double>("r1");
+            double r2     = requireParameter<double>("r2");
+            double r3     = requireParameter<double>("r3");
+            double mu1    = requireParameter<double>("mu1");
+            double mu2    = requireParameter<double>("mu2");
+            double mu3    = requireParameter<double>("mu3");
+
+            //measurement noise
+            Q      = requireParameter<double>("Q");
+
+            //outliers threshold
+            lambda = requireParameter<double>("lambda");
 
             //proces noice
             R <<   r1,    0,  0,
                     0,   r2,  0,
                     0,    0, r3;//[3X3]
-        }
-        void loadParameters()
-        {
-            lambda = requireParameter<double>("lambda");
-            Q = requireParameter<double>("Q");
-            r1 = requireParameter<double>("r1");
-            r2 = requireParameter<double>("r2");
-            r3 = requireParameter<double>("r3");
+
+            //intial position
+            prev_mu<< mu1,
+                      mu2,
+                      mu3;//[3X1]
+
+            //intial sigma Covariance matrix
+            prev_sigma << 0.05,    0, 0,
+                             0, 0.05, 0,
+                            0,    0, 0.01;//[3X3]
+            //measurement noise
+            static_update_lim    = requireParameter<double>("static_update_lim");
+
+            //measurement noise
+            threshold    = requireParameter<double>("threshold");
+
         }
 
         void callback_map(const nm::OccupancyGrid::ConstPtr& msg)
         {
-            map = *msg;
+            map = *msg;          
         }
 
         void callback_ir(const sensors::Distance::ConstPtr &realIR)
@@ -132,7 +147,7 @@ namespace wheatley
                 calc_ekf(*realIR, simulatedIR, pose, prev_pose);
 
             prev_pose = pose;
-            first_pose_callback = false;
+            first_pose_callback = false;           
         }
 
         void calc_ekf(const sensors::Distance& real, const sensors::Distance& simulated, const gm::Pose& pose, const gm::Pose& prev_pose)
@@ -143,127 +158,158 @@ namespace wheatley
             double     u_x = pose.position.x-prev_pose.position.x;
             double     u_y = pose.position.y-prev_pose.position.y;
             double u_theta = tf::getYaw(pose.orientation) - tf::getYaw(prev_pose.orientation);
-            //double theta = tf::getYaw(pose.orientation);
-            //get the pose
-            //prev_mu<<pose.position.x, pose.position.y, theta;
 
-            int NUM_MEASUREMENTS=6,num_inliers=0;
+            std::cout << "u_x: "<< abs(u_x) << std::endl;
+            std::cout << "u_y: "<< abs(u_y) << std::endl;
+            std::cout << "u_theta: "<< abs(u_theta) << std::endl;
 
-            //initialize matrix and vectors
-            Eigen::VectorXd inliers(NUM_MEASUREMENTS);//[6X1]
-            Eigen::VectorXf nu_buffer(NUM_MEASUREMENTS);//[6X1]
-            Eigen::MatrixXf H_buffer(NUM_MEASUREMENTS,3) ;//[6X3]
-            Eigen::Matrix3f sigma,G;//[3X3]
-            Eigen::Vector3f mu,update; //[3X1]
 
-            //prediction mu
-            prev_mu(0,0)+=u_x;
-            prev_mu(1,0)+=u_y;
-            prev_mu(2,0)+=u_theta;
 
-            double theta = prev_mu(2,0);
+            //do not ekf if the robot is static
+            int static static_update=0;
 
-            //jacobian
-            G<< 1,0,-u_y,
-                0,1, u_x,
-                0,0,  1;
+            std::cout << "                                                           static_update: "<< static_update<< std::endl;
+            std::cout << "                                                           threshold: "<<threshold << std::endl;
 
-            //predicted sigma (covarianze matrix)
-            sigma=G*prev_sigma*G.transpose()+R;
-
-            //jacobian and nu for all the measuremts.
-            //data association is implicit in simulated (measuremt model)
-            H_buffer(0,0)=real.front*cos(theta)/simulated.front;
-            H_buffer(0,1)=real.front*sin(theta)/simulated.front;
-            H_buffer(0,2)=0;
-            nu_buffer(0)=real.front-simulated.front;
-
-            H_buffer(1,0)=real.rear*cos(theta)/simulated.rear;
-            H_buffer(1,1)=real.rear*sin(theta)/simulated.rear;
-            H_buffer(1,2)=0;
-            nu_buffer(1)=real.rear-simulated.rear;
-
-            H_buffer(2,0)=real.left_front*cos(theta)/simulated.left_front;
-            H_buffer(2,1)=real.left_front*sin(theta)/simulated.left_front;
-            H_buffer(2,2)=0;
-            nu_buffer(2)=real.left_front-simulated.left_front;
-
-            H_buffer(3,0)=real.left_rear*cos(theta)/simulated.left_rear;
-            H_buffer(3,1)=real.left_rear*sin(theta)/simulated.left_rear;
-            H_buffer(3,2)=0;
-            nu_buffer(3)=real.left_rear-simulated.left_rear;
-
-            H_buffer(4,0)=real.right_front*cos(theta)/simulated.right_front;
-            H_buffer(4,1)=real.right_front*sin(theta)/simulated.right_front;
-            H_buffer(4,2)=0;
-            nu_buffer(4)=real.right_front-simulated.right_front;
-
-            H_buffer(5,0)=real.right_rear*cos(theta)/simulated.right_rear;
-            H_buffer(5,1)=real.right_rear*sin(theta)/simulated.right_rear;
-            H_buffer(5,2)=0;
-            nu_buffer(5)=real.right_rear-simulated.right_rear;
-
-            //detect outliers
-            Eigen::RowVector3f hi; //[1x3]
-            double S,D;
-            for(int i=0;i<NUM_MEASUREMENTS;i++){
-                 hi<< H_buffer(i,0), H_buffer(i,1), H_buffer(i,2);
-                 S=hi*sigma*hi.transpose()+Q;
-                 D=nu_buffer(i)*nu_buffer(i)/S;
-                 if (D>=lambda)
-                 {
-                    inliers(i)=1;
-                    num_inliers++;
-                 }
-                 else
-                    inliers(i)=0;
-            }
-
-            //compute the H and nu for inliers.
-            Eigen::VectorXf nu(num_inliers);
-            Eigen::MatrixXf H_hat(num_inliers,3);
-            int j=0;
-            for ( int i=0;i<NUM_MEASUREMENTS;i++)
+            if (abs(u_x)<threshold && abs(u_y)<threshold && abs(u_theta)<threshold)
             {
-                if(inliers(i))
-                {
-                    nu(j)=nu_buffer(i);
-                    H_hat(j,0)=H_buffer(i,0);
-                    H_hat(j,1)=H_buffer(i,1);
-                    H_hat(j,2)=H_buffer(i,2);
-                    j++;
-                }
+                static_update++;
             }
 
-           //compute K kalman gain
-           Eigen::MatrixXf I(3,3);
-           I = Eigen::MatrixXf::Identity(3,3);
+            if (abs(u_x)>threshold || abs(u_y)>threshold || abs(u_theta)>threshold)
+            {static_update=0;}
 
-           Eigen::MatrixXf S_hat(num_inliers,num_inliers);
-           Eigen::MatrixXf Q_hat(num_inliers,num_inliers);
-           Q_hat = Q * Eigen::MatrixXf::Identity(num_inliers,num_inliers);
+            if (abs(u_x)>threshold || abs(u_y)>threshold || abs(u_theta)>threshold || static_update<static_update_lim)
 
-           S_hat=H_hat*sigma*H_hat.transpose()+Q_hat;
-           Eigen::MatrixXf K(3,num_inliers);
 
-           K=sigma*H_hat.transpose()*S_hat.inverse();
+            {
+                    int NUM_MEASUREMENTS=6;
 
-           //compute the update
-           update=K*nu;
+                    //initialize matrix and vectors
+                    Eigen::VectorXd inliers(NUM_MEASUREMENTS);//[6X1]
+                    Eigen::VectorXf nu_buffer(NUM_MEASUREMENTS);//[6X1]
+                    Eigen::MatrixXf H_buffer(NUM_MEASUREMENTS,3) ;//[6X3]
+                    Eigen::Matrix3f sigma,sigma_hat,G;//[3X3]
+                    Eigen::Vector3f mu, mu_hat,update; //[3X1]
 
-           //update mu
-           mu=prev_mu+update;
-           prev_mu=mu;//saving for next iteration
+                    //prediction mu
+                    mu_hat(0,0)=prev_mu(0,0)+u_x;
+                    mu_hat(1,0)=prev_mu(1,0)+u_y;
+                    mu_hat(2,0)=prev_mu(2,0)+u_theta;
+                    double theta = mu_hat(2,0);
 
-           //update sigma
-           sigma=(I-K*H_hat)*prev_sigma;
-           //store sigma for the next iteration
-           prev_sigma=sigma;
+                    //jacobian
+                    G<< 1,0,-u_y,
+                        0,1, u_x,
+                        0,0,  1;
+
+                     std::cout<<"G \n"<< G <<std::endl;
+
+                    //predicted sigma (covarianze matrix)
+                    sigma_hat=G*prev_sigma*G.transpose()+R;
+
+                    std::cout<<"Sigma_hat \n"<< sigma_hat <<std::endl;
+
+                    //jacobian and nu for all the measuremts.
+                    //data association is implicit in simulated (measuremt model)
+                    H_buffer(0,0)=real.front*cos(theta)/simulated.front;
+                    H_buffer(0,1)=real.front*sin(theta)/simulated.front;
+                    H_buffer(0,2)=0;
+                    nu_buffer(0)=real.front-simulated.front;
+
+                    H_buffer(1,0)=real.rear*cos(theta)/simulated.rear;
+                    H_buffer(1,1)=real.rear*sin(theta)/simulated.rear;
+                    H_buffer(1,2)=0;
+                    nu_buffer(1)=real.rear-simulated.rear;
+
+                    H_buffer(2,0)=real.left_front*cos(theta)/simulated.left_front;
+                    H_buffer(2,1)=real.left_front*sin(theta)/simulated.left_front;
+                    H_buffer(2,2)=0;
+                    nu_buffer(2)=real.left_front-simulated.left_front;
+
+                    H_buffer(3,0)=real.left_rear*cos(theta)/simulated.left_rear;
+                    H_buffer(3,1)=real.left_rear*sin(theta)/simulated.left_rear;
+                    H_buffer(3,2)=0;
+                    nu_buffer(3)=real.left_rear-simulated.left_rear;
+
+                    H_buffer(4,0)=real.right_front*cos(theta)/simulated.right_front;
+                    H_buffer(4,1)=real.right_front*sin(theta)/simulated.right_front;
+                    H_buffer(4,2)=0;
+                    nu_buffer(4)=real.right_front-simulated.right_front;
+
+                    H_buffer(5,0)=real.right_rear*cos(theta)/simulated.right_rear;
+                    H_buffer(5,1)=real.right_rear*sin(theta)/simulated.right_rear;
+                    H_buffer(5,2)=0;
+                    nu_buffer(5)=real.right_rear-simulated.right_rear;
+
+                    //detect outliers
+                    int num_inliers=0;
+                    Eigen::RowVector3f hi; //[1x3]
+                    double S,D;
+                    for(int i=0;i<NUM_MEASUREMENTS;i++){
+                         hi<< H_buffer(i,0), H_buffer(i,1), H_buffer(i,2);
+                         S=hi*sigma_hat*hi.transpose()+Q;
+                         D=nu_buffer(i)*nu_buffer(i)/S;
+                         if (D>=lambda)
+                         {
+                            inliers(i)=1;
+                            num_inliers++;
+                            std::cout<<"inlier " <<std::endl;
+                         }
+                         else
+                            inliers(i)=0;
+                    }
+
+                    //compute the H and nu for inliers.
+                    Eigen::VectorXf nu(num_inliers);
+                    Eigen::MatrixXf H_hat(num_inliers,3);
+                    int j=0;
+                    for ( int i=0;i<NUM_MEASUREMENTS;i++)
+                    {
+                        if(inliers(i))
+                        {
+                            nu(j)=nu_buffer(i);
+                            H_hat(j,0)=H_buffer(i,0);
+                            H_hat(j,1)=H_buffer(i,1);
+                            H_hat(j,2)=H_buffer(i,2);
+                            j++;
+                        }
+                    }
+
+                   //compute K kalman gain
+                   Eigen::MatrixXf I(3,3);
+                   I = Eigen::MatrixXf::Identity(3,3);
+
+                   Eigen::MatrixXf S_hat(num_inliers,num_inliers);
+                   Eigen::MatrixXf Q_hat(num_inliers,num_inliers);
+                   Q_hat = Q * Eigen::MatrixXf::Identity(num_inliers,num_inliers);
+
+                   S_hat=H_hat*sigma_hat*H_hat.transpose()+Q_hat;
+                   Eigen::MatrixXf K(3,num_inliers);
+
+                   K=sigma_hat*H_hat.transpose()*S_hat.inverse();
+
+                   //compute the measurement update
+                   update=K*nu;
+
+                   //update mu
+                   mu=mu_hat+update;
+                   prev_mu=mu;//saving for next iteration
+
+                   //update sigma
+                   sigma=(I-K*H_hat)*sigma_hat;
+                   std::cout<<"update:   "<<update.transpose() <<std::endl;
+                   //store sigma for the next iteration
+                   prev_sigma=sigma;
+
+            }// end ekf
+            else static_update++;
+
+
            //poblish mu
-
-           publish_pose_ekf(now, mu(0,0), mu(1,0), mu(2,0));
-
-        }
+           publish_pose_ekf(now, prev_mu(0,0), prev_mu(1,0), prev_mu(2,0));
+           std::cout<<"                                                       mu:       "<<    prev_mu.transpose() <<std::endl;
+        }// end function calc_ekf
 
         void publish_pose_ekf(ros::Time now,double x,double y,double theta)
     {
@@ -338,7 +384,7 @@ namespace wheatley
 }
 
 int main (int argc, char **argv)
-{
+{    
     ros::init(argc, argv, "ekf_node");
     wheatley::KalmanNode ekf_node;
     ekf_node.run();
