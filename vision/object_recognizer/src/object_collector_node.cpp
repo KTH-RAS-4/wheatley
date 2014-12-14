@@ -44,12 +44,12 @@ int COMPLEX = 0x30;
 // hue min max values
 float object_color_hue[] = {
     -20, 180, // wall
-    1, 10, // orange
+    0, 10, // orange
     10, 25, // yellow
     125, 160, // purple
     70, 125, // blue
     25, 70, // green
-    -20, 0, // red
+    -20, -1, // red
     25, 70 //light green
 };
 
@@ -88,6 +88,7 @@ class StoredObject
     bool identified;
     bool sent_to_shape;
     string type;
+    string color;
 
 public:
     StoredObject(vision_msgs::Object object, int iteration) {
@@ -96,6 +97,7 @@ public:
         identified = false;
         sent_to_shape = false;
         type = "nothing";
+        color = "";
 
         //Init color map
         object_color_map[WALL] = "Wall";
@@ -204,10 +206,11 @@ public:
             }
             else
             {
-                this->type = this->object.type = "object";
+                this->type = "object";
             }
-            this->object.type = this->type;
+            object.type = this->type;
         }
+        color = this->type;
         return this->type;
     }
     string getType() {

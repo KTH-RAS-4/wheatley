@@ -41,11 +41,13 @@ private:
   ros::Rate loop_rate;
   double desiredTheta;
   double theta;
+  double minTurnTwist;
 
 public:
   WallBrain()
     : n("~")
     , loop_rate(10)
+    , minTurnTwist(requireParameter<double>("minTurnTwist"))
   {
     init();
   }
@@ -185,7 +187,14 @@ public:
       else
       {
           geometry_msgs::Twist twist;
-          twist.angular.z = clamp(error/4, -speed, speed);
+          twist.angular.z = clamp(error/3.5, -speed, speed);
+          if (0 <= twist.angular.z && twist.angular.z < minTurnTwist)
+          {
+              twist.angular.z = minTurnTwist;
+          } else if (-minTurnTwist < twist.angular.z && twist.angular.z < 0)
+          {
+              twist.angular.z = -minTurnTwist;
+          }
           pub_motor_twist.publish(twist);
           return false;
       }

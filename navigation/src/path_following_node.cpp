@@ -76,6 +76,7 @@ private:
     double desiredTheta;
     double theta;
     bool wallBrain;
+    double minTurnTwist;
 
 public:
     PathFollower()
@@ -95,6 +96,7 @@ public:
         , maxSkipForwardAndTurn(requireParameter<double>("max_skip_forward_and_turn"))
         , belowWhichSpeedClassifiesAsSlow(requireParameter<double>("below_which_speed_classifies_as_slow"))
         , stopBeforeTurningDistance(requireParameter<double>("stop_before_turning_distance"))
+        , minTurnTwist(requireParameter<double>("minTurnTwist"))
         , prev_poses(ceil(prevPoseMemory*prevPoseSaveRate))
         , loop_rate(10)
         , time_until_path(requireParameter<double>("time_until_path"))
@@ -350,12 +352,12 @@ public:
                 }
                 break;
             case FOLLOW:
-                if (!follow(0.2, 0.15))
+                if (!follow(0.2, 0.12))
                 {
-                    if (distance.right_front > 0.2)
-                        desiredTheta = theta-M_PI/2;
-                    else
+                    if (distance.left_front > 0.2)
                         desiredTheta = theta+M_PI/2;
+                    else
+                        desiredTheta = theta-M_PI/2;
                     state = ALIGN;
                     ROS_INFO("state: ALIGN");
                     ros::Duration(0.2).sleep();
@@ -399,7 +401,14 @@ public:
         else
         {
             geometry_msgs::Twist twist;
-            twist.angular.z = clamp(error/4, -speed, speed);
+            twist.angular.z = clamp(error/3.5, -speed, speed);
+            if (0 <= twist.angular.z && twist.angular.z < minTurnTwist)
+            {
+                twist.angular.z = minTurnTwist;
+            } else if (-minTurnTwist < twist.angular.z && twist.angular.z < 0)
+            {
+                twist.angular.z = -minTurnTwist;
+            }
             pub_motor_twist.publish(twist);
             return false;
         }

@@ -193,8 +193,8 @@ public:
 
     void mapIr(const sensors::SensorClouds &msg)
     {
-        /*if (!isMapping)
-            return;*/
+        if (!isMapping)
+            return;
 
         std::vector<sensor_msgs::PointCloud2> clouds = msg.point_clouds;
         std::vector<u_int8_t> hasEndpoint = msg.hasEndpoint;

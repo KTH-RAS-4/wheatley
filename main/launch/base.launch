@@ -10,7 +10,7 @@
 	<include file="$(find sensors)/launch/ir_distances.launch"/>
 	<include file="$(find sensors)/launch/ir_points.launch"/>
 	<include file="$(find sensors)/launch/pose.launch"/>
-	<include file="$(find sensors)/launch/ekf.launch"/>
+	<!--<include file="$(find sensors)/launch/ekf.launch"/>-->
 	<include file="$(find motor_controller)/launch/motor_controller.launch"/>
 	<include file="$(find wall_following)/launch/wall_avoider.launch"/>
 	<include file="$(find executor)/launch/executor.launch"/>
