@@ -1,10 +1,19 @@
 <!---->
 
 <launch>
-	<arg name="phase"/>   
+	<arg name="phase"/>
+	<arg name="save_map"/>
     <param name="/phase" value="$(arg phase)"/>
 	
-	<include file="$(find mapping)/launch/mapping.launch"/>
 	<include file="$(find navigation)/launch/navigator.launch"/>
 	<include file="$(find object_recognizer)/launch/object_recognizer.launch"/>
+
+	<group if="$(arg save_map)">
+		<include file="$(find mapping)/launch/mapping.launch"/>
+		<node pkg="map_server" type="map_saver" name="map_saver"/>
+	</group>
+
+	<!--<group unless="$(arg save_map)">
+		<arg name="map_name"/>
+	</group>-->
 </launch>
