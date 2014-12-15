@@ -156,7 +156,6 @@ namespace wheatley
 
         void calc_ekf(const sensors::Distance& real, const sensors::Distance& simulated, const gm::Pose& pose, const gm::Pose& prev_pose)
         {
-             ROS_INFO_STREAM("calc_ekf");
             ros::Time now = ros::Time::now();
 
             //get the Ut
@@ -164,30 +163,46 @@ namespace wheatley
             double     u_y = pose.position.y-prev_pose.position.y;
             double u_theta = tf::getYaw(pose.orientation) - tf::getYaw(prev_pose.orientation);
 
-            std::cout << "u_x: "<< abs(u_x) << std::endl;
-            std::cout << "u_y: "<< abs(u_y) << std::endl;
-            std::cout << "u_theta: "<< abs(u_theta) << std::endl;
-
-
+            std::cout << "u_x: "    << std::abs(u_x)     << std::endl;
+            std::cout << "u_y: "    << std::abs(u_y)     << std::endl;
+            std::cout << "u_theta: "<< std::abs(u_theta) << std::endl;
 
             //do not ekf if the robot is static
             int static static_update=0;
 
-            std::cout << "                                                           static_update: "<< static_update<< std::endl;
-            std::cout << "                                                           threshold: "<<threshold << std::endl;
+            std::cout << "static_update: "<< static_update<< std::endl;
+            std::cout << "threshold: "<<threshold << std::endl;
 
-            if (abs(u_x)<threshold && abs(u_y)<threshold && abs(u_theta)<threshold)
+            if (std::abs(u_x)<threshold && std::abs(u_y)<threshold && std::abs(u_theta)<threshold)
             {
                 static_update++;
             }
 
-            if (abs(u_x)>threshold || abs(u_y)>threshold || abs(u_theta)>threshold)
+            if (std::abs(u_x)>threshold || std::abs(u_y)>threshold || std::abs(u_theta)>threshold)
             {static_update=0;}
 
-            if (abs(u_x)>threshold || abs(u_y)>threshold || abs(u_theta)>threshold || static_update<static_update_lim)
+            if (1|| std::abs(u_x)>threshold || std::abs(u_y)>threshold || std::abs(u_theta)>threshold || static_update<static_update_lim ){
 
 
-            {
+                std::cout<<"real.front     "<< real.front <<std::endl;
+                std::cout<<"simulated.front"<< simulated.front <<std::endl;
+
+                std::cout<<"real.left_front     "<< real.left_front <<std::endl;
+                std::cout<<"simulated.left_front"<< simulated.left_front <<std::endl;
+
+                std::cout<<"real.right_front     "<< real.right_front <<std::endl;
+                std::cout<<"simulated.right_front"<< simulated.right_front <<std::endl;
+
+                std::cout<<"real.rear     "<< real.rear <<std::endl;
+                std::cout<<"simulated.rear"<< simulated.rear <<std::endl;
+
+                std::cout<<"real.left_rear     "<< real.left_rear <<std::endl;
+                std::cout<<"simulated.left_rear"<< simulated.left_rear <<std::endl;
+
+                std::cout<<"real.right_rear     "<< real.right_rear <<std::endl;
+                std::cout<<"simulated.right_rear"<< simulated.right_rear <<std::endl;
+
+
                     int NUM_MEASUREMENTS=6;
 
                     //initialize matrix and vectors
@@ -303,13 +318,13 @@ namespace wheatley
 
                    //update sigma
                    sigma=(I-K*H_hat)*sigma_hat;
-                   std::cout<<"update:   "<<update.transpose() <<std::endl;
+                   std::cout<<"update:                                             "<<update.transpose() <<std::endl;
                    //store sigma for the next iteration
                    prev_sigma=sigma;
 
+                   prev_mu=mu_hat;
             }// end ekf
             else static_update++;
-
 
            //poblish mu
            publish_pose_ekf(now, prev_mu(0,0), prev_mu(1,0), prev_mu(2,0));
@@ -391,12 +406,9 @@ namespace wheatley
 
 int main (int argc, char **argv)
 {    
-     ROS_INFO_STREAM("main 1");
     ros::init(argc, argv, "ekf_node");
     wheatley::KalmanNode ekf_node;
-     ROS_INFO_STREAM("main 2");
     ekf_node.run();
-     ROS_INFO_STREAM("main final");
 }
 
 /*
