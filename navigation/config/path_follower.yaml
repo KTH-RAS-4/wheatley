@@ -3,6 +3,8 @@ min_stop_forward_distance: 0.07
 max_stop_forward_distance: 0.12
 max_projection_distance: 0.2
 max_skip_turn_go_turn_back_distance: 0.05
+max_wall_align_distance: 0.2
+max_wall_align_angle: 40
 new_order_cooldown: 1.5
 max_skip_forward_and_turn: 0.03
 below_which_speed_classifies_as_slow: 0.03
