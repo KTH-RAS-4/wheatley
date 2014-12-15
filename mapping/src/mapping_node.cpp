@@ -225,7 +225,7 @@ public:
                 loc_cloud->header.frame_id = fixed_frame_;
 
                 Lock lock(mutex_);
-                gu::addCloud(&map, loc_cloud, 25, hasEndpoint[pc]);
+                gu::addCloud(&map, loc_cloud, 30, hasEndpoint[pc]);
 
                 //last_cloud_=loc_cloud;
                 //clouds_.push_back(last_cloud_);

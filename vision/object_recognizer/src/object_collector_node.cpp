@@ -61,7 +61,7 @@ float object_color_saturation[] = {
 
 float object_color_value[] = {
     0, 255,
-    0, 0,
+    100, 255,
     160, 255,   //yellow
     0, 0,
     0, 0,

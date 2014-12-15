@@ -1,6 +1,6 @@
 stopping_distance: 0.07
-min_stop_forward_distance: 0.05
-max_stop_forward_distance: 0.10
+min_stop_forward_distance: 0.07
+max_stop_forward_distance: 0.12
 max_projection_distance: 0.2
 max_skip_turn_go_turn_back_distance: 0.05
 new_order_cooldown: 1.5
@@ -10,7 +10,7 @@ stop_before_turning_distance: 0.10
 
 prev_pose_memory: 20
 prev_pose_save_rate: 5
-prev_pose_avoid_distance: 0.2
+prev_pose_avoid_distance: 0.15
 
 time_until_path: 0
 minTurnTwist: 0.65
