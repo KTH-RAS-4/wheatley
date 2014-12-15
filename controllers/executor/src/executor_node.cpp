@@ -223,7 +223,7 @@ namespace wheatley
                 else if (state == "LEFT")
                 {
                     static bool align_done = false;
-                    if (!align_done && align(1.4)) //align just finished
+                    if (!align_done && align(1)) //align just finished
                     {
                         count = 0;
                         align_done = true;
@@ -255,7 +255,7 @@ namespace wheatley
                 else if (state == "RIGHT")
                 {
                     static bool align_done = false;
-                    if (!align_done && align(1.4)) //align just finished
+                    if (!align_done && align(1)) //align just finished
                     {
                         count = 0;
                         align_done = true;
@@ -371,7 +371,7 @@ namespace wheatley
         {
             double error = angles::shortest_angular_distance(theta, desiredTheta)*180/M_PI;
 
-            if (std::abs(error) < 1)
+            if (std::abs(error) < 2)
             {
                 geometry_msgs::Twist twist;
                 pub_motor_twist.publish(twist);
@@ -382,7 +382,7 @@ namespace wheatley
             {
                 geometry_msgs::Twist twist;
                 twist.angular.z = clamp(error/3.5, -speed, speed);
-                if (twist.angular.z >= 0 && twist.angular.z < 0.5)
+                if (twist.angular.z >= 0 && twist.angular.z < minTurnTwist)
                 {
                     twist.angular.z = minTurnTwist;
                 } else if (twist.angular.z > -minTurnTwist && twist.angular.z < 0)

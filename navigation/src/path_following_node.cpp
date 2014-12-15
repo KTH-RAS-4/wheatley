@@ -476,7 +476,7 @@ public:
                 break;
             }
             case FOLLOW:
-                if (!follow(0.2, 0.15))
+                if (!follow(0.2, 0.12))
                 {
                     if (distance.left_front > 0.2)
                         desiredTheta = theta+M_PI/2;
@@ -525,7 +525,14 @@ public:
         else
         {
             geometry_msgs::Twist twist;
-            twist.angular.z = clamp(error/4, -speed, speed);
+            twist.angular.z = clamp(error/3.5, -speed, speed);
+            if (0 <= twist.angular.z && twist.angular.z < minTurnTwist)
+            {
+                twist.angular.z = minTurnTwist;
+            } else if (-minTurnTwist < twist.angular.z && twist.angular.z < 0)
+            {
+                twist.angular.z = -minTurnTwist;
+            }
             pub_motor_twist.publish(twist);
             return false;
         }
