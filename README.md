@@ -32,7 +32,7 @@ roslaunch main competition.launch phase:=1 save_map:=true
 ```
 
 #packages
-I a broad overview, the packages are:
+In a broad overview, the packages are:
 ##main
 Launchfiles for bringing everything up.
 ##controllers
