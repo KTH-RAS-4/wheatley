@@ -86,7 +86,7 @@ namespace wheatley
         signed char occupancyFunction(float distance)
         {
             const float min = robot_diameter/2;
-            const float max = robot_diameter/2 + 0.3;
+            const float max = robot_diameter/2 + 0.1;
 
             if (distance <= min)
                 return gu::OCCUPIED;
@@ -94,7 +94,7 @@ namespace wheatley
             {
                 //ROS_INFO("%f %d", distance, (int)(std::exp(-(distance-min)/(max-min)) * (gu::OCCUPIED-1)));
                 //return std::exp(-(distance-min)/(max-min)) * (gu::OCCUPIED-1);
-                return (1-(distance-min)/(max-min))*(gu::OCCUPIED-1);
+                return 0.7*(1-(distance-min)/(max-min))*(gu::OCCUPIED-1);
             }
             else
                 return gu::UNKNOWN;

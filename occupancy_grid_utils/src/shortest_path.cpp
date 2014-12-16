@@ -333,11 +333,11 @@ nm::OccupancyGrid inflateObstacles (const nm::OccupancyGrid& g,
                         std::vector<InflationQueueItem>,
                         std::greater<InflationQueueItem> > queue;
     nm::OccupancyGrid g2(g);
-    for (int i=0; i<seen.size(); i++)
-    {
-        if (g2.data[i] == OCCUPIED)
-            g2.data[i] = 101;
-    }
+    //for (int i=0; i<seen.size(); i++)
+    //{
+    //    if (g2.data[i] == OCCUPIED)
+    //        g2.data[i] = 101;
+    //}
 
     // Add initial obstacles
     for (coord_t x=0; x<(int)g.info.width; x++)
