@@ -1,29 +1,46 @@
 # Wheatley
-The main ROS package for the robot built by group 4 of KTH-RAS fall 2014.
+The ROS package for the robot built by group 4 in the course DD2425 Robotics and Autonomous Systems at KTH in the fall of 2014.
 
-#packages
+#Installation
+This package is intended for use with ROS hydro on Ubuntu 12.04.
 
-##main
-Contains all the launch for bringing everything up.
-Bringing up the basic stuff (arduino, motor_controller, sensors, robot_model) is currently done with:
+To install, first run ```sudo -l > /dev/null ``` to log in as sa sudo user, and then run
+
+```bash
+cd /tmp #or wherever
+wget https://raw.githubusercontent.com/KTH-RAS/ras_install/hydro-2014/scripts/install_nuc.sh
+chmod +x install_nuc.sh
+./install_nuc.sh
+source ~/.bashrc
+
+cd ~/catkin_ws/src
+wget https://raw.githubusercontent.com/KTH-RAS/ras_install/hydro-2014/rosinstall/ras_utils.rosinstall
+wstool merge ras_utils.rosinstall
+wstool update
+
+git clone https://github.com/KTH-RAS-4/wheatley.git
+cd ~/catkin_ws
+catkin_make vision_msgs_generate_messages sensors_generate_messages ras_msgs_generate_messages all
+```
+
+Running the robot can then be done with the following commands; in separate terminals.
+
 ```bash
 roslaunch main base.launch
-roslaunch main primesense.launch
+roslaunch main competition.launch phase:=1 save_map:=true
 ```
 
+#packages
+I a broad overview, the packages are:
+##main
+Launchfiles for bringing everything up.
 ##controllers
-Motor controllers, wall following...
-
+Motor controller, wall follower, executor, xbox...
 ##sensors
-Distance sensors, current pose...
-
+IR distance sensors, pose...
+##mapping
+Occupancy grid and object mapper.
+##navigation
+Pathfinder and path follower.
 ##vision
 Object detection and recognition.
-###image_publisher
-Publishes the image stream from an attached camera on /camera/rgb/image_raw (same as the primesense). Run it with
-
-```bash
-rosrun image_publisher image_publisher_node $0
-```
-
-where `$0` is an integer defining which camera to use (try values from 0 and up).
