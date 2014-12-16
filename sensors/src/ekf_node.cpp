@@ -58,7 +58,7 @@ namespace wheatley
         Eigen::Vector3f prev_mu; //[3X1]
         Eigen::Matrix3f prev_sigma;//[3X3]
         Eigen::Matrix3f R;//[3X3]
-        double lambda,Q,threshold;
+        double lambda,Q,threshold, SHORT_DIS_LIM,  LONG_DIS_LIM;
         int static_update_lim;
 
     public:
@@ -121,17 +121,20 @@ namespace wheatley
             //measurement noise
             threshold    = requireParameter<double>("threshold");
 
+            //max distance acetable for considere sensor reading and simulation valid
+            SHORT_DIS_LIM    = requireParameter<double>("SHORT_DIS_LIM");
+            LONG_DIS_LIM    = requireParameter<double>("LONG_DIS_LIM");
+
+
         }
 
         void callback_map(const nm::OccupancyGrid::ConstPtr& msg)
         {
             map = *msg;          
-             ROS_INFO_STREAM("call back map");
         }
 
         void callback_ir(const sensors::Distance::ConstPtr &realIR)
         {
-             ROS_INFO_STREAM("calbak ir1");
             if (!tfl.waitForTransform(fixed_frame, robot_frame, realIR->header.stamp, ros::Duration(0.2)))
             {
                 ROS_ERROR_STREAM("timeout waiting for transform from "<<robot_frame<<" to "<<fixed_frame);
@@ -151,12 +154,14 @@ namespace wheatley
 
             prev_pose = pose;
             first_pose_callback = false;           
-             ROS_INFO_STREAM("call back ir final");
         }
 
         void calc_ekf(const sensors::Distance& real, const sensors::Distance& simulated, const gm::Pose& pose, const gm::Pose& prev_pose)
         {
             ros::Time now = ros::Time::now();
+
+            //do not ekf if the robot is static
+            int static static_update=0;
 
             //get the Ut
             double     u_x = pose.position.x-prev_pose.position.x;
@@ -167,46 +172,31 @@ namespace wheatley
             std::cout << "u_y: "    << std::abs(u_y)     << std::endl;
             std::cout << "u_theta: "<< std::abs(u_theta) << std::endl;
 
-            //do not ekf if the robot is static
-            int static static_update=0;
+            bool odometryUpdateTrue = std::abs(u_x)>threshold || std::abs(u_y)>threshold || std::abs(u_theta)>threshold;
 
             std::cout << "static_update: "<< static_update<< std::endl;
+
             std::cout << "threshold: "<<threshold << std::endl;
 
-            if (std::abs(u_x)<threshold && std::abs(u_y)<threshold && std::abs(u_theta)<threshold)
+            if (!odometryUpdateTrue)
             {
                 static_update++;
             }
+            else
+            {
+                static_update=0;
+            }
 
-            if (std::abs(u_x)>threshold || std::abs(u_y)>threshold || std::abs(u_theta)>threshold)
-            {static_update=0;}
 
-            if (1|| std::abs(u_x)>threshold || std::abs(u_y)>threshold || std::abs(u_theta)>threshold || static_update<static_update_lim ){
+            //sensors::Distance simulated = simulateIrDistances(pose, realIR->header.stamp);
+            //pub_sim_ir.publish(simulated);
 
-
-                std::cout<<"real.front     "<< real.front <<std::endl;
-                std::cout<<"simulated.front"<< simulated.front <<std::endl;
-
-                std::cout<<"real.left_front     "<< real.left_front <<std::endl;
-                std::cout<<"simulated.left_front"<< simulated.left_front <<std::endl;
-
-                std::cout<<"real.right_front     "<< real.right_front <<std::endl;
-                std::cout<<"simulated.right_front"<< simulated.right_front <<std::endl;
-
-                std::cout<<"real.rear     "<< real.rear <<std::endl;
-                std::cout<<"simulated.rear"<< simulated.rear <<std::endl;
-
-                std::cout<<"real.left_rear     "<< real.left_rear <<std::endl;
-                std::cout<<"simulated.left_rear"<< simulated.left_rear <<std::endl;
-
-                std::cout<<"real.right_rear     "<< real.right_rear <<std::endl;
-                std::cout<<"simulated.right_rear"<< simulated.right_rear <<std::endl;
-
+            if (static_update<static_update_lim ){
 
                     int NUM_MEASUREMENTS=6;
 
                     //initialize matrix and vectors
-                    Eigen::VectorXd inliers(NUM_MEASUREMENTS);//[6X1]
+                    Eigen::VectorXd inliers(NUM_MEASUREMENTS), outlier(NUM_MEASUREMENTS);//[6X1]
                     Eigen::VectorXf nu_buffer(NUM_MEASUREMENTS);//[6X1]
                     Eigen::MatrixXf H_buffer(NUM_MEASUREMENTS,3) ;//[6X3]
                     Eigen::Matrix3f sigma,sigma_hat,G;//[3X3]
@@ -226,41 +216,108 @@ namespace wheatley
                      std::cout<<"G \n"<< G <<std::endl;
 
                     //predicted sigma (covarianze matrix)
-                    sigma_hat=G*prev_sigma*G.transpose()+R;
+                    if (odometryUpdateTrue)
+                        sigma_hat=G*prev_sigma*G.transpose()+R;
+                    else
+                        sigma_hat=prev_sigma;
 
-                    std::cout<<"Sigma_hat \n"<< sigma_hat <<std::endl;
 
                     //jacobian and nu for all the measuremts.
+
+
+
                     //data association is implicit in simulated (measuremt model)
+                    std::cout<<"\nreal.front     "<< real.front <<std::endl;
+                    std::cout<<"simulated.front"<< simulated.front <<std::endl;
+
                     H_buffer(0,0)=real.front*cos(theta)/simulated.front;
                     H_buffer(0,1)=real.front*sin(theta)/simulated.front;
                     H_buffer(0,2)=0;
                     nu_buffer(0)=real.front-simulated.front;
+                    if (0<=real.front && real.front<= LONG_DIS_LIM && 0<=simulated.front && simulated.front<= LONG_DIS_LIM)
+                        outlier(0)=0;
+                    else {
+                        outlier(0)=1;
+                        std::cout<<"outlier" <<std::endl;
+                    }
+
+
+
+                    std::cout<<"\nreal.rear     "<< real.rear <<std::endl;
+                    std::cout<<"simulated.rear"<< simulated.rear <<std::endl;
 
                     H_buffer(1,0)=real.rear*cos(theta)/simulated.rear;
                     H_buffer(1,1)=real.rear*sin(theta)/simulated.rear;
                     H_buffer(1,2)=0;
                     nu_buffer(1)=real.rear-simulated.rear;
+                    if (0<=real.rear && real.rear<= LONG_DIS_LIM && 0<=simulated.rear && simulated.rear<= LONG_DIS_LIM)
+                        outlier(1)=1;//always outlier, until sensor is replaced
+                    else
+                    {
+                        outlier(1)=1;
+                        std::cout<<"outlier" <<std::endl;
+                    }
+
+                    std::cout<<"\nreal.left_front     "<< real.left_front <<std::endl;
+                    std::cout<<"simulated.left_front"<< simulated.left_front <<std::endl;
 
                     H_buffer(2,0)=real.left_front*cos(theta)/simulated.left_front;
                     H_buffer(2,1)=real.left_front*sin(theta)/simulated.left_front;
                     H_buffer(2,2)=0;
                     nu_buffer(2)=real.left_front-simulated.left_front;
+                    if (0<=real.left_front && real.left_front<= SHORT_DIS_LIM && 0<=simulated.left_front && simulated.left_front<= SHORT_DIS_LIM)
+                        outlier(2)=0;
+                    else
+                    {
+                        outlier(2)=1;
+                        std::cout<<"outlier" <<std::endl;
+                    }
+
+                    std::cout<<"\nreal.left_rear     "<< real.left_rear <<std::endl;
+                    std::cout<<"simulated.left_rear"<< simulated.left_rear <<std::endl;
 
                     H_buffer(3,0)=real.left_rear*cos(theta)/simulated.left_rear;
                     H_buffer(3,1)=real.left_rear*sin(theta)/simulated.left_rear;
                     H_buffer(3,2)=0;
                     nu_buffer(3)=real.left_rear-simulated.left_rear;
+                    if (0<=real.left_rear && real.left_rear<= SHORT_DIS_LIM && 0<=simulated.left_rear && simulated.left_rear<= SHORT_DIS_LIM)
+                        outlier(3)=0;
+                    else
+                    {
+                        outlier(3)=1;
+                        std::cout<<"outlier" <<std::endl;
+                    }
+
+
+                    std::cout<<"\nreal.right_front     "<< real.right_front <<std::endl;
+                    std::cout<<"simulated.right_front"<< simulated.right_front <<std::endl;
 
                     H_buffer(4,0)=real.right_front*cos(theta)/simulated.right_front;
                     H_buffer(4,1)=real.right_front*sin(theta)/simulated.right_front;
                     H_buffer(4,2)=0;
                     nu_buffer(4)=real.right_front-simulated.right_front;
+                    if (0<=real.right_front && real.right_front<= SHORT_DIS_LIM && 0<=simulated.right_front && simulated.right_front<= SHORT_DIS_LIM)
+                        outlier(4)=0;
+                    else
+                    {
+                        outlier(4)=1;
+                        std::cout<<"outlier" <<std::endl;
+                    }
+
+                    std::cout<<"\nreal.right_rear     "<< real.right_rear <<std::endl;
+                    std::cout<<"simulated.right_rear"<< simulated.right_rear <<std::endl;
 
                     H_buffer(5,0)=real.right_rear*cos(theta)/simulated.right_rear;
                     H_buffer(5,1)=real.right_rear*sin(theta)/simulated.right_rear;
                     H_buffer(5,2)=0;
                     nu_buffer(5)=real.right_rear-simulated.right_rear;
+                    if (0<=real.right_rear && real.right_rear<= SHORT_DIS_LIM && 0<=simulated.right_rear && simulated.right_rear<= SHORT_DIS_LIM)
+                        outlier(5)=0;
+                    else
+                    {
+                        outlier(5)=1;
+                        std::cout<<"outlier" <<std::endl;
+                    }
 
                     //detect outliers
                     int num_inliers=0;
@@ -270,14 +327,17 @@ namespace wheatley
                          hi<< H_buffer(i,0), H_buffer(i,1), H_buffer(i,2);
                          S=hi*sigma_hat*hi.transpose()+Q;
                          D=nu_buffer(i)*nu_buffer(i)/S;
-                         if (D>=lambda)
+                         if (D>=lambda ||  outlier(i))
+                         {
+                            inliers(i)=0;
+                         }
+                         else
                          {
                             inliers(i)=1;
                             num_inliers++;
-                            std::cout<<"inlier " <<std::endl;
+                            std::cout<<"**************************inlier num = "<< i <<std::endl;
+                            std::cout<<"nu("<<i <<") = "<< nu_buffer(i) <<std::endl;
                          }
-                         else
-                            inliers(i)=0;
                     }
 
                     //compute the H and nu for inliers.
@@ -318,13 +378,16 @@ namespace wheatley
 
                    //update sigma
                    sigma=(I-K*H_hat)*sigma_hat;
-                   std::cout<<"update:                                             "<<update.transpose() <<std::endl;
                    //store sigma for the next iteration
                    prev_sigma=sigma;
 
-                   prev_mu=mu_hat;
+                   // debug  lines
+                   //prev_mu=mu_hat; //remove this line
+                   std::cout<<" sigma:   \n"<<    sigma <<std::endl;
+                   std::cout<<"     H:       "<<    H_hat <<std::endl;
+                   std::cout<<"    nu:       "<<    nu <<std::endl;
+                   std::cout<<"update:    "<<update.transpose() <<std::endl;
             }// end ekf
-            else static_update++;
 
            //poblish mu
            publish_pose_ekf(now, prev_mu(0,0), prev_mu(1,0), prev_mu(2,0));
@@ -333,7 +396,6 @@ namespace wheatley
 
         void publish_pose_ekf(ros::Time now,double x,double y,double theta)
     {
-         ROS_INFO_STREAM("publish ekf pose");
         //publish "robot" transform
         tf::Transform transform;
         transform.setOrigin(tf::Vector3(x, y, 0));
@@ -410,299 +472,3 @@ int main (int argc, char **argv)
     wheatley::KalmanNode ekf_node;
     ekf_node.run();
 }
-
-/*
-    if(1)
-    {
-        int dim=5;
-        Eigen::MatrixXf I(dim,dim);
-        I = 1.3 * Eigen::MatrixXf::Identity(dim,dim);
-        ROS_INFO_STREAM("I*13= \n" << I);
-    }
-
-    if(1){
-        Eigen::VectorXf diff(6);
-        Eigen::VectorXd inliers(6);
-        diff<<1,2,3,4,5,6;
-        ROS_INFO_STREAM("diff = \n" << diff);
-        ROS_INFO_STREAM("diff(5) = " << diff(5));
-
-
-        Eigen::MatrixXf H_buffer1(6,3) ;//[6X3]
-        double x,y;
-        x=1;
-        y=11;
-        for (int hhh=0;hhh<6;hhh++){
-            H_buffer1(hhh,0)=x*hhh;
-            H_buffer1(hhh,1)=y*hhh;
-            H_buffer1(hhh,2)=0;
-        }
-
-        ROS_INFO_STREAM("H_buffer1 = \n" << H_buffer1);
-        ROS_INFO_STREAM("H_buffe(5,2) = " << H_buffer1(5,1));
-
-        double num_inliers=0;
-        for (int hhh=0;hhh<6;hhh++){
-            H_buffer1(hhh,0)=x*hhh;
-            H_buffer1(hhh,1)=y*hhh;
-            H_buffer1(hhh,2)=0;
-        }
-
-
-        int result;
-        for (int o=0;o<6;o++){
-
-            ROS_INFO_STREAM("diff(5) = " << diff(o));
-            result=diff(o);
-            if (result%2)
-                inliers(o)=0;
-            else
-            {
-                inliers(o)=1;
-                num_inliers++;
-            }
-
-        }
-        ROS_INFO_STREAM("inliers = \n" << inliers);
-        Eigen::VectorXf nu(num_inliers);
-        Eigen::MatrixXf H_hat(num_inliers,3);
-        int oo=0;
-        for ( int o=0;o<6;o++)
-        {
-            if(inliers(o))
-            {
-                nu(oo)=diff(o);
-                H_hat(oo,0)=H_buffer1(o,0);
-                H_hat(oo,1)=H_buffer1(o,1);
-                H_hat(oo,2)=H_buffer1(o,2);
-                oo++;
-            }
-        }
-        ROS_INFO_STREAM("H_hat = \n" << H_hat);
-        ROS_INFO_STREAM("nu = \n" << nu);
-
-        Eigen::Vector3f pose1,h1t;//[3x1]
-        pose1=H_hat*nu;
-        ROS_INFO_STREAM("pose = \n" << pose1);
-
-        Eigen::RowVector3f h1; //[1x3]
-        h1<< H_buffer1(4,0), H_buffer1(4,1), H_buffer1(4,2);
-        ROS_INFO_STREAM("h1 = " << h1);
-
-        double Q1; //5 cm
-        //double lambda; //chi2inv(0.8,1);
-        Eigen::Matrix3f R1;//[3X3]
-
-        Q1=0.05; //5 cm
-        //lambda=1.0742; //chi2inv(0.8,1);
-
-        R1 << 0.05,    0, 0,
-                0, 0.05, 0,
-                0,    0, 0.01;//[3X3]
-
-        //h1t=h1.transpose();
-
-        double pose2=h1*R1*h1.transpose()+Q1;
-
-        ROS_INFO_STREAM("result = " << pose2);
-
-
-    }
-
-    if (0){
-    Eigen::Matrix3d sigma,G,R,I,k,u;//[3X3]
-    Eigen::Vector3d mu,a,u1,u2,u3,u4;//[3X1]
-    Eigen::RowVector3d H,b,c,i,d;//[1X3]
-
-    int j=4;
-    Eigen::MatrixXd n(3,j) ;//[3Xj]
-    Eigen::MatrixXd n_t(j,3) ;//[jX3]
-
-    R(0,0)=1;
-    R(0,1)=0;
-    R(0,2)=0;
-    R(1,0)=0;
-    R(1,1)=2;
-    R(1,2)=0;
-    R(2,0)=0;
-    R(2,1)=0;
-    R(2,2)=3;
-
-    I(0,0)=1;
-    I(0,1)=0;
-    I(0,2)=0;
-    I(1,0)=0;
-    I(1,1)=1;
-    I(1,2)=0;
-    I(2,0)=0;
-    I(2,1)=0;
-    I(2,2)=1;
-
-    H(0,0)=1;
-    H(0,1)=2;
-    H(0,2)=3;
-
-    i(0,0)=1;
-    i(0,1)=1;
-    i(0,2)=1;
-
-    mu(0,0)=10;
-    mu(1,0)=20;
-    mu(2,0)=30;
-
-    u1<<1,2,3;
-    u2<<11,22,33;
-    u3<<111,222,333;
-    u4<<1111,2222,3333;
-
-    n << u1,u2,u3,u4;
-    n_t=n.transpose();
-
-    //////////////////////////////
-
-    G=R*R;
-    b=H*R;//[1X3]=(1X3)(3X1)
-    a=R*mu; //[3X1]=[3x3][3x1]
-
-    double num =H*mu; //[1x1]=[1x3][3x1]
-
-    c=H+(10*i);//sum a constant to a vector
-
-    d=mu.transpose();
-    sigma=R.inverse();
-
-     k <<1,2,3,4,5,6,7,8,9;
-
-    ROS_INFO("hola %f",G(0,0));
-    ROS_INFO("hola %f",G(2,2));
-    ROS_INFO("hola %f",b(0,0));
-    ROS_INFO("hola %f",b(0,1));
-    ROS_INFO("hola %f",b(0,2));
-    ROS_INFO("hola %f",a(0,0));
-    ROS_INFO("hola %f",a(1,0));
-    ROS_INFO("hola %f",a(2,0));
-    ROS_INFO("hola %f",num);
-    ROS_INFO("hola %f",c(0,0));
-    ROS_INFO("hola %f",c(0,1));
-    ROS_INFO("hola %f",c(0,2));
-    ROS_INFO("hola %f",d(0,0));
-    ROS_INFO("hola %f",d(0,1));
-    ROS_INFO("hola %f",d(0,2));
-    ROS_INFO("hola %f",sigma(0,0));
-    ROS_INFO("hola %f",sigma(1,1));
-    ROS_INFO("hola %f",sigma(2,2));
-    ROS_INFO("hola %f",k(0,0));
-    ROS_INFO("hola %f",k(1,1));
-    ROS_INFO("hola %f",k(2,2));
-
-    ROS_INFO("hola %f",u1(0,0));
-    ROS_INFO("hola %f",u1(1,0));
-    ROS_INFO("hola %f",u1(2,0));
-    ROS_INFO("hola %f",u2(0,0));
-    ROS_INFO("hola %f",u2(1,0));
-    ROS_INFO("hola %f",u2(2,0));
-    ROS_INFO("hola %f",u3(0,0));
-    ROS_INFO("hola %f",u3(1,0));
-    ROS_INFO("hola %f",u3(2,0));
-    ROS_INFO("hola %f",u4(0,0));
-    ROS_INFO("hola %f",u4(1,0));
-    ROS_INFO("hola %f",u4(2,0));
-
-//    ROS_INFO("\nhola %f",u(0,1));
-//    ROS_INFO("hola %f",u(0,2));
-//    ROS_INFO("hola %f",u(0,0));
-
-    ROS_INFO_STREAM("n = " << n);
-
-    ROS_INFO_STREAM("n.transpose() = \n" << n_t);
-    ROS_INFO_STREAM("n.transpose() = \n" << n_t(1,1));
-
-
-    }
-
-        Eigen::VectorXf diff(6);
-*/
-
-/*
-MAX_RANGE_LONG_DISTANCE_SENSOR=0.60;
-MAX_RANGE_SHORT_DISTANCE_SENSOR=0.20;
-ROBOT_SENSORS_GAP_DISTANCE=0.17;
-
-double angle_left, angle_right, angle;
-
-//pending if difference >10 , disregard
-
-if (distance.right_front < MAX_RANGE_SHORT_DISTANCE_SENSOR  && distance.right_rear < MAX_RANGE_SHORT_DISTANCE_SENSOR)
-{
-    angle_right=atan((distance.right_front-distance.right_rear)/ROBOT_SENSORS_GAP_DISTANCE);
-}
-else
-{
-    angle_right=0;
-}
-
-if (distance.left_front < MAX_RANGE_SHORT_DISTANCE_SENSOR  && distance.left_rear < MAX_RANGE_SHORT_DISTANCE_SENSOR)
-{
-    angle_left=-1*atan((distance.left_front-distance.left_rear)/ROBOT_SENSORS_GAP_DISTANCE);
-}
-else
-{
-    angle_left=0;
-}
-
-
-if(angle_right!=0)
-{
-    angle=angle_right;
-    if (angle_left!=0)
-    {
-        angle=(angle_right+angle_left)/2;
-    }
-}
-else if (angle_left!=0)
-    angle=angle_left;
-
-ROS_INFO_STREAM("angle= " <<angle);
-ROS_INFO("theta= [%f]",theta);
-ROS_INFO_STREAM("**********diff= " <<theta-angle);
-
-if(0)
-{
-    string answer;
-
-    gm::Pose forward_pose;
-    forward_distance=robot_outer_diameter;
-    forward_pose.position.x = pose.position.x+cos(theta)*(forward_distance+robot_outer_diameter)/2;
-    forward_pose.position.y = pose.position.y+sin(theta)*(forward_distance+robot_outer_diameter)/2;
-    /// return UNOCCUPIED if all the cells in the square centered at this point with side 2*r contains no obstacles
-    /// return OCCUPIED if at least one cell is occupied.
-    /// retrun unkown other wise.
-    /// ///UNOCCUPIED=0; OCCUPIED=100; UNKNOWN=255; ERROR=33;
-    int a = gu::IsWindowFree(&map_oc, forward_pose.position, forward_distance/2);
-    switch (a){
-        case 0:
-           answer="unoccupied";
-            break;
-        case 100:
-            answer="*********occupied";
-            break;
-        case 255:
-            answer="***********unknown";
-            break;
-        case 33:
-            answer="**************ERRROR";
-            break;
-    }
-
-    ROS_INFO_STREAM("dermineOccupancy = " << answer);
-
-    // gu::determineOccupancy (map_oc.hit_counts, map_oc.pass_through_counts,map_oc.occupancy_threshold,map_oc.min_pass_through);
-    // if (answer)
-    //    ROS_INFO("free");
-    //else
-    //  ROS_INFO("******************occupied*********************");
-
-    //void addKnownFreePoint (OverlayClouds* overlay, const gm::Point& p, const double r)
-    //void addKnownOccupiedPoint (OverlayClouds* overlay, const gm::Point& p, const double r)
-    //bool IsWindowFree (OverlayClouds* overlay, const gm::Point& p, const double r)
-}*/
