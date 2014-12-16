@@ -20,7 +20,8 @@ wstool update
 
 git clone https://github.com/KTH-RAS-4/wheatley.git
 cd ~/catkin_ws
-catkin_make vision_msgs_generate_messages sensors_generate_messages ras_msgs_generate_messages all
+catkin_make executor_generate_messages occupancy_grid_utils_generate_messages ras_arduino_msgs_generate_messages ras_msgs_generate_messages sensors_generate_messages sound_play_generate_messages vision_msgs_generate_messages
+catkin_make all
 ```
 
 Running the robot can then be done with the following commands; in separate terminals.
