@@ -178,18 +178,8 @@ namespace wheatley
 
             std::cout << "threshold: "<<threshold << std::endl;
 
-            if (!odometryUpdateTrue)
-            {
-                static_update++;
-            }
-            else
-            {
-                static_update=0;
-            }
-
-
-            //sensors::Distance simulated = simulateIrDistances(pose, realIR->header.stamp);
-            //pub_sim_ir.publish(simulated);
+            if (!odometryUpdateTrue)  {  static_update++;  }
+            else                      {  static_update=0;  }
 
             if (static_update<static_update_lim ){
 
@@ -208,6 +198,14 @@ namespace wheatley
                     mu_hat(2,0)=prev_mu(2,0)+u_theta;
                     double theta = mu_hat(2,0);
 
+                    gm::Pose pose_hat=pose;
+                    pose_hat.position.x=mu_hat(0,0);
+                    pose_hat.position.y=mu_hat(1,0);
+                    //pose_hat.orientation=mu_hat(2,0);
+                    sensors::Distance simulated2 = simulateIrDistances(pose_hat, now);
+                    //pub_sim_ir.publish(simulated);
+
+
                     //jacobian
                     G<< 1,0,-u_y,
                         0,1, u_x,
@@ -222,10 +220,12 @@ namespace wheatley
                         sigma_hat=prev_sigma;
 
 
+                    //measurement model
+                    //nav_msgs::Odometry pose_hat;
+                    //pose_hat=get_pose_ekf(now, mu_hat(0,0), mu_hat(1,0), mu_hat(2,0));
+                    sensors::Distance simulated3 = simulateIrDistances(pose, now);
+
                     //jacobian and nu for all the measuremts.
-
-
-
                     //data association is implicit in simulated (measuremt model)
                     std::cout<<"\nreal.front     "<< real.front <<std::endl;
                     std::cout<<"simulated.front"<< simulated.front <<std::endl;
@@ -389,12 +389,14 @@ namespace wheatley
                    std::cout<<"update:    "<<update.transpose() <<std::endl;
             }// end ekf
 
-           //poblish mu
-           publish_pose_ekf(now, prev_mu(0,0), prev_mu(1,0), prev_mu(2,0));
+           //publish mu
+           nav_msgs::Odometry pose_ekf;
+           pose_ekf=get_pose_ekf(now, prev_mu(0,0), prev_mu(1,0), prev_mu(2,0));
+           pub_pose_ekf.publish(pose_ekf);
            std::cout<<"                                                       mu:       "<<    prev_mu.transpose() <<std::endl;
         }// end function calc_ekf
 
-        void publish_pose_ekf(ros::Time now,double x,double y,double theta)
+        nav_msgs::Odometry get_pose_ekf(ros::Time now,double x,double y,double theta)
     {
         //publish "robot" transform
         tf::Transform transform;
@@ -418,6 +420,7 @@ namespace wheatley
         pose.pose.pose.orientation.z = q.z();
         pose.pose.pose.orientation.w = q.w();
         pub_pose_ekf.publish(pose);
+        return pose;
     }
 
         sensors::Distance simulateIrDistances(const gm::Pose& pose, const ros::Time& stamp)
