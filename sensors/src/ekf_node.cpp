@@ -80,12 +80,13 @@ namespace wheatley
 
             sub_map = nh.subscribe("map_in", 1, &KalmanNode::callback_map, this);
             sub_ir = nh.subscribe("/sensors/ir/distances", 1, &KalmanNode::callback_ir, this);
-            pub_sim_ir = nh.advertise<sensors::Distance>("simulated_ir_distances", 1);
+            pub_sim_ir = nh.advertise<sensors::Distance>("/simulated_ir_distances", 1);
             pub_pose_ekf = nh.advertise<nav_msgs::Odometry> ("pose_ekf", 1);
 
             loadParameters();
 
         }
+
         void loadParameters()
         {           
             double r1     = requireParameter<double>("r1");
@@ -144,7 +145,7 @@ namespace wheatley
 
             gm::Pose pose = getPose(tfl, realIR->header.stamp, robot_frame, fixed_frame);
             sensors::Distance simulatedIR = simulateIrDistances(pose, realIR->header.stamp);
-            pub_sim_ir.publish(simulatedIR);
+            //pub_sim_ir.publish(simulatedIR);
 
             static bool first_pose_callback = true;
             static gm::Pose prev_pose;
@@ -156,11 +157,11 @@ namespace wheatley
             first_pose_callback = false;           
         }
 
-        void calc_ekf(const sensors::Distance& real, const sensors::Distance& simulated, const gm::Pose& pose, const gm::Pose& prev_pose)
+        void calc_ekf(const sensors::Distance& real, const sensors::Distance& simulated3, const gm::Pose& pose, const gm::Pose& prev_pose)
         {
             ros::Time now = ros::Time::now();
 
-            //do not ekf if the robot is static
+            //do not ekf more thant if static_update_lim times when the robot is static
             int static static_update=0;
 
             //get the Ut
@@ -177,6 +178,7 @@ namespace wheatley
             std::cout << "static_update: "<< static_update<< std::endl;
 
             std::cout << "threshold: "<<threshold << std::endl;
+
 
             if (!odometryUpdateTrue)  {  static_update++;  }
             else                      {  static_update=0;  }
@@ -198,14 +200,6 @@ namespace wheatley
                     mu_hat(2,0)=prev_mu(2,0)+u_theta;
                     double theta = mu_hat(2,0);
 
-                    gm::Pose pose_hat=pose;
-                    pose_hat.position.x=mu_hat(0,0);
-                    pose_hat.position.y=mu_hat(1,0);
-                    //pose_hat.orientation=mu_hat(2,0);
-                    sensors::Distance simulated2 = simulateIrDistances(pose_hat, now);
-                    //pub_sim_ir.publish(simulated);
-
-
                     //jacobian
                     G<< 1,0,-u_y,
                         0,1, u_x,
@@ -220,18 +214,43 @@ namespace wheatley
                         sigma_hat=prev_sigma;
 
 
-                    //measurement model
-                    //nav_msgs::Odometry pose_hat;
-                    //pose_hat=get_pose_ekf(now, mu_hat(0,0), mu_hat(1,0), mu_hat(2,0));
-                    sensors::Distance simulated3 = simulateIrDistances(pose, now);
 
-                    //jacobian and nu for all the measuremts.
-                    //data association is implicit in simulated (measuremt model)
+                    gm::Pose pose_hat=pose;
+                    pose_hat.position.x=mu_hat(0,0);
+                    pose_hat.position.y=mu_hat(1,0);
+                    pose_hat.orientation.z=mu_hat(2,0);
+
+                    //nav_msgs::Odometry pose_ekf1 = get_pose_ekf(now,pose_hat.position.x,pose_hat.position.y,pose_hat.orientation.z  );
+                    //pub_pose_ekf.publish(pose_ekf1);
+
+                    //measurement model
+                    sensors::Distance simulated = simulateIrDistances(pose_hat, now);
+                    pub_sim_ir.publish(simulated);
+
                     std::cout<<"\nreal.front     "<< real.front <<std::endl;
                     std::cout<<"simulated.front"<< simulated.front <<std::endl;
 
-                    H_buffer(0,0)=real.front*cos(theta)/simulated.front;
-                    H_buffer(0,1)=real.front*sin(theta)/simulated.front;
+                    std::cout<<"\nreal.rear     "<< real.rear <<std::endl;
+                    std::cout<<"simulated.rear"<< simulated.rear <<std::endl;
+
+                    std::cout<<"\nreal.left_front     "<< real.left_front <<std::endl;
+                    std::cout<<"simulated.left_front"<< simulated.left_front <<std::endl;
+
+                    std::cout<<"\nreal.left_rear     "<< real.left_rear <<std::endl;
+                    std::cout<<"simulated.left_rear"<< simulated.left_rear <<std::endl;
+
+                    std::cout<<"\nreal.right_front     "<< real.right_front <<std::endl;
+                    std::cout<<"simulated.right_front"<< simulated.right_front <<std::endl;
+
+                    std::cout<<"\nreal.right_rear     "<< real.right_rear <<std::endl;
+                    std::cout<<"simulated.right_rear"<< simulated.right_rear <<std::endl;
+
+
+                    //jacobian and nu for all the measuremts.
+                    //data association is implicit in simulated (measuremt model)
+
+                    H_buffer(0,0)=simulated.front*cos(theta)/simulated.front;
+                    H_buffer(0,1)=simulated.front*sin(theta)/simulated.front;
                     H_buffer(0,2)=0;
                     nu_buffer(0)=real.front-simulated.front;
                     if (0<=real.front && real.front<= LONG_DIS_LIM && 0<=simulated.front && simulated.front<= LONG_DIS_LIM)
@@ -242,27 +261,22 @@ namespace wheatley
                     }
 
 
-
-                    std::cout<<"\nreal.rear     "<< real.rear <<std::endl;
-                    std::cout<<"simulated.rear"<< simulated.rear <<std::endl;
-
-                    H_buffer(1,0)=real.rear*cos(theta)/simulated.rear;
-                    H_buffer(1,1)=real.rear*sin(theta)/simulated.rear;
+                    H_buffer(1,0)=simulated.rear*cos(theta)/simulated.rear;
+                    H_buffer(1,1)=simulated.rear*sin(theta)/simulated.rear;
                     H_buffer(1,2)=0;
                     nu_buffer(1)=real.rear-simulated.rear;
                     if (0<=real.rear && real.rear<= LONG_DIS_LIM && 0<=simulated.rear && simulated.rear<= LONG_DIS_LIM)
-                        outlier(1)=1;//always outlier, until sensor is replaced
+                        outlier(1)=0;//always outlier, until sensor is replaced
                     else
                     {
                         outlier(1)=1;
                         std::cout<<"outlier" <<std::endl;
                     }
 
-                    std::cout<<"\nreal.left_front     "<< real.left_front <<std::endl;
-                    std::cout<<"simulated.left_front"<< simulated.left_front <<std::endl;
 
-                    H_buffer(2,0)=real.left_front*cos(theta)/simulated.left_front;
-                    H_buffer(2,1)=real.left_front*sin(theta)/simulated.left_front;
+
+                    H_buffer(2,0)=simulated.left_front*cos(theta)/simulated.left_front;
+                    H_buffer(2,1)=simulated.left_front*sin(theta)/simulated.left_front;
                     H_buffer(2,2)=0;
                     nu_buffer(2)=real.left_front-simulated.left_front;
                     if (0<=real.left_front && real.left_front<= SHORT_DIS_LIM && 0<=simulated.left_front && simulated.left_front<= SHORT_DIS_LIM)
@@ -273,11 +287,9 @@ namespace wheatley
                         std::cout<<"outlier" <<std::endl;
                     }
 
-                    std::cout<<"\nreal.left_rear     "<< real.left_rear <<std::endl;
-                    std::cout<<"simulated.left_rear"<< simulated.left_rear <<std::endl;
 
-                    H_buffer(3,0)=real.left_rear*cos(theta)/simulated.left_rear;
-                    H_buffer(3,1)=real.left_rear*sin(theta)/simulated.left_rear;
+                    H_buffer(3,0)=simulated.left_rear*cos(theta)/simulated.left_rear;
+                    H_buffer(3,1)=simulated.left_rear*sin(theta)/simulated.left_rear;
                     H_buffer(3,2)=0;
                     nu_buffer(3)=real.left_rear-simulated.left_rear;
                     if (0<=real.left_rear && real.left_rear<= SHORT_DIS_LIM && 0<=simulated.left_rear && simulated.left_rear<= SHORT_DIS_LIM)
@@ -289,11 +301,10 @@ namespace wheatley
                     }
 
 
-                    std::cout<<"\nreal.right_front     "<< real.right_front <<std::endl;
-                    std::cout<<"simulated.right_front"<< simulated.right_front <<std::endl;
 
-                    H_buffer(4,0)=real.right_front*cos(theta)/simulated.right_front;
-                    H_buffer(4,1)=real.right_front*sin(theta)/simulated.right_front;
+
+                    H_buffer(4,0)=simulated.right_front*cos(theta)/simulated.right_front;
+                    H_buffer(4,1)=simulated.right_front*sin(theta)/simulated.right_front;
                     H_buffer(4,2)=0;
                     nu_buffer(4)=real.right_front-simulated.right_front;
                     if (0<=real.right_front && real.right_front<= SHORT_DIS_LIM && 0<=simulated.right_front && simulated.right_front<= SHORT_DIS_LIM)
@@ -304,11 +315,10 @@ namespace wheatley
                         std::cout<<"outlier" <<std::endl;
                     }
 
-                    std::cout<<"\nreal.right_rear     "<< real.right_rear <<std::endl;
-                    std::cout<<"simulated.right_rear"<< simulated.right_rear <<std::endl;
 
-                    H_buffer(5,0)=real.right_rear*cos(theta)/simulated.right_rear;
-                    H_buffer(5,1)=real.right_rear*sin(theta)/simulated.right_rear;
+
+                    H_buffer(5,0)=simulated.right_rear*cos(theta)/simulated.right_rear;
+                    H_buffer(5,1)=simulated.right_rear*sin(theta)/simulated.right_rear;
                     H_buffer(5,2)=0;
                     nu_buffer(5)=real.right_rear-simulated.right_rear;
                     if (0<=real.right_rear && real.right_rear<= SHORT_DIS_LIM && 0<=simulated.right_rear && simulated.right_rear<= SHORT_DIS_LIM)
@@ -319,13 +329,14 @@ namespace wheatley
                         std::cout<<"outlier" <<std::endl;
                     }
 
+                    //Batch update
                     //detect outliers
                     int num_inliers=0;
-                    Eigen::RowVector3f hi; //[1x3]
+                    Eigen::RowVector3f h_i; //[1x3]
                     double S,D;
                     for(int i=0;i<NUM_MEASUREMENTS;i++){
-                         hi<< H_buffer(i,0), H_buffer(i,1), H_buffer(i,2);
-                         S=hi*sigma_hat*hi.transpose()+Q;
+                         h_i<< H_buffer(i,0), H_buffer(i,1), H_buffer(i,2);
+                         S=h_i*sigma_hat*h_i.transpose()+Q;
                          D=nu_buffer(i)*nu_buffer(i)/S;
                          if (D>=lambda ||  outlier(i))
                          {
@@ -339,6 +350,7 @@ namespace wheatley
                             std::cout<<"nu("<<i <<") = "<< nu_buffer(i) <<std::endl;
                          }
                     }
+
 
                     //compute the H and nu for inliers.
                     Eigen::VectorXf nu(num_inliers);
@@ -357,9 +369,6 @@ namespace wheatley
                     }
 
                    //compute K kalman gain
-                   Eigen::MatrixXf I(3,3);
-                   I = Eigen::MatrixXf::Identity(3,3);
-
                    Eigen::MatrixXf S_hat(num_inliers,num_inliers);
                    Eigen::MatrixXf Q_hat(num_inliers,num_inliers);
                    Q_hat = Q * Eigen::MatrixXf::Identity(num_inliers,num_inliers);
@@ -376,6 +385,8 @@ namespace wheatley
                    mu=mu_hat+update;
                    prev_mu=mu;//saving for next iteration
 
+                   Eigen::MatrixXf I(3,3);
+                   I = Eigen::MatrixXf::Identity(3,3);
                    //update sigma
                    sigma=(I-K*H_hat)*sigma_hat;
                    //store sigma for the next iteration
@@ -383,15 +394,14 @@ namespace wheatley
 
                    // debug  lines
                    //prev_mu=mu_hat; //remove this line
-                   std::cout<<" sigma:   \n"<<    sigma <<std::endl;
-                   std::cout<<"     H:       "<<    H_hat <<std::endl;
-                   std::cout<<"    nu:       "<<    nu <<std::endl;
+                   //std::cout<<" sigma:   \n"<<    sigma <<std::endl;
+                   //std::cout<<"     H:       \n"<<    H_hat <<std::endl;
+                   //std::cout<<"    nu:       \n"<<    nu <<std::endl;
                    std::cout<<"update:    "<<update.transpose() <<std::endl;
             }// end ekf
 
            //publish mu
-           nav_msgs::Odometry pose_ekf;
-           pose_ekf=get_pose_ekf(now, prev_mu(0,0), prev_mu(1,0), prev_mu(2,0));
+           nav_msgs::Odometry pose_ekf = get_pose_ekf(now, prev_mu(0,0), prev_mu(1,0), prev_mu(2,0));
            pub_pose_ekf.publish(pose_ekf);
            std::cout<<"                                                       mu:       "<<    prev_mu.transpose() <<std::endl;
         }// end function calc_ekf
@@ -419,7 +429,6 @@ namespace wheatley
         pose.pose.pose.orientation.y = q.y();
         pose.pose.pose.orientation.z = q.z();
         pose.pose.pose.orientation.w = q.w();
-        pub_pose_ekf.publish(pose);
         return pose;
     }
 

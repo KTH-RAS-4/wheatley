@@ -3,7 +3,7 @@
 		name="ekf" output="screen" clear_params="true" ns="sensors">
 		<rosparam command="load" file="$(find sensors)/config/ekf_settings.yaml"/>
 		<remap from="~/map_in" to="/map"/>
-		<remap from="~/simulated_ir_distances" to="~/distances"/>
+		<remap from="~/simulated_ir_distances" to="~/sim_ir_distances"/>
 	</node>
 </launch>
 

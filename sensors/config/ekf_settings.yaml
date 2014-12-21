@@ -1,4 +1,4 @@
-Q:      0.052
+Q:      0.082
 lambda: 1.0742
 r1:     0.05
 r2:     0.05
@@ -7,6 +7,6 @@ mu1:    0.00
 mu2:    0.00
 mu3:    0.00
 threshold: 0.0001
-static_update_lim: 1000
+static_update_lim: 500
 SHORT_DIS_LIM: 0.20
 LONG_DIS_LIM: 0.40
